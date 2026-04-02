@@ -1147,7 +1147,7 @@ function addMessage(role, content, showTicket, video) {
     t = t.replace(/[*][*]([^*]+)[*][*]/g, "<strong>$1</strong>");
     t = t.replace(new RegExp("https?://\\S+", "g"), function(url) {
       url = url.replace(/[.,;:!?)]+$/, "");
-      return "<a href=" + url + " target=_blank rel=noopener style=\"color:var(--orange);font-weight:600;text-decoration:underline\">" + url + "</a>";
+      return "<a href=" + url + " target=_blank rel=noopener class=link-pill style=margin:0>" + url + "</a>";
     });
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
