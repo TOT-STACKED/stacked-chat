@@ -1144,7 +1144,7 @@ function addMessage(role, content, showTicket, video) {
   if (role === 'assistant') {
     let t = content.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2');
     t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    t = t.replace(/\\*\\*([^*]+)\\*\\*/g,'<strong>$1</strong>');
+    t = t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
     t = t.replace(/(https?:\/\/[^\s<&"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;">$1</a>');
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
