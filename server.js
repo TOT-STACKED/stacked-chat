@@ -946,9 +946,9 @@ function renderScStep() {
     '<div class="sc-step">' +
     '<div class="sc-step-label"><span class="sc-emoji">' + step.emoji + '</span>' + step.label + '</div>' +
     '<div class="sc-options">' +
-    '<button class="sc-opt" data-val="green" onclick="scAnswer('green')">✅ All good</button>' +
-    '<button class="sc-opt" data-val="amber" onclick="scAnswer('amber')">⚠️ Slow / issue</button>' +
-    '<button class="sc-opt" data-val="red" onclick="scAnswer('red')">🔴 Down</button>' +
+    '<button class="sc-opt" data-val="green" data-action="scAnswer">✅ All good</button>' +
+    '<button class="sc-opt" data-val="amber" data-action="scAnswer">⚠️ Slow / issue</button>' +
+    '<button class="sc-opt" data-val="red" data-action="scAnswer">🔴 Down</button>' +
     '</div></div>';
 
   // Highlight previously selected if user goes back (not implemented but defensive)
@@ -976,6 +976,12 @@ function scAnswer(val) {
     renderScStep();
   }, 280);
 }
+// Event delegation for shift check option buttons
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action="scAnswer"]');
+  if (btn) scAnswer(btn.dataset.val);
+});
+
 
 function renderScSummary() {
   const title = document.getElementById('scDrawerTitle');
