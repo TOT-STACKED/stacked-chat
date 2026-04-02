@@ -1145,13 +1145,13 @@ function addMessage(role, content, showTicket, video) {
     let t = content;
     t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     t = t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-    var urlRe = new RegExp('https?://[^\\s<&"]+', 'g');
+    var urlRe = new RegExp("https?://[^\\s<&\"]+", "g");
     t = t.replace(urlRe, function(u){return '<a href="' + u + '" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline">' + u + '</a>';});
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
   if (role === 'assistant') {
-    var urlRegex = new RegExp('https?://[^\\s)>\\]"]+', 'g');
+    var urlRegex = new RegExp("https?://[^\\s)>\\]\"]+", "g");
     const links = [...new Set(content.match(urlRegex) || [])].slice(0, 4);
     if (links.length) {
       const map = {'squareup.com':'📦 Square help','sumup.com':'💳 SumUp help','zettle.com':'💳 Zettle help','worldpay.com':'💳 Worldpay help','stripe.com':'💳 Stripe help','lightspeedhq.com':'🖥 Lightspeed help','tevalis.com':'🖥 Tevalis help','eposnow.com':'🖥 EPOS Now help','vitamojo.com':'🍽 Vita Mojo help','opentable.com':'📅 OpenTable help','resdiary.com':'📅 ResDiary help','sevenrooms.com':'📅 SevenRooms help','deputy.com':'📅 Deputy help','deliverect.com':'📦 Deliverect help','nory.ai':'🤖 Nory help','tenzo.io':'📊 Tenzo help'};
