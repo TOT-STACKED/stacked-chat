@@ -1163,7 +1163,7 @@ function addMessage(role, content, showTicket, video) {
   }
   if (role === 'assistant' && showTicket) {
     const tr = document.createElement('div'); tr.className = 'ticket-row';
-    tr.innerHTML = '<button class="ticket-btn" onclick="openTicket()">🎫 This didn\'t solve my issue \— raise a ticket</button>';
+    tr.innerHTML = '<button class="ticket-btn" onclick="openTicket()">🎫 This didn&#39;t solve my issue — raise a ticket</button>';
     msgs.appendChild(tr);
   }
   if (role === 'assistant' && video) {
@@ -1259,7 +1259,7 @@ async function submitTicket() {
       body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? '\n\nExtra detail: ' + note : ''), conversation: messages, status: 'open' })
     });
     closeTicket();
-    showToast('\✓ Ticket raised \— we\'ll be in touch!', 'green');
+    showToast("✓ Ticket raised — we'll be in touch!", "green");
   } catch(e) { closeTicket(); showToast('Something went wrong, please try again.'); }
 }
 
