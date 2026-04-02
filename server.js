@@ -1155,7 +1155,7 @@ function addMessage(role, content, showTicket, video) {
       parts.push(pre);
       var url = m[0].replace(/[.,;:!?)]+$/, '');
       parts.push('<a href="' + url + '" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline">' + url + '</a>');
-      lastIdx = m.index + url.length;
+      lastIdx = m.index + m[0].length;
     }
     var tail = content.slice(lastIdx);
     tail = tail.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1170,7 +1170,7 @@ function addMessage(role, content, showTicket, video) {
     const links = [...new Set(content.match(urlRegex) || [])].slice(0, 4);
     if (links.length) {
       const map = {'squareup.com':'📦 Square help','sumup.com':'💳 SumUp help','zettle.com':'💳 Zettle help','worldpay.com':'💳 Worldpay help','stripe.com':'💳 Stripe help','lightspeedhq.com':'🖥 Lightspeed help','tevalis.com':'🖥 Tevalis help','eposnow.com':'🖥 EPOS Now help','vitamojo.com':'🍽 Vita Mojo help','opentable.com':'📅 OpenTable help','resdiary.com':'📅 ResDiary help','sevenrooms.com':'📅 SevenRooms help','deputy.com':'📅 Deputy help','deliverect.com':'📦 Deliverect help','nory.ai':'🤖 Nory help','tenzo.io':'📊 Tenzo help'};
-      const label = u => { try { const h = new URL(u).hostname.replace('www.',''); for (const [k,v] of Object.entries(map)) { if (h.includes(k)) return v; } return '🔗 '+h; } catch(e) { return '🔗 Link'; } };
+      var label = function(u) { try { var h = new URL(u).hostname.replace('www.',''); var entries = Object.keys(map); for (var k=0;k<entries.length;k++){if(h.includes(entries[k]))return map[entries[k]];} return h; } catch(e){return u;} };
       const lr = document.createElement('div'); lr.className = 'link-row';
       links.forEach(function(u) {
         var a = document.createElement('a');
