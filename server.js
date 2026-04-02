@@ -1142,7 +1142,7 @@ function addMessage(role, content, showTicket, video) {
   else { avatar.textContent = (user?.name || 'You')[0].toUpperCase(); avatar.style.background = 'var(--orange)'; avatar.style.color = '#fff'; }
   const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
   if (role === 'assistant') {
-    let t = content.replace(/\[([^\x5D]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2');
+    let t = content;
     t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     t = t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
     t = t.replace(/(https?:\/\/[^\s<&"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;">$1</a>');
