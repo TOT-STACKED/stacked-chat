@@ -1142,16 +1142,12 @@ function addMessage(role, content, showTicket, video) {
   else { avatar.textContent = (user?.name || 'You')[0].toUpperCase(); avatar.style.background = 'var(--orange)'; avatar.style.color = '#fff'; }
   const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
   if (role === 'assistant') {
-    // Linkify URLs first (before HTML escaping)
     var t = content;
-    // HTML escape first
-    t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    // Bold
-    t = t.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
-    // Linkify - use string split on https:// to find URLs
-    t = t.replace(new RegExp('https?://\\S+', 'g'), function(url) {
-      url = url.replace(/[.,;:!?)]+$/, '');
-      var a = document.createElement("a"); a.href=url; a.target="_blank"; a.rel="noopener"; a.style.cssText="color:var(--orange);font-weight:600;text-decoration:underline"; a.textContent=url; return a.outerHTML;
+    t = t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    t = t.replace(/[*][*]([^*]+)[*][*]/g, "<strong>$1</strong>");
+    t = t.replace(new RegExp("https?://\\S+", "g"), function(url) {
+      url = url.replace(/[.,;:!?)]+$/, "");
+      return "<a href=" + url + " target=_blank rel=noopener style=\"color:var(--orange);font-weight:600;text-decoration:underline\">" + url + "</a>";
     });
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
