@@ -759,7 +759,7 @@ const ALL_QUICK_BTNS = [
   { emoji: '📶', label: 'WiFi down', msg: 'WiFi is down in my venue' },
   { emoji: '🖨️', label: 'Kitchen printer issue', msg: 'Kitchen printer not receiving orders' },
   { emoji: '📅', label: 'Reservation system down', msg: 'My reservation system is not working' },
-  { emoji: '🔒', label: "Can't log in", msg: 'Staff cannot log in to the system' },
+  { emoji: '🔒', label: "Cannot log in", msg: 'Staff cannot log in to the system' },
   { emoji: '📱', label: 'Contactless not working', msg: 'Contactless payments not working' },
   { emoji: '🐌', label: 'EPOS running slow', msg: 'EPOS is running slowly mid-service' },
 ];
