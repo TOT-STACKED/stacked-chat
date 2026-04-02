@@ -1143,25 +1143,16 @@ function addMessage(role, content, showTicket, video) {
   const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
   if (role === 'assistant') {
     // Linkify URLs first (before HTML escaping)
-    var urlRe2 = new RegExp("https?://[^\\s]+", "g");
-    var parts = [];
-    var lastIdx = 0;
-    var m;
-    urlRe2.lastIndex = 0;
-    while ((m = urlRe2.exec(content)) !== null) {
-      var pre = content.slice(lastIdx, m.index);
-      pre = pre.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      pre = pre.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
-      parts.push(pre);
-      var url = m[0].replace(/[.,;:!?)]+$/, '');
-      parts.push('<a href="' + url + '" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline">' + url + '</a>');
-      lastIdx = m.index + m[0].length;
-    }
-    var tail = content.slice(lastIdx);
-    tail = tail.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    tail = tail.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
-    parts.push(tail);
-    var t = parts.join('');
+    var t = content;
+    // HTML escape first
+    t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Bold
+    t = t.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
+    // Linkify - use string split on https:// to find URLs
+    t = t.replace(new RegExp('https?://\\S+', 'g'), function(url) {
+      url = url.replace(/[.,;:!?)]+$/, '');
+      var a = document.createElement("a"); a.href=url; a.target="_blank"; a.rel="noopener"; a.style.cssText="color:var(--orange);font-weight:600;text-decoration:underline"; a.textContent=url; return a.outerHTML;
+    });
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
@@ -2020,6 +2011,7 @@ Once you know the product, respond with:
 
 Support URLs:
   Square: https://squareup.com/help/gb
+  Square status: https://status.squareup.com
   SumUp: https://help.sumup.com/en-GB
   Lightspeed: https://www.lightspeedhq.com/support/
   Tevalis: https://support.tevalis.com
