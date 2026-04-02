@@ -133,7 +133,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Stacked Chat</title>
-<link rel="icon" type="image/png" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgd2lkdGg9IjEwODBweCIgaGVpZ2h0PSIyMzFweCIgdmlld0JveD0iNjAgNDg0IDEwODAgMjMxIiBzdHlsZT0ic2hhcGUtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsgdGV4dC1yZW5kZXJpbmc6Z2VvbWV0cmljUHJlY2lzaW9uOyBpbWFnZS1yZW5kZXJpbmc6b3B0aW1pemVRdWFsaXR5OyBmaWxsLXJ1bGU6ZXZlbm9kZDsgY2xpcC1ydWxlOmV2ZW5vZGQiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIj4KPGc+PHBhdGggc3R5bGU9Im9wYWNpdHk6MSIgZmlsbD0iIzBiOTZmYSIgZD0iTSA5NzAuNSw1MTkuNSBDIDk2OS4yMDksNTE5LjI2MyA5NjguMjA5LDUxOS41OTYgOTY3LjUsNTIwLjVDIDk2MS43MjYsNTIwLjIgOTU4LjcyNiw1MjIuODY3IDk1OC41LDUyOC41QyA5NjAuMzk3LDU0MC4xMSA5NjEuNzMsNTUxLjc3NyA5NjIuNSw1NjMuNSBaIE0gNTgxLjUsNTU0LjUgQyA1ODQuODUsNTU0LjUwNiA1ODcuODUsNTU1LjUwNiA1OTAuNSw1NTcuNSBaIi8+PC9nPjwvc3ZnPgo=">
+<link rel="icon" type="image/png" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Righteous&display=swap" rel="stylesheet">
 <style>
@@ -388,7 +388,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
 <!-- ─── GATE ─── -->
 <div id="gate">
   <div class="gate-card">
-    <img class="gate-logo" id="gateWordmark" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgd2lkdGg9IjEwODBweCIgaGVpZ2h0PSIyMzFweCIgdmlld0JveD0iNjAgNDg0IDEwODAgMjMxIiBzdHlsZT0ic2hhcGUtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIj48ZyBmaWxsPSIjMGI5NmZhIj48cGF0aCBkPSJNIDk3MCw1MjAgQyA5NjIsNTIxIDk1OSw1MjMgOTU5LDUyOSBDIDk2MSw1NDEgOTYyLDU1MiA5NjMsNTY0IEMgOTQ0LDU2NCA5MjUsNTY0IDkwNiw1NjQgQyA5MDIsNTY4IDkwMiw1NzEgOTA2LDU3NSBDIDkyNCw1NzUgOTQyLDU3NiA5NjAsNTc3IEMgOTYzLDU4MSA5NjMsNjA3IDk2Miw2MjAgQyA5NjAsNjIyIDk1OCw2MjMgOTU3LDYyMyBDIDk0MSw2MjMgOTI0LDYyNCA5MDcsMzI0IEMgOTAyLDYyNyA5MDIsNjMxIDkwNSw2MzUgQyA5MjYsNjM1IDk0Nyw2MzYgOTY3LDYzNyBDIDk3MSw2NDEgOTcxLDY3MSA5NzAsNjg3IEMgOTY5LDY4OSA5NjcsNjkxIDk2Nyw2OTEgQyA5MjEsNjkyIDg3Niw2OTIgODMwLDY5MCBDIDgyOSw2ODkgODI4LDU1NSA4MjgsNTU1IEMgODE5LDU2OCA4MDYsNTk3IDgwNiw2MDIgQyA4MjEsNjIxIDgyMyw2MzAgODIxLDY5MSBDIDc5MSw2OTcgNzM5LDY4OCBDIDQ3LDY4MiA3NDMsNjM0IDczNiw2MjUgQyA3MzIsNjI1IDczMiw2MjkgNzI1LDY3NSBBIDQ5OSw2ODIgNjU1LDY3NSBDIDY1Miw2NzMgNjUyLDY2NyA2NTMsNjUyIEMgNjM3LDY2NCA2MTksNjcxIDU5OSw2NzIgQyA1NzQsNjc1IDU1Miw2NzAgNTMxLDY1OCBBIDQ2NSw3MDIgNTM5LDY4MyBDIDUxNCw2OTUgNDY1LDcwMiBDIDQ1OCw3MDAgNDUwLDY2OCBDIDQ0OSw2NjUgNDQ0LDY2NCA0MzQsNjY4IEMgNDM0LDcwMiA0MzMsNzA1IDQzMSw3MDYgQyA0MDUsNzEwIDM1NCw3MTUgQyAzNTIsNzEzIDM1Miw3MDggMzU3LDYyNSBDIDM0NSw2MjYgMzM3LDYzMCAzMzcsNjg0IEMgMzMzLDY5MCAyNjgsNjkwIEMgMjYzLDY4OSAyNjIsNjg0IDI2MCw2MjggQyAyNTksMzI2IDI0Niw2MjUgQyAyMjYsNjIxIDIyNiw2MDUgQyAyMDcsNjA0IDIyNiw2MDUgQyAxNzAsNjAyIEMgMTYxLDU4OSAxNDcsNTg4IEMgMTQ0LDU5MyAxNDUsNTk3IDE1MSw1OTkgQyAxODgsNjA4IDIwNiw2MTQgQyAyMzUsNjI4IDI0NCw2NTAgMjMwLDY4MSBDIDE5Myw3MDYgMTY0LDcxMiAxMDksNzAzIEMgNzQsNjg5IDU4LDY2NCA2MCw2MjggQyA4NCw2MjYgMTMwLDYyOSBDIDEzOCw2NDIgMTQ1LDY0NSAxNTUsNjQyIEMgMTU3LDYzOSAxNTcsNjM3IDE1NCw2MzQgQyAxMzQsNjI3IDEwNCw2MjAgQyA2NCw2MDYgNTUsNTgxIDc0LDU0NSBDIDQ3MCw1MjIgMTQzLDUxOCAxOTAsNTI3IEMgMjA0LDUzMiAyMTYsNTQwIDIyNiw1NTIgQyAyMjYsNTEwIEMgMjc2LDUwNyAzNzAsNTA3IEMgMzc3LDUxNiAzNzIsNTI5IEMgNDA2LDUyNCA0NzMsNTE0IEMgNDc4LDUxNSA0ODIsNTIyIEMgNDk2LDU2MiBDIDUwMSw1MTcgNTI1LDQ5MSA1NjksNDg0IEMgNjA2LDQ4MyA2NDksNTAxIDY2OSw1NDkgQyA2NzIsNTMyIDY3OCw0OTggQyA2ODUcA0093IDc0OCw1MDQgQyA3NTEsNTA4IDc1MSw1MTEgQyA3NDQsNTU2IEMgNzQ5LDU1OSBDIDc2Niw1MTUgQyA3NzYsNTA3IDgyOSw1MTYgQyA4MzMsNTA4IDk2Niw1MDggQyA5NzAsNTExIDk3Miw1MTUgOTcwLDUyMCBaIi8+PC9nPjwvc3ZnPgo=" alt="Stacked">
+    <img class="gate-logo" id="gateWordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
     <p class="gate-sub">Hospitality tech support, powered by AI</p>
     <h2>Welcome &mdash; let's get you sorted</h2>
     <p>Drop your details below and we'll have you chatting in seconds.</p>
@@ -417,7 +417,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
 <div id="app">
   <header>
     <a href="https://wearestacked.io" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:flex-start;text-decoration:none;gap:2px;">
-      <img class="header-logo" id="headerIcon" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgd2lkdGg9IjEwODBweCIgaGVpZ2h0PSIyMzFweCIgdmlld0JveD0iNjAgNDg0IDEwODAgMjMxIiBzdHlsZT0ic2hhcGUtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIj48ZyBmaWxsPSIjMGI5NmZhIj48cGF0aCBkPSJNIDk3MCw1MjAgQyA5NjIsNTIxIDk1OSw1MjMgOTU5LDUyOSBaIi8+PC9nPjwvc3ZnPgo=" alt="Stacked">
+      <img class="header-logo" id="headerIcon" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
       <span style="font-family:'Righteous',sans-serif;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--orange);padding-left:1px;margin-top:2px;">CHAT</span>
     </a>
     <div class="header-actions">
@@ -477,7 +477,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
   <main>
     <div id="messages">
       <div class="welcome" id="welcome">
-        <img class="welcome-wordmark" id="welcomeWordmark" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgd2lkdGg9IjEwODBweCIgaGVpZ2h0PSIyMzFweCIgdmlld0JveD0iNjAgNDg0IDEwODAgMjMxIiBzdHlsZT0ic2hhcGUtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIj48ZyBmaWxsPSIjMGI5NmZhIj48cGF0aCBkPSJNIDk3MCw1MjAgQyA5NjIsNTIxIDk1OSw1MjMgOTU5LDUyOSBaIi8+PC9nPjwvc3ZnPgo=" alt="Stacked">
+        <img class="welcome-wordmark" id="welcomeWordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
         <div style="font-family:'Righteous',sans-serif;font-size:22px;letter-spacing:0.05em;text-transform:uppercase;color:var(--orange);margin-top:2px;margin-bottom:8px;">CHAT</div>
         <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Loading&hellip;</span></div>
         <h2>Got a tech problem?<br>Let's fix it.</h2>
@@ -1408,7 +1408,7 @@ tbody tr:hover td{background:var(--surface2)}
 <body>
 <header>
   <div class="header-left">
-    <img class="wordmark" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPCFET0NUWVBFIHN2ZyBQVUJMSUMgIi0vL1czQy8vRFREIFNWRyAxLjEvL0VOIiAiaHR0cDovL3d3dy53My5vcmcvR3JhcGhpY3MvU1ZHLzEuMS9EVEQvc3ZnMTEuZHRkIj4KPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEuMSIgd2lkdGg9IjEwODBweCIgaGVpZ2h0PSIyMzFweCIgdmlld0JveD0iNjAgNDg0IDEwODAgMjMxIiBzdHlsZT0ic2hhcGUtcmVuZGVyaW5nOmdlb21ldHJpY1ByZWNpc2lvbjsiIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIj48ZyBmaWxsPSIjMGI5NmZhIj48cGF0aCBkPSJNIDk3MCw1MjAgQyA5NjIsNTIxIDk1OSw1MjMgOTU5LDUyOSBaIi8+PC9nPjwvc3ZnPgo=" alt="Stacked">
+    <img class="wordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
     <div class="divider"></div>
     <nav class="header-nav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
