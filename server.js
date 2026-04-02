@@ -2042,6 +2042,7 @@ Support URLs:
   Nory: https://support.nory.ai
   Planday: https://support.planday.com
 
+- ALWAYS include the full vendor support URL (starting with https://) when referencing a support page - never just the domain name
 - End with "If this hasn't resolved it, hit 'Raise a ticket' below" if the issue seems complex
 
 KNOWLEDGE BASE:
