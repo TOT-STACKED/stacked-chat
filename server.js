@@ -150,10 +150,10 @@ const STACKED_CHAT = `<!DOCTYPE html>
   body { height: 100%; height: 100dvh; background: var(--cream); font-family: 'DM Sans', sans-serif; color: var(--brown); overflow: hidden; overscroll-behavior: none; touch-action: pan-y; max-width: 100vw; }
 
   /* ─── GATE ─── */
-  #gate { position: fixed; inset: 0; background: var(--cream); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 24px; overflow-y: auto; }
+  #gate { position: fixed; inset: 0; background: var(--cream); display: flex; align-items: flex-start; justify-content: center; z-index: 100; padding: 16px; overflow-y: auto; }
   #gate.hidden { display: none; }
-  .gate-card { background: var(--white); border-radius: 24px; padding: 40px 32px; width: 100%; max-width: 420px; box-shadow: var(--shadow-lg); text-align: center; }
-  .gate-logo { height: 44px; max-width: 240px; object-fit: contain; margin-bottom: 4px; }
+  .gate-card { background: var(--white); border-radius: 24px; padding: 28px 24px; width: 100%; max-width: 420px; box-shadow: var(--shadow-lg); text-align: center; margin: auto; }
+  .gate-logo { height: 44px; max-width: 240px; object-fit: contain; margin-bottom: 4px; filter: brightness(0) saturate(100%) invert(42%) sepia(85%) saturate(450%) hue-rotate(179deg) brightness(108%); }
   .gate-sub { font-size: 13px; color: var(--brown-mid); margin-bottom: 28px; font-weight: 400; letter-spacing: 0.02em; }
   .gate-card h2 { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
   .gate-card p { font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; line-height: 1.5; }
@@ -200,7 +200,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
   /* ─── APP SHELL ─── */
   #app { display: flex; flex-direction: column; height: 100%; height: 100dvh; width: 100%; max-width: 100vw; overflow: hidden; }
   header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--white); border-bottom: 1px solid var(--cream-dark); flex-shrink: 0; box-shadow: 0 1px 8px rgba(15,155,255,0.06); width: 100%; max-width: 100vw; }
-  .header-logo { height: 28px; max-width: 180px; object-fit: contain; }
+  .header-logo { height: 28px; max-width: 180px; object-fit: contain; filter: brightness(0) saturate(100%) invert(42%) sepia(85%) saturate(450%) hue-rotate(179deg) brightness(108%); }
   .header-actions { display: flex; gap: 8px; align-items: center; }
   .icon-btn { background: none; border: none; cursor: pointer; padding: 8px; border-radius: 10px; color: var(--brown-mid); font-size: 18px; transition: background 0.15s, color 0.15s; display: flex; align-items: center; justify-content: center; }
   .icon-btn:hover { background: var(--cream); color: var(--brown); }
@@ -209,7 +209,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
   main { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px 16px 8px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; width: 100%; }
   .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 32px 16px; gap: 12px; text-align: center; }
-  .welcome-wordmark { height: 52px; margin-bottom: 0px; max-width: 320px; object-fit: contain; }
+  .welcome-wordmark { height: 52px; margin-bottom: 0px; max-width: 320px; object-fit: contain; filter: brightness(0) saturate(100%) invert(42%) sepia(85%) saturate(450%) hue-rotate(179deg) brightness(108%); }
   .welcome h2 { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; line-height: 1.2; }
   .welcome p { font-size: 14px; color: var(--brown-mid); margin-bottom: 8px; }
   .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 380px; }
@@ -754,14 +754,14 @@ function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(e
 function quickSend(text) { document.getElementById('input').value = text; sendMessage(); }
 
 const ALL_QUICK_BTNS = [
-  { emoji: '\\uD83D\\uDCBB', label: 'EPOS crashed', msg: 'My EPOS has crashed mid-service' },
-  { emoji: '\\uD83D\\uDCB3', label: 'Payment terminal offline', msg: 'My payment terminal is offline' },
-  { emoji: '\\uD83D\\uDCF6', label: 'WiFi down', msg: 'WiFi is down in my venue' },
-  { emoji: '\\uD83D\\uDDA8\\uFE0F', label: 'Kitchen printer issue', msg: 'Kitchen printer not receiving orders' },
-  { emoji: '\\uD83D\\uDCC5', label: 'Reservation system down', msg: 'My reservation system is not working' },
-  { emoji: '\\uD83D\\uDD12', label: "Can't log in", msg: 'Staff cannot log in to the system' },
-  { emoji: '\\uD83D\\uDCF1', label: 'Contactless not working', msg: 'Contactless payments not working' },
-  { emoji: '\\uD83D\\uDC0C', label: 'EPOS running slow', msg: 'EPOS is running slowly mid-service' },
+  { emoji: '\uD83D\uDCBB', label: 'EPOS crashed', msg: 'My EPOS has crashed mid-service' },
+  { emoji: '\uD83D\uDCB3', label: 'Payment terminal offline', msg: 'My payment terminal is offline' },
+  { emoji: '\uD83D\uDCF6', label: 'WiFi down', msg: 'WiFi is down in my venue' },
+  { emoji: '\uD83D\uDDA8\uFE0F', label: 'Kitchen printer issue', msg: 'Kitchen printer not receiving orders' },
+  { emoji: '\uD83D\uDCC5', label: 'Reservation system down', msg: 'My reservation system is not working' },
+  { emoji: '\uD83D\uDD12', label: "Can't log in", msg: 'Staff cannot log in to the system' },
+  { emoji: '\uD83D\uDCF1', label: 'Contactless not working', msg: 'Contactless payments not working' },
+  { emoji: '\uD83D\uDC0C', label: 'EPOS running slow', msg: 'EPOS is running slowly mid-service' },
 ];
 
 async function loadSocialProof() {
@@ -847,28 +847,28 @@ const ALL_TIPS = [
   { product: 'Square', text: 'Did you know Square can split a bill by seat? Tap the item, then "Split item" to divide it across covers.' },
   { product: 'Square', text: 'Square offline mode lets you take card payments even when your internet goes down. Transactions sync automatically when you reconnect.' },
   { product: 'Square', text: 'You can print a kitchen ticket and a customer receipt simultaneously on Square — set it up in Printing > Printer Settings.' },
-  { product: 'Lightspeed', text: 'Lightspeed\'s floor plan view lets you drag and merge tables mid-service. Long-press any table to start.' },
+  { product: 'Lightspeed', text: 'Lightspeed’s floor plan view lets you drag and merge tables mid-service. Long-press any table to start.' },
   { product: 'Lightspeed', text: 'You can set automatic happy hour pricing in Lightspeed — go to Settings > Price rules > Time-based discounts.' },
   { product: 'Deputy', text: 'Deputy can auto-approve shift swaps between staff with matching roles — turn it on under Scheduling > Swap settings.' },
   { product: 'Deputy', text: 'Did you know Deputy sends SMS reminders to staff before their shift? Reduce no-shows by enabling it in Notifications.' },
-  { product: 'OpenTable', text: 'OpenTable\'s shift notes let you brief your floor team before service — add them in Reservations > Shift summary.' },
+  { product: 'OpenTable', text: 'OpenTable’s shift notes let you brief your floor team before service — add them in Reservations > Shift summary.' },
   { product: 'OpenTable', text: 'You can set a minimum dining duration per table in OpenTable to prevent back-to-back bookings that are too tight.' },
   { product: 'Tevalis', text: 'Tevalis holds orders in a print queue if the kitchen printer goes offline — they all fire through when it reconnects.' },
-  { product: 'Deliverect', text: 'Deliverect can auto-pause your delivery platforms if you\'re approaching max kitchen capacity. Set a threshold in your hub settings.' },
+  { product: 'Deliverect', text: 'Deliverect can auto-pause your delivery platforms if you’re approaching max kitchen capacity. Set a threshold in your hub settings.' },
   { product: 'Tenzo', text: 'Tenzo can show you your revenue per cover by day part — useful for spotting which sessions are underperforming.' },
-  { product: 'Airship', text: 'Airship\'s birthday campaign can be fully automated — set it once and it sends a personalised offer to every customer on their birthday.' },
-  { product: 'SumUp', text: 'SumUp\'s Solo terminal has a tipping prompt built in — enable it in your SumUp app under Payment settings.' },
+  { product: 'Airship', text: 'Airship’s birthday campaign can be fully automated — set it once and it sends a personalised offer to every customer on their birthday.' },
+  { product: 'SumUp', text: 'SumUp’s Solo terminal has a tipping prompt built in — enable it in your SumUp app under Payment settings.' },
   { product: 'ResDiary', text: 'ResDiary can send automated pre-visit emails with your menu and parking info — set up in Marketing > Pre-visit messages.' },
-  { product: 'SevenRooms', text: 'SevenRooms tracks a guest\'s lifetime spend and visit history automatically — your team can see it on the host app before they arrive.' },
+  { product: 'SevenRooms', text: 'SevenRooms tracks a guest’s lifetime spend and visit history automatically — your team can see it on the host app before they arrive.' },
   { product: 'Nory', text: 'Nory predicts your busiest shifts using weather data and local events — check the forecast view before building your rota.' },
-  { product: 'Bizimply', text: 'Bizimply\'s clock-in app can enforce geofencing — staff can only clock in when they\'re physically at your venue.' },
-  { product: 'Planday', text: 'Planday\'s punch clock can take a photo on clock-in to prevent buddy punching — enable it in Clock-in settings.' },
+  { product: 'Bizimply', text: 'Bizimply’s clock-in app can enforce geofencing — staff can only clock in when they’re physically at your venue.' },
+  { product: 'Planday', text: 'Planday’s punch clock can take a photo on clock-in to prevent buddy punching — enable it in Clock-in settings.' },
   { product: 'Collins', text: 'Collins can automatically add a deposit to large-party bookings — set the threshold in your venue settings.' },
   { product: 'Stampede', text: 'Stampede captures WiFi login data and lets you send automated follow-up messages to guests — connect it to your router in 10 minutes.' },
   { product: 'EPOS Now', text: 'EPOS Now can send automated low-stock alerts by email — set your par levels in Inventory > Stock alerts.' },
   { product: 'Nutritics', text: 'Nutritics can generate allergen info sheets and menus automatically once your recipes are set up — go to Print > Allergen report.' },
-  { product: 'Fourth', text: 'Fourth\'s labour scheduling can factor in your forecasted covers — link it to your reservation system for smarter rotas.' },
-  { product: 'Zonal', text: 'Zonal\'s kitchen display can colour-code orders by course — reducing the chance of mains going out before starters are cleared.' },
+  { product: 'Fourth', text: 'Fourth’s labour scheduling can factor in your forecasted covers — link it to your reservation system for smarter rotas.' },
+  { product: 'Zonal', text: 'Zonal’s kitchen display can colour-code orders by course — reducing the chance of mains going out before starters are cleared.' },
 ];
 
 function renderTipOfTheDay() {
@@ -901,11 +901,11 @@ function fireTip() {
 
 // ─── SHIFT CHECK ──────────────────────────────────────────────────────────
 const SC_STEPS = [
-  { id: 'epos',     emoji: '\\uD83D\\uDCBB', label: 'EPOS / till system' },
-  { id: 'payments', emoji: '\\uD83D\\uDCB3', label: 'Card / payment terminal' },
-  { id: 'wifi',     emoji: '\\uD83D\\uDCF6', label: 'WiFi / internet' },
-  { id: 'printer',  emoji: '\\uD83D\\uDDA8\\uFE0F', label: 'Kitchen printer' },
-  { id: 'bookings', emoji: '\\uD83D\\uDCC5', label: 'Booking / reservation system' },
+  { id: 'epos',     emoji: '\uD83D\uDCBB', label: 'EPOS / till system' },
+  { id: 'payments', emoji: '\uD83D\uDCB3', label: 'Card / payment terminal' },
+  { id: 'wifi',     emoji: '\uD83D\uDCF6', label: 'WiFi / internet' },
+  { id: 'printer',  emoji: '\uD83D\uDDA8\uFE0F', label: 'Kitchen printer' },
+  { id: 'bookings', emoji: '\uD83D\uDCC5', label: 'Booking / reservation system' },
 ];
 
 let scAnswers = {};
@@ -946,9 +946,9 @@ function renderScStep() {
     '<div class="sc-step">' +
     '<div class="sc-step-label"><span class="sc-emoji">' + step.emoji + '</span>' + step.label + '</div>' +
     '<div class="sc-options">' +
-    '<button class="sc-opt" data-val="green" onclick="scAnswer(\\'green\\')">\\u2705 All good</button>' +
-    '<button class="sc-opt" data-val="amber" onclick="scAnswer(\\'amber\\')">\\u26A0\\uFE0F Slow / issue</button>' +
-    '<button class="sc-opt" data-val="red" onclick="scAnswer(\\'red\\')">\\uD83D\\uDD34 Down</button>' +
+    '<button class="sc-opt" data-val="green" onclick="scAnswer('green')">✅ All good</button>' +
+    '<button class="sc-opt" data-val="amber" onclick="scAnswer('amber')">⚠️ Slow / issue</button>' +
+    '<button class="sc-opt" data-val="red" onclick="scAnswer('red')">🔴 Down</button>' +
     '</div></div>';
 
   // Highlight previously selected if user goes back (not implemented but defensive)
@@ -987,15 +987,15 @@ function renderScSummary() {
 
   let icon, headline, sub;
   if (allGood) {
-    icon = '\\uD83D\\uDFE2';
+    icon = '🟢';
     headline = 'All systems go';
     sub = 'Everything is looking good. Have a great service!';
   } else if (issues.length > 0) {
-    icon = '\\uD83D\\uDD34';
+    icon = '🔴';
     headline = issues.length + ' system' + (issues.length > 1 ? 's' : '') + ' need' + (issues.length === 1 ? 's' : '') + ' attention';
     sub = 'Get these sorted before service starts.';
   } else {
-    icon = '\\u26A0\\uFE0F';
+    icon = '⚠️';
     headline = warnings.length + ' thing' + (warnings.length > 1 ? 's' : '') + ' to keep an eye on';
     sub = 'Not critical, but worth monitoring during service.';
   }
@@ -1056,7 +1056,7 @@ function scFinish() {
   // Update button to show it's been done today
   const btn = document.getElementById('shiftCheckBtn');
   if (btn) {
-    btn.innerHTML = '\\u2705 Shift check done';
+    btn.innerHTML = '✅ Shift check done';
     btn.style.borderColor = '#16a34a';
     btn.style.color = '#166534';
     btn.onclick = null;
@@ -1071,16 +1071,16 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 function toggleMic() {
   const mic = document.getElementById('mic');
   const input = document.getElementById('input');
-  if (isIOS) { input.focus(); showToast('Tap the \\uD83C\\uDFA4 mic on your keyboard to speak'); return; }
+  if (isIOS) { input.focus(); showToast('Tap the 🎤 mic on your keyboard to speak'); return; }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { input.focus(); showToast('Tap the \\uD83C\\uDFA4 mic on your keyboard to speak'); return; }
+  if (!SR) { input.focus(); showToast('Tap the 🎤 mic on your keyboard to speak'); return; }
   if (isListening) { recognition?.stop(); return; }
   recognition = new SR();
   recognition.lang = 'en-GB'; recognition.interimResults = false; recognition.maxAlternatives = 1;
   recognition.onstart = () => { isListening = true; mic.classList.add('listening'); };
   recognition.onresult = (e) => { input.value = e.results[0][0].transcript; autoResize(input); };
   recognition.onend = () => { isListening = false; mic.classList.remove('listening'); };
-  recognition.onerror = () => { isListening = false; mic.classList.remove('listening'); showToast('Could not hear anything \\u2014 try again'); };
+  recognition.onerror = () => { isListening = false; mic.classList.remove('listening'); showToast('Could not hear anything — try again'); };
   recognition.start();
 }
 
@@ -1245,7 +1245,7 @@ async function submitTicket() {
   try {
     await fetch(SERVER_URL + '/save-ticket', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? '\\n\\nExtra detail: ' + note : ''), conversation: messages, status: 'open' })
+      body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? '\n\nExtra detail: ' + note : ''), conversation: messages, status: 'open' })
     });
     closeTicket();
     showToast('\\u2713 Ticket raised \\u2014 we\\'ll be in touch!', 'green');
@@ -1301,7 +1301,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
 body{background:var(--bg);font-family:'Inter',system-ui,sans-serif;color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
 header{background:var(--surface);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
 .header-left{display:flex;align-items:center;gap:16px}
-.wordmark{height:32px;max-width:200px;object-fit:contain}
+.wordmark{height:32px;max-width:200px;object-fit:contain;filter: brightness(0) saturate(100%) invert(42%) sepia(85%) saturate(450%) hue-rotate(179deg) brightness(108%);}
 .divider{width:1px;height:20px;background:var(--border2)}
 .header-nav{display:flex;align-items:center;gap:2px}
 .nav-item{padding:5px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;transition:all 0.1s}
