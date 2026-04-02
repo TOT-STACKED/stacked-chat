@@ -754,14 +754,14 @@ function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(e
 function quickSend(text) { document.getElementById('input').value = text; sendMessage(); }
 
 const ALL_QUICK_BTNS = [
-  { emoji: '\uD83D\uDCBB', label: 'EPOS crashed', msg: 'My EPOS has crashed mid-service' },
-  { emoji: '\uD83D\uDCB3', label: 'Payment terminal offline', msg: 'My payment terminal is offline' },
-  { emoji: '\uD83D\uDCF6', label: 'WiFi down', msg: 'WiFi is down in my venue' },
-  { emoji: '\uD83D\uDDA8\uFE0F', label: 'Kitchen printer issue', msg: 'Kitchen printer not receiving orders' },
-  { emoji: '\uD83D\uDCC5', label: 'Reservation system down', msg: 'My reservation system is not working' },
-  { emoji: '\uD83D\uDD12', label: "Can't log in", msg: 'Staff cannot log in to the system' },
-  { emoji: '\uD83D\uDCF1', label: 'Contactless not working', msg: 'Contactless payments not working' },
-  { emoji: '\uD83D\uDC0C', label: 'EPOS running slow', msg: 'EPOS is running slowly mid-service' },
+  { emoji: '💻', label: 'EPOS crashed', msg: 'My EPOS has crashed mid-service' },
+  { emoji: '💳', label: 'Payment terminal offline', msg: 'My payment terminal is offline' },
+  { emoji: '📶', label: 'WiFi down', msg: 'WiFi is down in my venue' },
+  { emoji: '🖨️', label: 'Kitchen printer issue', msg: 'Kitchen printer not receiving orders' },
+  { emoji: '📅', label: 'Reservation system down', msg: 'My reservation system is not working' },
+  { emoji: '🔒', label: "Can't log in", msg: 'Staff cannot log in to the system' },
+  { emoji: '📱', label: 'Contactless not working', msg: 'Contactless payments not working' },
+  { emoji: '🐌', label: 'EPOS running slow', msg: 'EPOS is running slowly mid-service' },
 ];
 
 async function loadSocialProof() {
@@ -783,11 +783,11 @@ function personaliseWelcome() {
 }
 
 const TIME_ISSUES = {
-  morning:   [{ icon:'\\u2615', text:'Till not opening at start of day', tag:'Common 8-11am' }, { icon:'\\uD83D\\uDCF6', text:'WiFi not connecting for staff', tag:'Morning issue' }],
-  lunch:     [{ icon:'\\uD83D\\uDCB3', text:'Payment terminal slow during rush', tag:'Common 12-2pm' }, { icon:'\\uD83D\\uDDA8\\uFE0F', text:'Kitchen printer missing orders', tag:'Rush hour' }],
-  afternoon: [{ icon:'\\uD83D\\uDCCB', text:'Reservations not syncing', tag:'Common 2-5pm' }, { icon:'\\uD83D\\uDD12', text:'Staff login issues after shift change', tag:'Afternoon' }],
-  evening:   [{ icon:'\\uD83D\\uDCBB', text:'EPOS freezing mid-service', tag:'Common 5-10pm' }, { icon:'\\uD83D\\uDCF1', text:'Contactless not working at table', tag:'Service issue' }],
-  latenight: [{ icon:'\\uD83D\\uDD0C', text:'System not closing down properly', tag:'End of night' }, { icon:'\\uD83D\\uDCCA', text:'Reports not generating', tag:'Close of day' }],
+  morning:   [{ icon:'\☕', text:'Till not opening at start of day', tag:'Common 8-11am' }, { icon:'📶', text:'WiFi not connecting for staff', tag:'Morning issue' }],
+  lunch:     [{ icon:'💳', text:'Payment terminal slow during rush', tag:'Common 12-2pm' }, { icon:'🖨️', text:'Kitchen printer missing orders', tag:'Rush hour' }],
+  afternoon: [{ icon:'📋', text:'Reservations not syncing', tag:'Common 2-5pm' }, { icon:'🔒', text:'Staff login issues after shift change', tag:'Afternoon' }],
+  evening:   [{ icon:'💻', text:'EPOS freezing mid-service', tag:'Common 5-10pm' }, { icon:'📱', text:'Contactless not working at table', tag:'Service issue' }],
+  latenight: [{ icon:'🔌', text:'System not closing down properly', tag:'End of night' }, { icon:'📊', text:'Reports not generating', tag:'Close of day' }],
 };
 
 async function loadPredictiveFixes() {
@@ -804,7 +804,7 @@ async function loadPredictiveFixes() {
     const r = await fetch(SERVER_URL + '/analytics');
     const data = await r.json();
     if (data.topTopics && data.topTopics.length > 0) {
-      const topicMap = { 'epos': { icon:'\\uD83D\\uDCBB', text:'EPOS issues' }, 'payment': { icon:'\\uD83D\\uDCB3', text:'Payment terminal problems' }, 'wifi': { icon:'\\uD83D\\uDCF6', text:'WiFi / network issues' }, 'printer': { icon:'\\uD83D\\uDDA8\\uFE0F', text:'Printer not working' }, 'login': { icon:'\\uD83D\\uDD12', text:'Login / access issues' }, 'reservation': { icon:'\\uD83D\\uDCC5', text:'Reservation system issues' } };
+      const topicMap = { 'epos': { icon:'💻', text:'EPOS issues' }, 'payment': { icon:'💳', text:'Payment terminal problems' }, 'wifi': { icon:'📶', text:'WiFi / network issues' }, 'printer': { icon:'🖨️', text:'Printer not working' }, 'login': { icon:'🔒', text:'Login / access issues' }, 'reservation': { icon:'📅', text:'Reservation system issues' } };
       data.topTopics.slice(0, 2).forEach(topic => {
         const key = Object.keys(topicMap).find(k => topic.toLowerCase().includes(k));
         if (key) issues.unshift({ ...topicMap[key], tag: 'Trending now' });
@@ -816,9 +816,9 @@ async function loadPredictiveFixes() {
   const grid = document.getElementById('predictGrid');
   const section = document.getElementById('predictSection');
   if (!grid || !section) return;
-  if (label) label.textContent = 'Common issues ' + (isWeekend ? 'this weekend' : 'today') + ' \\u00b7 ' + (period === 'evening' ? 'evening service' : period);
+  if (label) label.textContent = 'Common issues ' + (isWeekend ? 'this weekend' : 'today') + ' \· ' + (period === 'evening' ? 'evening service' : period);
   grid.innerHTML = issues.slice(0,3).map(i =>
-    '<button class="predict-btn" onclick="quickSend(\\'' + i.text.replace(/'/g,"\\'") + '\\')">' +
+    '<button class="predict-btn" data-action="predictSend" data-msg="' + i.text.replace(/"/g,'&quot;') + '">' +
     '<span class="predict-icon">' + i.icon + '</span><span>' + i.text + '</span>' +
     '<span class="predict-tag">' + i.tag + '</span></button>'
   ).join('');
@@ -837,7 +837,7 @@ function renderQuickBtns() {
   if (!grid) return;
   const shuffled = [...ALL_QUICK_BTNS].sort(() => Math.random() - 0.5).slice(0, 4);
   grid.innerHTML = shuffled.map(b =>
-    '<button class="quick-btn" onclick="quickSend(\\'' + b.msg.replace(/'/g,"\\'") + '\\')">' +
+    '<button class="quick-btn" data-action="quickSend" data-msg="' + b.msg.replace(/"/g,'&quot;') + '">' +
     '<span class="emoji">' + b.emoji + '</span>' + b.label + '</button>'
   ).join('');
 }
@@ -901,11 +901,11 @@ function fireTip() {
 
 // ─── SHIFT CHECK ──────────────────────────────────────────────────────────
 const SC_STEPS = [
-  { id: 'epos',     emoji: '\uD83D\uDCBB', label: 'EPOS / till system' },
-  { id: 'payments', emoji: '\uD83D\uDCB3', label: 'Card / payment terminal' },
-  { id: 'wifi',     emoji: '\uD83D\uDCF6', label: 'WiFi / internet' },
-  { id: 'printer',  emoji: '\uD83D\uDDA8\uFE0F', label: 'Kitchen printer' },
-  { id: 'bookings', emoji: '\uD83D\uDCC5', label: 'Booking / reservation system' },
+  { id: 'epos',     emoji: '💻', label: 'EPOS / till system' },
+  { id: 'payments', emoji: '💳', label: 'Card / payment terminal' },
+  { id: 'wifi',     emoji: '📶', label: 'WiFi / internet' },
+  { id: 'printer',  emoji: '🖨️', label: 'Kitchen printer' },
+  { id: 'bookings', emoji: '📅', label: 'Booking / reservation system' },
 ];
 
 let scAnswers = {};
@@ -976,12 +976,16 @@ function scAnswer(val) {
     renderScStep();
   }, 280);
 }
-// Event delegation for shift check option buttons
-document.addEventListener('click', function(e) {
-  const btn = e.target.closest('[data-action="scAnswer"]');
-  if (btn) scAnswer(btn.dataset.val);
-});
 
+// ─── GLOBAL EVENT DELEGATION ──────────────────────────────────────────────
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const msg = btn.dataset.msg ? btn.dataset.msg.replace(/&quot;/g, '"') : null;
+  if (action === 'scAnswer') scAnswer(btn.dataset.val);
+  if (action === 'predictSend' || action === 'quickSend') { hideWelcome(); quickSend(msg); }
+});
 
 function renderScSummary() {
   const title = document.getElementById('scDrawerTitle');
@@ -1138,33 +1142,33 @@ function addMessage(role, content, showTicket, video) {
   else { avatar.textContent = (user?.name || 'You')[0].toUpperCase(); avatar.style.background = 'var(--orange)'; avatar.style.color = '#fff'; }
   const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
   if (role === 'assistant') {
-    let t = content.replace(/\\[([^\\]]+)\\]\\((https?:\\/\\/[^)]+)\\)/g, '$1 $2');
+    let t = content.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2');
     t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     t = t.replace(/\\*\\*([^*]+)\\*\\*/g,'<strong>$1</strong>');
-    t = t.replace(/(https?:\\/\\/[^\\s<&"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;">$1</a>');
+    t = t.replace(/(https?:\/\/[^\s<&"]+)/g,'<a href="$1" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline;">$1</a>');
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
   if (role === 'assistant') {
-    const urlRegex = /https?:\\/\\/[^\\s)>\\]"]+/g;
+    const urlRegex = /https?:\/\/[^\s)>\]"]+/g;
     const links = [...new Set(content.match(urlRegex) || [])].slice(0, 4);
     if (links.length) {
-      const map = {'squareup.com':'\\uD83D\\uDCE6 Square help','sumup.com':'\\uD83D\\uDCB3 SumUp help','zettle.com':'\\uD83D\\uDCB3 Zettle help','worldpay.com':'\\uD83D\\uDCB3 Worldpay help','stripe.com':'\\uD83D\\uDCB3 Stripe help','lightspeedhq.com':'\\uD83D\\uDDA5 Lightspeed help','tevalis.com':'\\uD83D\\uDDA5 Tevalis help','eposnow.com':'\\uD83D\\uDDA5 EPOS Now help','vitamojo.com':'\\uD83C\\uDF7D Vita Mojo help','opentable.com':'\\uD83D\\uDCC5 OpenTable help','resdiary.com':'\\uD83D\\uDCC5 ResDiary help','sevenrooms.com':'\\uD83D\\uDCC5 SevenRooms help','deputy.com':'\\uD83D\\uDCC5 Deputy help','deliverect.com':'\\uD83D\\uDCE6 Deliverect help','nory.ai':'\\uD83E\\uDD16 Nory help','tenzo.io':'\\uD83D\\uDCCA Tenzo help'};
-      const label = u => { try { const h = new URL(u).hostname.replace('www.',''); for (const [k,v] of Object.entries(map)) { if (h.includes(k)) return v; } return '\\uD83D\\uDD17 '+h; } catch(e) { return '\\uD83D\\uDD17 Link'; } };
+      const map = {'squareup.com':'📦 Square help','sumup.com':'💳 SumUp help','zettle.com':'💳 Zettle help','worldpay.com':'💳 Worldpay help','stripe.com':'💳 Stripe help','lightspeedhq.com':'🖥 Lightspeed help','tevalis.com':'🖥 Tevalis help','eposnow.com':'🖥 EPOS Now help','vitamojo.com':'🍽 Vita Mojo help','opentable.com':'📅 OpenTable help','resdiary.com':'📅 ResDiary help','sevenrooms.com':'📅 SevenRooms help','deputy.com':'📅 Deputy help','deliverect.com':'📦 Deliverect help','nory.ai':'🤖 Nory help','tenzo.io':'📊 Tenzo help'};
+      const label = u => { try { const h = new URL(u).hostname.replace('www.',''); for (const [k,v] of Object.entries(map)) { if (h.includes(k)) return v; } return '🔗 '+h; } catch(e) { return '🔗 Link'; } };
       const lr = document.createElement('div'); lr.className = 'link-row';
-      lr.innerHTML = links.map(u => '<a class="link-pill" href="'+u+'" target="_blank" rel="noopener">\\u2197 '+label(u)+'</a>').join('');
+      lr.innerHTML = links.map(u => '<a class="link-pill" href="'+u+'" target="_blank" rel="noopener">\↗ '+label(u)+'</a>').join('');
       msgs.appendChild(lr);
     }
   }
   if (role === 'assistant' && showTicket) {
     const tr = document.createElement('div'); tr.className = 'ticket-row';
-    tr.innerHTML = '<button class="ticket-btn" onclick="openTicket()">\\uD83C\\uDFAB This didn\\'t solve my issue \\u2014 raise a ticket</button>';
+    tr.innerHTML = '<button class="ticket-btn" onclick="openTicket()">🎫 This didn\'t solve my issue \— raise a ticket</button>';
     msgs.appendChild(tr);
   }
   if (role === 'assistant' && video) {
     const pr = document.createElement('div'); pr.className = 'video-pill-row';
     const pb = document.createElement('button'); pb.className = 'video-pill';
-    pb.textContent = '\\uD83C\\uDFAC We have a video on this \\u2014 tap to watch';
+    pb.textContent = '🎬 We have a video on this \— tap to watch';
     pb.dataset.v = encodeURIComponent(JSON.stringify(video));
     pb.onclick = function() { openCvModal(this.dataset.v); };
     pr.appendChild(pb); msgs.appendChild(pr);
@@ -1218,7 +1222,7 @@ async function loadHistory() {
       const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
       const count = (row.messages || []).filter(m => m.role === 'user').length;
       const item = document.createElement('div'); item.className = 'history-item';
-      const author = (row.name && row.name !== user.name) ? ' \\u00b7 ' + row.name : '';
+      const author = (row.name && row.name !== user.name) ? ' \· ' + row.name : '';
       item.innerHTML =
         '<div class="history-date">' + dateStr + author + '</div>' +
         '<div class="history-preview">' + escHtml(row.preview || 'Chat session') + '</div>' +
@@ -1254,7 +1258,7 @@ async function submitTicket() {
       body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? '\n\nExtra detail: ' + note : ''), conversation: messages, status: 'open' })
     });
     closeTicket();
-    showToast('\\u2713 Ticket raised \\u2014 we\\'ll be in touch!', 'green');
+    showToast('\✓ Ticket raised \— we\'ll be in touch!', 'green');
   } catch(e) { closeTicket(); showToast('Something went wrong, please try again.'); }
 }
 
@@ -1608,7 +1612,7 @@ function renderHealthData(a) {
   if (!sortedSystems.some(([,c]) => c > 0)) {
     sbEl.innerHTML = '<div class="empty">No issues flagged in the last 7 days &#x1F389;</div>';
   } else {
-    const sicEmoji = { epos: '\\uD83D\\uDCBB', payments: '\\uD83D\\uDCB3', wifi: '\\uD83D\\uDCF6', printer: '\\uD83D\\uDDA8\\uFE0F', bookings: '\\uD83D\\uDCC5' };
+    const sicEmoji = { epos: '💻', payments: '💳', wifi: '📶', printer: '🖨️', bookings: '📅' };
     sbEl.innerHTML = sortedSystems.map(([sys, count]) => {
       const pct = maxSic > 0 ? Math.round(count / maxSic * 100) : 0;
       return '<div class="data-row">' +
@@ -1630,8 +1634,8 @@ function renderHealthData(a) {
       const d = new Date(hc.checked_at).toLocaleDateString('en-GB', {day:'numeric',month:'short'});
       const t = new Date(hc.checked_at).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
       const statusDot = allGood
-        ? '<span style="color:#16a34a;font-weight:700">\\u2705 All good</span>'
-        : '<span style="color:#dc2626;font-weight:700">\\u26A0\\uFE0F Issues flagged</span>';
+        ? '<span style="color:#16a34a;font-weight:700">\✅ All good</span>'
+        : '<span style="color:#dc2626;font-weight:700">⚠️ Issues flagged</span>';
       return '<div class="conv-item">' +
         '<div class="conv-top">' +
         '<span class="conv-name">' + esc(hc.venue || 'Unknown venue') + '</span>' +
@@ -1651,9 +1655,9 @@ function renderHealthData(a) {
 
   const systemNames = { epos: 'EPOS', payments: 'Payments', wifi: 'WiFi', printer: 'Printer', bookings: 'Bookings' };
   const statusBadge = v => {
-    if (v === 'green') return '<span style="color:#16a34a;font-weight:600">\\u2705 OK</span>';
-    if (v === 'amber') return '<span style="color:#ca8a04;font-weight:600">\\u26A0\\uFE0F Issue</span>';
-    if (v === 'red')   return '<span style="color:#dc2626;font-weight:600">\\uD83D\\uDD34 Down</span>';
+    if (v === 'green') return '<span style="color:#16a34a;font-weight:600">\✅ OK</span>';
+    if (v === 'amber') return '<span style="color:#ca8a04;font-weight:600">⚠️ Issue</span>';
+    if (v === 'red')   return '<span style="color:#dc2626;font-weight:600">🔴 Down</span>';
     return '&mdash;';
   };
 
@@ -1691,7 +1695,7 @@ function vDragLeave(){document.getElementById('videoDrop').classList.remove('dra
 function vDrop(e){e.preventDefault();document.getElementById('videoDrop').classList.remove('drag-over');handleVideoFiles(e.dataTransfer.files);}
 async function handleVideoFiles(files){const list=document.getElementById('videoUploadList');for(const file of files){if(!file.type.startsWith('video/')){notify('Only video files please','red');continue;}const itemId='vup_'+Date.now();const item=document.createElement('div');item.style.cssText='padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;margin-bottom:6px;border:1px solid var(--border)';item.textContent=file.name;list.appendChild(item);try{const b64=await new Promise((res,rej)=>{const reader=new FileReader();reader.onload=e=>res(e.target.result);reader.onerror=rej;reader.readAsDataURL(file);});const r=await fetch('/videos/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:b64,title:file.name.replace(/\\.[^.]+$/,''),description:'',type:'mp4',is_upload:true})});const data=await r.json();if(data.ok){notify('Video uploaded!','green');loadVideos();}else{notify('Upload error: '+(data.error||'unknown'),'red');}}catch(e){notify('Upload failed: '+e.message,'red');}}}
 async function addVideo(){const u=document.getElementById('vidUrl').value.trim();if(!u){notify('Paste a URL first','red');return;}const t=document.getElementById('vidTitle').value.trim();const d=document.getElementById('vidDesc').value.trim();const btn=document.getElementById('addVidBtn');btn.disabled=true;btn.textContent='Adding...';try{const r=await fetch('/videos/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u,title:t,description:d})});const data=await r.json();if(data.ok){notify('Video added!','green');['vidUrl','vidTitle','vidDesc'].forEach(id=>document.getElementById(id).value='');loadVideos();}else{notify('Error: '+(data.error||'unknown'),'red');}}catch(e){notify('Error: '+e.message,'red');}btn.disabled=false;btn.textContent='+ Add URL';}
-async function loadVideos(){var el=document.getElementById('videoGrid');if(!el)return;el.innerHTML='<div class="empty" style="color:var(--text3)">Loading...</div>';try{var r=await fetch('/videos');var vids=await r.json();el.innerHTML='';if(!Array.isArray(vids)||!vids.length){var emp=document.createElement('div');emp.className='empty';emp.textContent='No videos yet.';el.appendChild(emp);return;}vids.forEach(function(v){var card=document.createElement('div');card.className='video-card';var thumbEl;if(v.thumbnail){thumbEl=document.createElement('img');thumbEl.className='video-thumb';thumbEl.src=v.thumbnail;}else{thumbEl=document.createElement('div');thumbEl.className='video-thumb-empty';thumbEl.textContent=v.type==='youtube'?'\\u25b6':'\\uD83C\\uDFAC';}thumbEl.dataset.v=encodeURIComponent(JSON.stringify(v));thumbEl.onclick=function(){playVideoEnc(this.dataset.v);};card.appendChild(thumbEl);var info=document.createElement('div');info.className='video-info';var titleEl=document.createElement('div');titleEl.className='video-title';titleEl.textContent=v.title||'Untitled';info.appendChild(titleEl);if(v.description){var descEl=document.createElement('div');descEl.className='video-desc';descEl.textContent=v.description;info.appendChild(descEl);}var footer=document.createElement('div');footer.className='video-footer';var badge=document.createElement('span');badge.className='vbadge '+(v.type||'mp4');badge.textContent=(v.type||'').toLowerCase()==='youtube'?'YouTube':'MP4';var delBtn=document.createElement('button');delBtn.className='btn-del';delBtn.textContent='Delete';delBtn.dataset.id=v.id;delBtn.onclick=function(){deleteVideo(this.dataset.id,this);};footer.appendChild(badge);footer.appendChild(delBtn);info.appendChild(footer);card.appendChild(info);el.appendChild(card);});}catch(e){el.innerHTML='<div class="empty" style="color:var(--red)">Error: '+e.message+'</div>';}}
+async function loadVideos(){var el=document.getElementById('videoGrid');if(!el)return;el.innerHTML='<div class="empty" style="color:var(--text3)">Loading...</div>';try{var r=await fetch('/videos');var vids=await r.json();el.innerHTML='';if(!Array.isArray(vids)||!vids.length){var emp=document.createElement('div');emp.className='empty';emp.textContent='No videos yet.';el.appendChild(emp);return;}vids.forEach(function(v){var card=document.createElement('div');card.className='video-card';var thumbEl;if(v.thumbnail){thumbEl=document.createElement('img');thumbEl.className='video-thumb';thumbEl.src=v.thumbnail;}else{thumbEl=document.createElement('div');thumbEl.className='video-thumb-empty';thumbEl.textContent=v.type==='youtube'?'\▶':'🎬';}thumbEl.dataset.v=encodeURIComponent(JSON.stringify(v));thumbEl.onclick=function(){playVideoEnc(this.dataset.v);};card.appendChild(thumbEl);var info=document.createElement('div');info.className='video-info';var titleEl=document.createElement('div');titleEl.className='video-title';titleEl.textContent=v.title||'Untitled';info.appendChild(titleEl);if(v.description){var descEl=document.createElement('div');descEl.className='video-desc';descEl.textContent=v.description;info.appendChild(descEl);}var footer=document.createElement('div');footer.className='video-footer';var badge=document.createElement('span');badge.className='vbadge '+(v.type||'mp4');badge.textContent=(v.type||'').toLowerCase()==='youtube'?'YouTube':'MP4';var delBtn=document.createElement('button');delBtn.className='btn-del';delBtn.textContent='Delete';delBtn.dataset.id=v.id;delBtn.onclick=function(){deleteVideo(this.dataset.id,this);};footer.appendChild(badge);footer.appendChild(delBtn);info.appendChild(footer);card.appendChild(info);el.appendChild(card);});}catch(e){el.innerHTML='<div class="empty" style="color:var(--red)">Error: '+e.message+'</div>';}}
 function playVideoEnc(enc){playVideo(JSON.parse(decodeURIComponent(enc)));}
 function playVideo(v){document.getElementById('vmodalTitle').textContent=v.title||'Video';var body=document.getElementById('vmodalBody');while(body.firstChild)body.removeChild(body.firstChild);if(v.type==='youtube'&&v.yt_id){var ifr=document.createElement('iframe');ifr.src='https://www.youtube.com/embed/'+v.yt_id+'?autoplay=1&rel=0';ifr.frameBorder='0';ifr.allowFullscreen=true;ifr.setAttribute('allow','autoplay;encrypted-media;fullscreen');ifr.style.cssText='display:block;width:100%;aspect-ratio:16/9';body.appendChild(ifr);}else{var vid=document.createElement('video');vid.src=v.url;vid.controls=true;vid.autoplay=true;vid.style.cssText='width:100%;aspect-ratio:16/9';body.appendChild(vid);}document.getElementById('vmodal').style.display='flex';}
 function closeVModal(){document.getElementById('vmodal').style.display='none';var b=document.getElementById('vmodalBody');while(b.firstChild)b.removeChild(b.firstChild);}
