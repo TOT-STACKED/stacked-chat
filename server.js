@@ -1256,7 +1256,7 @@ async function submitTicket() {
   try {
     await fetch(SERVER_URL + '/save-ticket', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? '\n\nExtra detail: ' + note : ''), conversation: messages, status: 'open' })
+      body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? ' | Extra detail: ' + note : ''), conversation: messages, status: 'open' })
     });
     closeTicket();
     showToast("✓ Ticket raised — we'll be in touch!", "green");
