@@ -1163,13 +1163,23 @@ function addMessage(role, content, showTicket, video) {
       const map = {'squareup.com':'📦 Square help','sumup.com':'💳 SumUp help','zettle.com':'💳 Zettle help','worldpay.com':'💳 Worldpay help','stripe.com':'💳 Stripe help','lightspeedhq.com':'🖥 Lightspeed help','tevalis.com':'🖥 Tevalis help','eposnow.com':'🖥 EPOS Now help','vitamojo.com':'🍽 Vita Mojo help','opentable.com':'📅 OpenTable help','resdiary.com':'📅 ResDiary help','sevenrooms.com':'📅 SevenRooms help','deputy.com':'📅 Deputy help','deliverect.com':'📦 Deliverect help','nory.ai':'🤖 Nory help','tenzo.io':'📊 Tenzo help'};
       const label = u => { try { const h = new URL(u).hostname.replace('www.',''); for (const [k,v] of Object.entries(map)) { if (h.includes(k)) return v; } return '🔗 '+h; } catch(e) { return '🔗 Link'; } };
       const lr = document.createElement('div'); lr.className = 'link-row';
-      lr.innerHTML = links.map(u => '<a class="link-pill" href="'+u+'" target="_blank" rel="noopener">\↗ '+label(u)+'</a>').join('');
+      links.forEach(function(u) {
+        var a = document.createElement('a');
+        a.className = 'link-pill';
+        a.href = u; a.target = '_blank'; a.rel = 'noopener';
+        a.textContent = '↗ ' + label(u);
+        lr.appendChild(a);
+      });
       msgs.appendChild(lr);
     }
   }
   if (role === 'assistant' && showTicket) {
     const tr = document.createElement('div'); tr.className = 'ticket-row';
-    tr.innerHTML = '<button class="ticket-btn" onclick="openTicket()">🎫 This didn&#39;t solve my issue — raise a ticket</button>';
+    var tb = document.createElement('button');
+    tb.className = 'ticket-btn';
+    tb.textContent = '🎫 This didn\u2019t solve my issue \u2014 raise a ticket';
+    tb.onclick = openTicket;
+    tr.appendChild(tb);
     msgs.appendChild(tr);
   }
   if (role === 'assistant' && video) {
