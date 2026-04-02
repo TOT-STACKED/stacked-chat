@@ -1142,17 +1142,26 @@ function addMessage(role, content, showTicket, video) {
   else { avatar.textContent = (user?.name || 'You')[0].toUpperCase(); avatar.style.background = 'var(--orange)'; avatar.style.color = '#fff'; }
   const bubble = document.createElement('div'); bubble.className = 'msg-bubble';
   if (role === 'assistant') {
-    var t = content;
-    t = t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    t = t.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
-    var urlRe = new RegExp("https?://[^\\s<&]+", "g");
-    t = t.replace(urlRe, function(u) {
-      var a = document.createElement('a');
-      a.href = u; a.target = '_blank'; a.rel = 'noopener';
-      a.style.cssText = 'color:var(--orange);font-weight:600;text-decoration:underline';
-      a.textContent = u;
-      return a.outerHTML;
-    });
+    // Linkify URLs first (before HTML escaping)
+    var urlRe2 = new RegExp("https?://[^\\s]+", "g");
+    var parts = [];
+    var lastIdx = 0;
+    var m;
+    urlRe2.lastIndex = 0;
+    while ((m = urlRe2.exec(content)) !== null) {
+      var pre = content.slice(lastIdx, m.index);
+      pre = pre.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      pre = pre.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
+      parts.push(pre);
+      var url = m[0].replace(/[.,;:!?)]+$/, '');
+      parts.push('<a href="' + url + '" target="_blank" rel="noopener" style="color:var(--orange);font-weight:600;text-decoration:underline">' + url + '</a>');
+      lastIdx = m.index + url.length;
+    }
+    var tail = content.slice(lastIdx);
+    tail = tail.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    tail = tail.replace(/[*][*]([^*]+)[*][*]/g, '<strong>$1</strong>');
+    parts.push(tail);
+    var t = parts.join('');
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
