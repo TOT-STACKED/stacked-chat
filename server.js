@@ -1145,7 +1145,7 @@ function addMessage(role, content, showTicket, video) {
     let t = content;
     t = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     t = t.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
-    t = t.replace(/(https?:\/\/[^\s<&"]+)/g, function(u){return '<a href=' + u + ' target=_blank rel=noopener style="color:var(--orange);font-weight:600;text-decoration:underline">' + u + '</a>';});
+    t = t.replace(/(https?:\/\/[^\s<&"]+)/g, function(u){return "<a href=" + u + " target=_blank rel=noopener style=\"color:var(--orange);font-weight:600;text-decoration:underline\">" + u + "</a>";});
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
