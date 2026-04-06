@@ -56,6 +56,141 @@ General troubleshooting:
 PSP contacts: Worldpay 0330 333 3967, SumUp 020 3510 0160, Square support.squareup.com/en/gb, Stripe 0800 041 8604, Zettle 020 3455 0690, Dojo 0800 060 8085, Adyen support.adyen.com, Elavon 0345 850 0195
 `;
 
+// ─── VENDOR SUPPORT URL LOOKUP ────────────────────────────────────────────
+const VENDOR_SUPPORT_URLS = {
+  // POS
+  'tevalis': 'https://support.tevalis.com',
+  'zonal': 'https://support.zonal.co.uk',
+  'epos now': 'https://www.eposnow.com/us/resource-hub/',
+  'lightspeed': 'https://www.lightspeedhq.com/support/',
+  'square': 'https://squareup.com/help/gb',
+  'toast': 'https://central.toasttab.com/s/',
+  'oracle micros': 'https://www.oracle.com/uk/industries/food-beverage/restaurant-pos/',
+  'icrtouch': 'https://icrtouch.com/support/',
+  'tabology': 'https://support.tabology.com',
+  'storekit': 'https://help.storekit.com',
+  'pepper': 'https://support.getpepper.io',
+  'par brink': 'https://www.partech.com/support',
+  'vita mojo': 'https://support.vitamojo.com',
+  'revel systems': 'https://help.revelsystems.com',
+  'comtrex': 'https://www.comtrex.co.uk/support',
+  'paypoint': 'https://www.paypoint.com/support',
+  // Payments
+  'dojo': 'https://help.dojo.tech',
+  'worldpay': 'https://www.worldpay.com/en-gb/support',
+  'stripe': 'https://support.stripe.com',
+  'zettle': 'https://www.zettle.com/gb/help',
+  'sumup': 'https://help.sumup.com/en-GB',
+  'adyen': 'https://support.adyen.com',
+  'elavon': 'https://www.elavon.co.uk/support',
+  'paymentsense': 'https://www.paymentsense.com/support/',
+  'barclaycard': 'https://www.barclaycard.co.uk/business/support',
+  'tyl': 'https://tyl.co.uk/support',
+  'natwest': 'https://tyl.co.uk/support',
+  'pleo': 'https://help.pleo.io',
+  'soldo': 'https://support.soldo.com',
+  // Reservations
+  'opentable': 'https://help.opentable.com',
+  'resdiary': 'https://support.resdiary.com',
+  'collins': 'https://support.designmynight.com',
+  'sevenrooms': 'https://support.sevenrooms.com',
+  'quandoo': 'https://help.quandoo.com',
+  'resy': 'https://help.resy.com',
+  'tock': 'https://support.exploretock.com',
+  'eat app': 'https://help.eatapp.co',
+  'eveve': 'https://support.eveve.com',
+  'carbonara': 'https://help.carbonara.app',
+  'hostme': 'https://help.hostmeapp.com',
+  'waitwhile': 'https://help.waitwhile.com',
+  // Workforce
+  'fourth': 'https://support.fourth.com',
+  'deputy': 'https://support.deputy.com',
+  'sona': 'https://support.getsona.com',
+  'rotaready': 'https://support.rotaready.com',
+  'bizimply': 'https://support.bizimply.com',
+  'planday': 'https://support.planday.com',
+  's4labour': 'https://www.s4labour.co.uk/support',
+  'hotschedules': 'https://help.hotschedules.com',
+  'workforce.com': 'https://support.workforce.com',
+  'harri': 'https://help.harri.com',
+  'nory': 'https://support.nory.ai',
+  'humanforce': 'https://support.humanforce.com',
+  'homebase': 'https://support.joinhomebase.com',
+  'when i work': 'https://help.wheniwork.com',
+  'tanda': 'https://help.tanda.co',
+  'breathe hr': 'https://support.breathehr.com',
+  'mitrefinch': 'https://www.mitrefinch.co.uk/support',
+  // Online ordering & delivery
+  'deliverect': 'https://support.deliverect.com',
+  'flipdish': 'https://help.flipdish.com',
+  'slerp': 'https://support.slerp.com',
+  'orderswift': 'https://support.orderswift.com',
+  'yoello': 'https://help.yoello.com',
+  'hungrrr': 'https://support.hungrrr.co.uk',
+  'preoday': 'https://support.preoday.com',
+  'deliveroo': 'https://restaurant-hub.deliveroo.com/help',
+  'uber eats': 'https://help.uber.com/restaurants',
+  'just eat': 'https://restaurants.just-eat.co.uk/help',
+  'otter': 'https://help.tryotter.com',
+  // Loyalty & CRM
+  'airship': 'https://support.airship.com',
+  'stampede': 'https://support.stampede.ai',
+  'yumpingo': 'https://support.yumpingo.com',
+  'eagle eye': 'https://eagleeye.com/support',
+  'klaviyo': 'https://help.klaviyo.com',
+  'punchh': 'https://support.punchh.com',
+  'paytronix': 'https://www.paytronix.com/support',
+  'loyalzoo': 'https://support.loyalzoo.com',
+  'como': 'https://support.como.com',
+  // Inventory & procurement
+  'apicbase': 'https://support.apicbase.com',
+  'nutritics': 'https://support.nutritics.com',
+  'crunchtime': 'https://support.crunchtime.com',
+  'marketman': 'https://support.marketman.com',
+  'kitchen cut': 'https://support.kitchencut.com',
+  'winnow': 'https://support.winnowsolutions.com',
+  'foodics': 'https://support.foodics.com',
+  'growyze': 'https://support.growyze.com',
+  'meez': 'https://help.meezrecipes.com',
+  // Hotel PMS
+  'mews': 'https://help.mews.com',
+  'cloudbeds': 'https://help.cloudbeds.com',
+  'guestline': 'https://support.guestline.net',
+  'clock pms': 'https://help.clock-software.com',
+  'opera': 'https://docs.oracle.com/en/industries/hospitality/',
+  'apaleo': 'https://help.apaleo.com',
+  'little hotelier': 'https://help.littlehotelier.com',
+  'siteminder': 'https://help.siteminder.com',
+  'beds24': 'https://beds24.com/support',
+  // Revenue management
+  'ideas': 'https://support.ideas.com',
+  'duetto': 'https://support.duettoresearch.com',
+  'ota insight': 'https://support.otainsight.com',
+  'rategain': 'https://support.rategain.com',
+  // Analytics
+  'tenzo': 'https://help.tenzo.io',
+  'avero': 'https://support.averoinc.com',
+  // WiFi
+  'purple wi-fi': 'https://support.purple.ai',
+  'purple wifi': 'https://support.purple.ai',
+  'cisco meraki': 'https://documentation.meraki.com',
+  'stampede wifi': 'https://support.stampede.ai',
+  // Guest engagement
+  'revinate': 'https://support.revinate.com',
+  'guestrevu': 'https://support.guestrevu.com',
+  'trustyou': 'https://support.trustyou.com',
+  'criton': 'https://support.criton.com',
+  // HR
+  'hibob': 'https://support.hibob.com',
+  'personio': 'https://support.personio.de',
+  'bamboohr': 'https://help.bamboohr.com',
+  'charlie hr': 'https://help.charliehr.com',
+  // Training
+  'typsy': 'https://help.typsy.com',
+  'beekeeper': 'https://support.beekeeper.io',
+  'flow learning': 'https://support.flowlearning.co',
+};
+
 // ─── SUPABASE HELPERS ──────────────────────────────────────────────────────
 async function sbFetch(path, opts = {}) {
   const https = require('https');
@@ -1189,7 +1324,36 @@ function addMessage(role, content, showTicket, video) {
     var urlRegex = new RegExp("https?://[^\\s)>\\]]+", "g");
     const links = [...new Set(content.match(urlRegex) || [])].slice(0, 4);
     if (links.length) {
-      const map = {'squareup.com':'📦 Square help','sumup.com':'💳 SumUp help','zettle.com':'💳 Zettle help','worldpay.com':'💳 Worldpay help','stripe.com':'💳 Stripe help','lightspeedhq.com':'🖥 Lightspeed help','tevalis.com':'🖥 Tevalis help','eposnow.com':'🖥 EPOS Now help','vitamojo.com':'🍽 Vita Mojo help','opentable.com':'📅 OpenTable help','resdiary.com':'📅 ResDiary help','sevenrooms.com':'📅 SevenRooms help','deputy.com':'📅 Deputy help','deliverect.com':'📦 Deliverect help','nory.ai':'🤖 Nory help','tenzo.io':'📊 Tenzo help'};
+      const map = {
+        'squareup.com':'📦 Square support','sumup.com':'💳 SumUp support','zettle.com':'💳 Zettle support',
+        'worldpay.com':'💳 Worldpay support','stripe.com':'💳 Stripe support','dojo.tech':'💳 Dojo support',
+        'adyen.com':'💳 Adyen support','elavon.co.uk':'💳 Elavon support','paymentsense.com':'💳 PaymentSense support',
+        'tyl.co.uk':'💳 Tyl support','barclaycard.co.uk':'💳 Barclaycard support','pleo.io':'💳 Pleo support',
+        'lightspeedhq.com':'🖥 Lightspeed support','tevalis.com':'🖥 Tevalis support','eposnow.com':'🖥 EPOS Now support',
+        'vitamojo.com':'🍽 Vita Mojo support','zonal.co.uk':'🖥 Zonal support','icrtouch.com':'🖥 ICRTouch support',
+        'toasttab.com':'🖥 Toast support','tabology.com':'🖥 Tabology support','storekit.com':'🖥 Storekit support',
+        'getpepper.io':'🖥 Pepper support','partech.com':'🖥 Par Brink support','revelsystems.com':'🖥 Revel support',
+        'opentable.com':'📅 OpenTable support','resdiary.com':'📅 ResDiary support','sevenrooms.com':'📅 SevenRooms support',
+        'designmynight.com':'📅 Collins support','resy.com':'📅 Resy support','quandoo.com':'📅 Quandoo support',
+        'exploretock.com':'📅 Tock support','eatapp.co':'📅 Eat App support','waitwhile.com':'📅 Waitwhile support',
+        'fourth.com':'👥 Fourth support','deputy.com':'👥 Deputy support','getsona.com':'👥 Sona support',
+        'rotaready.com':'👥 Rotaready support','bizimply.com':'👥 Bizimply support','planday.com':'👥 Planday support',
+        's4labour.co.uk':'👥 S4Labour support','hotschedules.com':'👥 HotSchedules support','workforce.com':'👥 Workforce.com support',
+        'harri.com':'👥 Harri support','nory.ai':'👥 Nory support','humanforce.com':'👥 Humanforce support',
+        'deliverect.com':'📦 Deliverect support','flipdish.com':'📦 Flipdish support','slerp.com':'📦 Slerp support',
+        'orderswift.com':'📦 Orderswift support','yoello.com':'📦 Yoello support','tryotter.com':'📦 Otter support',
+        'airship.com':'🎯 Airship support','stampede.ai':'🎯 Stampede support','yumpingo.com':'🎯 Yumpingo support',
+        'eagleeye.com':'🎯 Eagle Eye support','klaviyo.com':'🎯 Klaviyo support',
+        'apicbase.com':'📋 Apicbase support','nutritics.com':'📋 Nutritics support','crunchtime.com':'📋 Crunchtime support',
+        'marketman.com':'📋 Marketman support','kitchencut.com':'📋 Kitchen CUT support','winnowsolutions.com':'📋 Winnow support',
+        'mews.com':'🏨 Mews support','cloudbeds.com':'🏨 Cloudbeds support','guestline.net':'🏨 Guestline support',
+        'clock-software.com':'🏨 Clock PMS support','oracle.com':'🏨 Opera support',
+        'tenzo.io':'📊 Tenzo support','otainsight.com':'📊 OTA Insight support',
+        'purple.ai':'📶 Purple Wi-Fi support','meraki.com':'📶 Cisco Meraki support',
+        'revinate.com':'💬 Revinate support','guestrevu.com':'💬 GuestRevu support',
+        'hibob.com':'👤 HiBob support','personio.de':'👤 Personio support','bamboohr.com':'👤 BambooHR support',
+        'typsy.com':'🎓 Typsy support','beekeeper.io':'🎓 Beekeeper support',
+      };
       var label = function(u) { try { var h = new URL(u).hostname.replace('www.',''); var entries = Object.keys(map); for (var k=0;k<entries.length;k++){if(h.includes(entries[k]))return map[entries[k]];} return h; } catch(e){return u;} };
       const lr = document.createElement('div'); lr.className = 'link-row';
       links.forEach(function(u) {
@@ -2163,7 +2327,17 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
         });
 
         const rawReply = apiRes.content?.[0]?.text || 'Sorry, I could not get a response. Please try again.';
-        const reply = rawReply.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2');
+        let reply = rawReply.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2');
+        // Ensure a support URL pill always appears — inject one if Claude didn't include it
+        if (!/https?:\/\//.test(reply)) {
+          const combined = (message + ' ' + reply).toLowerCase();
+          for (const [vendor, url] of Object.entries(VENDOR_SUPPORT_URLS)) {
+            if (combined.includes(vendor)) {
+              reply = reply + '\n\n' + url;
+              break;
+            }
+          }
+        }
 
         let relevantVideos = [];
         let finalReply = reply;
