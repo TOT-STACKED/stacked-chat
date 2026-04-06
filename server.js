@@ -2844,10 +2844,16 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
         let type = 'mp4', thumbnail = '', ytId = null;
         const ytMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
         if (ytMatch) { ytId = ytMatch[1]; type = 'youtube'; thumbnail = 'https://img.youtube.com/vi/' + ytId + '/mqdefault.jpg'; }
-        const record = { url: videoUrl, title: title || ytId || 'Untitled', description: description || '', type, thumbnail, tenant: tenant || 'stacked', yt_id: ytId || null, category: category || '' };
-        const r = await sbFetch('/rest/v1/videos', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: record });
+        const record = { url: videoUrl, title: title || ytId || 'Untitled', description: description || '', type, thumbnail, tenant: tenant || 'stacked', yt_id: ytId || null };
+        if (category) record.category = category;
+        let r = await sbFetch('/rest/v1/videos', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: record });
+        // If category column doesn't exist yet, retry without it
+        if (r.status >= 400 && category) {
+          delete record.category;
+          r = await sbFetch('/rest/v1/videos', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: record });
+        }
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok: true, video: Array.isArray(r.data) ? r.data[0] : r.data }));
+        res.end(JSON.stringify({ ok: r.status < 400, video: Array.isArray(r.data) ? r.data[0] : r.data }));
       } catch(e) { res.writeHead(500, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:e.message})); }
     }); return;
   }
@@ -2908,16 +2914,28 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
         let added = 0;
         for (const v of videos) {
           try {
-            await sbFetch('/rest/v1/videos', {
+            const record = {
+              url: v.url, title: v.title, description: v.description || '',
+              type: 'youtube', thumbnail: v.thumbnail, yt_id: v.yt_id,
+              tenant: 'stacked'
+            };
+            if (category) record.category = category;
+            const r = await sbFetch('/rest/v1/videos', {
               method: 'POST',
               headers: { 'Prefer': 'return=minimal' },
-              body: {
-                url: v.url, title: v.title, description: v.description || '',
-                type: 'youtube', thumbnail: v.thumbnail, yt_id: v.yt_id,
-                category: category || '', tenant: 'stacked'
-              }
+              body: record
             });
-            added++;
+            if (r.status >= 200 && r.status < 300) {
+              added++;
+            } else {
+              console.error('Import Supabase error:', r.status, JSON.stringify(r.data));
+              // If category column missing, retry without it
+              if (JSON.stringify(r.data).includes('category')) {
+                delete record.category;
+                const r2 = await sbFetch('/rest/v1/videos', { method: 'POST', headers: { 'Prefer': 'return=minimal' }, body: record });
+                if (r2.status >= 200 && r2.status < 300) added++;
+              }
+            }
           } catch(e) { console.error('Import error:', e.message); }
         }
         res.writeHead(200, {'Content-Type':'application/json'});
