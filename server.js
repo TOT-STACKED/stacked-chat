@@ -320,49 +320,47 @@ const STACKED_CHAT = `<!DOCTYPE html>
   /* ─── GATE ─── */
   #gate {
     position: fixed; inset: 0;
-    background: #060d1a;
-    background-image: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(15,155,255,0.18) 0%, transparent 70%),
-                      radial-gradient(ellipse 50% 40% at 80% 100%, rgba(15,155,255,0.08) 0%, transparent 60%);
+    background: #f4f7fb;
+    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(15,155,255,0.10) 0%, transparent 70%),
+                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(15,155,255,0.06) 0%, transparent 60%);
     display: flex; align-items: center; justify-content: center;
     z-index: 100; padding: 16px; overflow-y: auto;
   }
   #gate.hidden { display: none; }
   .gate-card {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
+    background: #ffffff;
+    border: 1px solid #e4eaf2;
     border-radius: 20px;
     padding: 36px 32px;
     width: 100%; max-width: 400px;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    box-shadow: 0 4px 6px rgba(15,155,255,0.04), 0 16px 48px rgba(15,37,64,0.08);
     text-align: left;
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
   }
-  .gate-logo { height: 32px; max-width: 160px; object-fit: contain; margin-bottom: 28px; filter: brightness(0) invert(1); opacity: 0.9; display: block; }
+  .gate-logo { height: 32px; max-width: 160px; object-fit: contain; margin-bottom: 28px; filter: brightness(0) saturate(100%) invert(42%) sepia(85%) saturate(450%) hue-rotate(179deg) brightness(108%); display: block; }
   .gate-card h2 {
     font-family: 'Inter', sans-serif;
     font-size: 22px; font-weight: 700;
-    color: #ffffff; letter-spacing: -0.5px;
+    color: #0d2540; letter-spacing: -0.5px;
     margin-bottom: 6px; line-height: 1.2;
   }
   .gate-sub { display: none; }
   .gate-card p {
     font-family: 'Inter', sans-serif;
-    font-size: 14px; color: rgba(255,255,255,0.45);
-    margin-bottom: 28px; line-height: 1.5; font-weight: 400;
+    font-size: 14px; color: #6b87a0;
+    margin-bottom: 24px; line-height: 1.5; font-weight: 400;
   }
   .gate-input {
     width: 100%; padding: 12px 14px;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid #dde4ee;
     border-radius: 10px;
     font-family: 'Inter', sans-serif; font-size: 14px;
-    color: #fff;
-    background: rgba(255,255,255,0.06);
+    color: #0d2540;
+    background: #f8fafc;
     margin-bottom: 10px; outline: none;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .gate-input:focus { border-color: var(--orange); background: rgba(255,255,255,0.09); }
-  .gate-input::placeholder { color: rgba(255,255,255,0.3); }
+  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(15,155,255,0.1); }
+  .gate-input::placeholder { color: #a0b4c8; }
   .gate-btn {
     width: 100%; padding: 13px;
     background: var(--orange);
@@ -381,28 +379,28 @@ const STACKED_CHAT = `<!DOCTYPE html>
   .venue-wrap .gate-input { margin-bottom: 0; }
   .venue-dropdown {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: #0e1928; border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.5); z-index: 200;
+    background: #fff; border: 1px solid #dde4ee;
+    border-radius: 12px; box-shadow: 0 8px 24px rgba(15,37,64,0.10); z-index: 200;
     overflow: hidden; display: none;
   }
   .venue-dropdown.open { display: block; }
   .venue-option {
     padding: 12px 14px; font-size: 14px; font-family: 'Inter', sans-serif;
-    color: rgba(255,255,255,0.85); cursor: pointer; text-align: left;
-    border-bottom: 1px solid rgba(255,255,255,0.07); transition: background 0.1s;
+    color: #0d2540; cursor: pointer; text-align: left;
+    border-bottom: 1px solid #f0f4f8; transition: background 0.1s;
     display: flex; align-items: center; gap: 10px;
   }
   .venue-option:last-child { border-bottom: none; }
-  .venue-option:hover { background: rgba(255,255,255,0.06); }
+  .venue-option:hover { background: #f4f7fb; }
   .venue-option .venue-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
   .venue-option .venue-dot.new { background: var(--green); }
-  .venue-option strong { font-weight: 600; color: #fff; }
-  .venue-option span { font-size: 12px; color: rgba(255,255,255,0.4); }
+  .venue-option strong { font-weight: 600; color: #0d2540; }
+  .venue-option span { font-size: 12px; color: #6b87a0; }
   .venue-confirmed {
-    background: rgba(42,157,92,0.1); border: 1px solid rgba(42,157,92,0.25);
+    background: rgba(42,157,92,0.07); border: 1px solid rgba(42,157,92,0.2);
     border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;
     display: none; align-items: center; gap: 10px; font-size: 14px; font-weight: 500;
-    color: rgba(255,255,255,0.85); text-align: left; font-family: 'Inter', sans-serif;
+    color: #0d2540; text-align: left; font-family: 'Inter', sans-serif;
   }
   .venue-confirmed.show { display: flex; }
   .venue-confirmed .vc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
