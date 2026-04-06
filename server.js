@@ -303,7 +303,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
 <title>Stacked Chat</title>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Righteous&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Righteous&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -318,51 +318,94 @@ const STACKED_CHAT = `<!DOCTYPE html>
   body { height: 100%; height: 100dvh; background: var(--cream); font-family: 'DM Sans', sans-serif; color: var(--brown); overflow: hidden; overscroll-behavior: none; touch-action: pan-y; max-width: 100vw; }
 
   /* ─── GATE ─── */
-  #gate { position: fixed; inset: 0; background: var(--cream); display: flex; align-items: flex-start; justify-content: center; z-index: 100; padding: 16px; overflow-y: auto; }
+  #gate {
+    position: fixed; inset: 0;
+    background: #060d1a;
+    background-image: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(15,155,255,0.18) 0%, transparent 70%),
+                      radial-gradient(ellipse 50% 40% at 80% 100%, rgba(15,155,255,0.08) 0%, transparent 60%);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100; padding: 16px; overflow-y: auto;
+  }
   #gate.hidden { display: none; }
-  .gate-card { background: var(--white); border-radius: 24px; padding: 28px 24px; width: 100%; max-width: 420px; box-shadow: var(--shadow-lg); text-align: center; margin: auto; }
-  .gate-logo { height: 44px; max-width: 240px; object-fit: contain; margin-bottom: 4px; filter: brightness(0) saturate(100%) invert(42%) sepia(85%) saturate(450%) hue-rotate(179deg) brightness(108%); }
-  .gate-sub { font-size: 13px; color: var(--brown-mid); margin-bottom: 28px; font-weight: 400; letter-spacing: 0.02em; }
-  .gate-card h2 { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
-  .gate-card p { font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; line-height: 1.5; }
-  .gate-input { width: 100%; padding: 13px 16px; border: 1.5px solid var(--cream-dark); border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--brown); background: var(--cream); margin-bottom: 12px; outline: none; transition: border-color 0.2s; }
-  .gate-input:focus { border-color: var(--orange); background: var(--white); }
-  .gate-input::placeholder { color: var(--brown-mid); opacity: 0.6; }
-  .gate-btn { width: 100%; padding: 14px; background: var(--orange); color: #fff; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 4px; transition: background 0.2s, transform 0.1s; }
-  .gate-btn:hover { background: var(--orange-light); }
-  .gate-btn:active { transform: scale(0.98); }
-  .gate-error { font-size: 13px; color: var(--red); margin-top: -6px; margin-bottom: 8px; display: none; }
+  .gate-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 20px;
+    padding: 36px 32px;
+    width: 100%; max-width: 400px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+    text-align: left;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+  .gate-logo { height: 32px; max-width: 160px; object-fit: contain; margin-bottom: 28px; filter: brightness(0) invert(1); opacity: 0.9; display: block; }
+  .gate-card h2 {
+    font-family: 'Inter', sans-serif;
+    font-size: 22px; font-weight: 700;
+    color: #ffffff; letter-spacing: -0.5px;
+    margin-bottom: 6px; line-height: 1.2;
+  }
+  .gate-sub { display: none; }
+  .gate-card p {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px; color: rgba(255,255,255,0.45);
+    margin-bottom: 28px; line-height: 1.5; font-weight: 400;
+  }
+  .gate-input {
+    width: 100%; padding: 12px 14px;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    font-family: 'Inter', sans-serif; font-size: 14px;
+    color: #fff;
+    background: rgba(255,255,255,0.06);
+    margin-bottom: 10px; outline: none;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .gate-input:focus { border-color: var(--orange); background: rgba(255,255,255,0.09); }
+  .gate-input::placeholder { color: rgba(255,255,255,0.3); }
+  .gate-btn {
+    width: 100%; padding: 13px;
+    background: var(--orange);
+    color: #fff; border: none; border-radius: 10px;
+    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
+    cursor: pointer; margin-top: 6px;
+    transition: opacity 0.15s, transform 0.1s;
+    letter-spacing: -0.2px;
+  }
+  .gate-btn:hover { opacity: 0.88; }
+  .gate-btn:active { transform: scale(0.99); }
+  .gate-error { font-size: 13px; color: #ff6b6b; margin-top: -4px; margin-bottom: 8px; display: none; font-family: 'Inter', sans-serif; }
 
   /* ─── VENUE AUTOCOMPLETE ─── */
-  .venue-wrap { position: relative; margin-bottom: 12px; }
+  .venue-wrap { position: relative; margin-bottom: 10px; }
   .venue-wrap .gate-input { margin-bottom: 0; }
   .venue-dropdown {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: var(--white); border: 1.5px solid var(--cream-dark);
-    border-radius: 12px; box-shadow: var(--shadow-lg); z-index: 200;
+    background: #0e1928; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px; box-shadow: 0 16px 40px rgba(0,0,0,0.5); z-index: 200;
     overflow: hidden; display: none;
   }
   .venue-dropdown.open { display: block; }
   .venue-option {
-    padding: 12px 16px; font-size: 14px; font-family: 'DM Sans', sans-serif;
-    color: var(--brown); cursor: pointer; text-align: left;
-    border-bottom: 1px solid var(--cream-dark); transition: background 0.1s;
+    padding: 12px 14px; font-size: 14px; font-family: 'Inter', sans-serif;
+    color: rgba(255,255,255,0.85); cursor: pointer; text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.07); transition: background 0.1s;
     display: flex; align-items: center; gap: 10px;
   }
   .venue-option:last-child { border-bottom: none; }
-  .venue-option:hover { background: var(--cream); }
-  .venue-option .venue-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
+  .venue-option:hover { background: rgba(255,255,255,0.06); }
+  .venue-option .venue-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
   .venue-option .venue-dot.new { background: var(--green); }
-  .venue-option strong { font-weight: 600; }
-  .venue-option span { font-size: 12px; color: var(--brown-mid); }
+  .venue-option strong { font-weight: 600; color: #fff; }
+  .venue-option span { font-size: 12px; color: rgba(255,255,255,0.4); }
   .venue-confirmed {
-    background: rgba(42,157,92,0.08); border: 1.5px solid rgba(42,157,92,0.3);
-    border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
+    background: rgba(42,157,92,0.1); border: 1px solid rgba(42,157,92,0.25);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;
     display: none; align-items: center; gap: 10px; font-size: 14px; font-weight: 500;
-    color: var(--brown); text-align: left;
+    color: rgba(255,255,255,0.85); text-align: left; font-family: 'Inter', sans-serif;
   }
   .venue-confirmed.show { display: flex; }
-  .venue-confirmed .vc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .venue-confirmed .vc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
   .venue-confirmed .vc-change { margin-left: auto; font-size: 12px; color: var(--orange); cursor: pointer; font-weight: 600; }
 
   /* ─── APP SHELL ─── */
@@ -557,9 +600,8 @@ const STACKED_CHAT = `<!DOCTYPE html>
 <div id="gate">
   <div class="gate-card">
     <img class="gate-logo" id="gateWordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
-    <p class="gate-sub">Hospitality tech support, powered by AI</p>
-    <h2>Welcome &mdash; let's get you sorted</h2>
-    <p>Drop your details below and we'll have you chatting in seconds.</p>
+    <h2>Fix it fast.</h2>
+    <p>AI support for hospitality tech — enter your details to get started.</p>
     <input class="gate-input" type="text" id="gateName" placeholder="Your name" autocomplete="given-name">
 
     <!-- Venue autocomplete -->
