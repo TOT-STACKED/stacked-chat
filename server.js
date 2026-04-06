@@ -3,6 +3,7 @@ const http = require('http');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yuzlfocqovwhqdpitvxj.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
+const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 
 const KNOWLEDGE_BASE = `
 You have access to a comprehensive knowledge base of hospitality technology vendor guides.
@@ -190,6 +191,31 @@ const VENDOR_SUPPORT_URLS = {
   'beekeeper': 'https://support.beekeeper.io',
   'flow learning': 'https://support.flowlearning.co',
 };
+
+// ─── SLACK ALERT ──────────────────────────────────────────────────────────
+async function sendSlackAlert({ venue, userName, email, issue, turns }) {
+  if (!SLACK_WEBHOOK_URL) return;
+  const https = require('https');
+  const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const text = [
+    '🚨 *Escalation Alert — Stacked Chat*',
+    `*Venue:* ${venue || 'Unknown'}`,
+    `*User:* ${userName || 'Unknown'} (${email || 'no email'})`,
+    `*Issue:* ${issue}`,
+    `*Conversation length:* ${turns} message${turns !== 1 ? 's' : ''}`,
+    `*Time:* ${now}`,
+  ].join('\n');
+  const body = JSON.stringify({ text });
+  const url = new URL(SLACK_WEBHOOK_URL);
+  return new Promise((res) => {
+    const req = https.request({
+      hostname: url.hostname, path: url.pathname + url.search,
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, (r) => { r.resume(); r.on('end', res); });
+    req.on('error', () => {});
+    req.write(body); req.end();
+  });
+}
 
 // ─── SUPABASE HELPERS ──────────────────────────────────────────────────────
 async function sbFetch(path, opts = {}) {
@@ -489,6 +515,11 @@ const STACKED_CHAT = `<!DOCTYPE html>
   .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; color: #fff; transition: background 0.15s; }
   .modal-submit:hover { background: var(--orange-light); }
   .toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--brown); color: #fff; border-radius: 20px; padding: 10px 20px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap; }
+  .escalation-banner { display: flex; align-items: flex-start; gap: 12px; background: #fff8f0; border: 1.5px solid #f59e42; border-radius: 16px; padding: 14px 16px; margin: 0 0 4px 42px; max-width: min(calc(100vw - 90px), 520px); }
+  .escalation-banner .esc-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .escalation-banner .esc-body { flex: 1; }
+  .escalation-banner .esc-title { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 3px; }
+  .escalation-banner .esc-sub { font-family: 'Inter', sans-serif; font-size: 12px; color: #b45309; line-height: 1.4; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.green { background: var(--green); }
   .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
@@ -1310,6 +1341,7 @@ async function sendMessage() {
     const data = await res.json();
     const reply = data.response || "Sorry, I couldn't get a response. Please try again.";
     const supportUrl = data.supportUrl || null;
+    const shouldEscalate = data.escalate || false;
     lastBotMsg = reply;
     typing.remove();
     let videoData = null, displayReply = reply;
@@ -1319,6 +1351,13 @@ async function sendMessage() {
       if (vtagEnd > -1) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
     }
     addMessage('assistant', displayReply, true, videoData, supportUrl);
+    if (shouldEscalate) {
+      const msgs = document.getElementById('messages');
+      const banner = document.createElement('div'); banner.className = 'escalation-banner';
+      banner.innerHTML = '<div class="esc-icon">🚨</div><div class="esc-body"><div class="esc-title">We\'ve flagged this for our team</div><div class="esc-sub">A member of the Stacked team has been alerted and will follow up with you shortly.</div></div>';
+      msgs.appendChild(banner);
+      msgs.scrollTop = msgs.scrollHeight;
+    }
     messages.push({ role: 'assistant', content: displayReply });
     await saveConversation();
   } catch(e) {
@@ -2206,6 +2245,8 @@ const server = http.createServer(async (req, res) => {
 
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
 
+ESCALATION: If the issue clearly needs human intervention — for example the user has tried all steps and it's still broken, there is data loss, a vendor outage, account access issues only the vendor can fix, or the user is losing significant revenue — add [ESCALATE] on its own line at the very end of your response. Keep your reply helpful and reassuring; the system will handle alerting the team automatically.
+
 Your personality:
 - Calm under pressure (operators often message you during a crisis)
 - Straight to the point — no waffle
@@ -2395,8 +2436,38 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
           }
         } catch(e) {}
 
+        // ─── ESCALATION DETECTION ────────────────────────────────────────
+        const ESCALATION_PHRASES = [
+          'speak to someone','talk to someone','need a human','need a person',
+          'real person','human agent','actual person','still not working',
+          'still broken','nothing works','tried everything','tried all','not fixed',
+          'losing money','losing sales','no solution','cant fix','can\'t fix','given up'
+        ];
+        const botEscalate = rawReply.includes('[ESCALATE]');
+        const userEscalate = ESCALATION_PHRASES.some(p => message.toLowerCase().includes(p));
+        const longUnresolved = history.length >= 10;
+        const shouldEscalate = botEscalate || userEscalate || longUnresolved;
+
+        // Strip [ESCALATE] tag from reply text
+        reply = reply.replace(/\[ESCALATE\]/g, '').trim();
+        finalReply = finalReply.replace(/\[ESCALATE\]/g, '').trim();
+
+        if (shouldEscalate) {
+          try {
+            const issue = history.length > 0
+              ? history.find(m => m.role === 'user')?.content || message
+              : message;
+            await sbFetch('/rest/v1/tickets', {
+              method: 'POST',
+              headers: { 'Prefer': 'return=minimal' },
+              body: { email: 'escalation@stackedchat.io', name: userName || 'Unknown', venue: venue || 'Unknown', issue: issue.substring(0, 300), status: 'open', escalated: true }
+            });
+            await sendSlackAlert({ venue, userName, email: 'via chat', issue: message.substring(0, 200), turns: history.length + 1 });
+          } catch(e) { console.error('Escalation error:', e); }
+        }
+
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, videos:relevantVideos}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
