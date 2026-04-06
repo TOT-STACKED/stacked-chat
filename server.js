@@ -252,7 +252,7 @@ async function getAnalytics() {
   try {
     const [convsR, ticketsR, docsR, healthR] = await Promise.all([
       sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=200'),
-      sbFetch('/rest/v1/tickets?select=id,email,name,venue,issue,status,escalated,created_at&order=created_at.desc&limit=100'),
+      sbFetch('/rest/v1/tickets?select=*&order=created_at.desc&limit=100'),
       sbFetch('/rest/v1/documents?select=filename,created_at&order=created_at.desc&limit=1000'),
       sbFetch('/rest/v1/health_checks?select=*&order=checked_at.desc&limit=200'),
     ]);
