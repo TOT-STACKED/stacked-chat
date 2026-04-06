@@ -2025,6 +2025,7 @@ async function loadAnalytics() {
 }
 
 function toggleConv(el) { el.classList.toggle('open'); }
+function imgErr(el) { el.style.display='none'; }
 function renderTicketTable(tickets) {
   const tt=document.getElementById('ticketsTable');
   if(!tickets.length){tt.innerHTML='<div class="empty">No tickets found</div>';return;}
@@ -2207,7 +2208,7 @@ function renderYtGrid(items){
   if(!items.length){grid.innerHTML='<div class="empty">No results</div>';return;}
   grid.innerHTML=items.map((v,i)=>'<div class="video-card" id="ytc'+i+'" style="cursor:pointer;position:relative" onclick="ytToggle('+i+',this)">'+
     '<div style="position:absolute;top:8px;left:8px;z-index:2;width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" id="ytchk'+i+'"></div>'+
-    '<img class="video-thumb" src="'+esc(v.thumbnail)+'" onerror="this.style.display=\'none\'">'+
+    '<img class="video-thumb" src="'+esc(v.thumbnail)+'" onerror="imgErr(this)">'+
     '<div class="video-info"><div class="video-title">'+esc(v.title)+'</div>'+
     '<div class="video-desc">'+esc(v.channel)+'</div>'+
     '<div class="video-footer"><span class="vbadge youtube">YouTube</span></div></div></div>').join('');
