@@ -417,14 +417,14 @@ const STACKED_CHAT = `<!DOCTYPE html>
   .user-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
   main { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px 16px 8px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; width: 100%; }
-  .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 32px 16px; gap: 12px; text-align: center; }
-  .welcome-wordmark { height: 52px; margin-bottom: 0px; max-width: 320px; object-fit: contain; filter: brightness(0) saturate(100%) invert(42%) sepia(85%) saturate(450%) hue-rotate(179deg) brightness(108%); }
-  .welcome h2 { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700; line-height: 1.2; }
-  .welcome p { font-size: 14px; color: var(--brown-mid); margin-bottom: 8px; }
-  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 380px; }
-  .quick-btn { background: var(--white); border: 2px solid var(--cream-dark); border-radius: 16px; padding: 18px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; color: var(--brown); cursor: pointer; text-align: left; transition: border-color 0.2s, box-shadow 0.2s, transform 0.1s; line-height: 1.25; min-height: 90px; display: flex; flex-direction: column; justify-content: flex-end; }
-  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(15,155,255,0.15); transform: translateY(-1px); }
-  .quick-btn .emoji { font-size: 24px; display: block; margin-bottom: 8px; }
+  .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 28px 20px 20px; gap: 0; text-align: center; }
+  .welcome-wordmark { height: 36px; margin-bottom: 16px; max-width: 200px; object-fit: contain; filter: brightness(0) saturate(100%) invert(42%) sepia(85%) saturate(450%) hue-rotate(179deg) brightness(108%); }
+  .welcome h2 { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -0.4px; color: var(--brown); margin-bottom: 6px; }
+  .welcome p { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; }
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-bottom: 12px; }
+  .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s; line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
+  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(15,155,255,0.12); transform: translateY(-1px); }
+  .quick-btn .emoji { font-size: 20px; }
   .msg { display: flex; align-items: flex-start; gap: 10px; max-width: 100%; }
   .msg.user { flex-direction: row-reverse; }
   .msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: var(--cream-dark); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--brown); overflow: hidden; }
@@ -491,8 +491,8 @@ const STACKED_CHAT = `<!DOCTYPE html>
   .toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--brown); color: #fff; border-radius: 20px; padding: 10px 20px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.green { background: var(--green); }
-  .social-proof { display: flex; align-items: center; gap: 6px; background: var(--white); border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--brown-mid); box-shadow: var(--shadow); margin-bottom: 4px; }
-  .social-proof .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse-green 2s infinite; }
+  .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
+  .social-proof .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse-green 2s infinite; }
   @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(42,157,92,0.4); } 50% { box-shadow: 0 0 0 5px rgba(42,157,92,0); } }
   .predict-section { width: 100%; max-width: 380px; margin-top: 4px; }
   .predict-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.6; margin-bottom: 8px; text-align: left; padding-left: 2px; }
@@ -539,16 +539,15 @@ const STACKED_CHAT = `<!DOCTYPE html>
 
   /* ─── SHIFT CHECK ─── */
   .shift-check-btn {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--white); border: 2px solid var(--cream-dark);
-    border-radius: 20px; padding: 9px 18px;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
-    color: var(--brown); cursor: pointer; margin-top: 4px;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    box-shadow: var(--shadow);
+    display: flex; align-items: center; gap: 6px;
+    background: none; border: 1px solid var(--cream-dark);
+    border-radius: 20px; padding: 8px 16px;
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+    color: var(--brown-mid); cursor: pointer; margin-top: 4px;
+    transition: border-color 0.15s, color 0.15s;
   }
-  .shift-check-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(15,155,255,0.15); }
-  .shift-check-btn .sc-icon { font-size: 16px; }
+  .shift-check-btn:hover { border-color: var(--orange); color: var(--brown); }
+  .shift-check-btn .sc-icon { font-size: 14px; }
 
   .sc-step { padding: 16px 0; border-bottom: 1px solid var(--cream-dark); }
   .sc-step:last-child { border-bottom: none; }
@@ -686,29 +685,20 @@ const STACKED_CHAT = `<!DOCTYPE html>
     <div id="messages">
       <div class="welcome" id="welcome">
         <img class="welcome-wordmark" id="welcomeWordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
-        <div style="font-family:'Righteous',sans-serif;font-size:22px;letter-spacing:0.05em;text-transform:uppercase;color:var(--orange);margin-top:2px;margin-bottom:8px;">CHAT</div>
-        <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Loading&hellip;</span></div>
-        <h2>Got a tech problem?<br>Let's fix it.</h2>
+        <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Hospitality tech support, powered by AI</span></div>
+        <h2>What can we fix<br>for you today?</h2>
         <p id="welcomeVenue">Ask anything about your hospitality tech.</p>
+        <div class="quick-grid" id="quickGrid"></div>
+        <button class="shift-check-btn" onclick="openShiftCheck()" id="shiftCheckBtn">
+          <span class="sc-icon">&#x2705;</span> Start of shift check
+        </button>
         <div class="predict-section" id="predictSection" style="display:none">
-          <div class="predict-label" id="predictLabel">Trending right now</div>
           <div class="predict-grid" id="predictGrid"></div>
         </div>
-        <div class="quick-grid" id="quickGrid" style="margin-top:8px;"></div>
-        <button class="shift-check-btn" onclick="openShiftCheck()" id="shiftCheckBtn">
-          <span class="sc-icon">&#x2705;</span> Start shift check
-        </button>
         <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none">
-          <div class="tip-header">
-            <span class="tip-badge">Tip of the day</span>
-            <span class="tip-product" id="tipProduct"></span>
-          </div>
+          <div class="tip-header"><span class="tip-badge">Tip of the day</span><span class="tip-product" id="tipProduct"></span></div>
           <div class="tip-text" id="tipText"></div>
-          <div class="tip-cta">Tap to explore in chat &rarr;</div>
-        </div>
-        <div class="qr-section" id="qrSection">
-          <div class="qr-box" id="qrCode" title="Share this with your team"></div>
-          <div class="qr-label">Share with your team &mdash; scan to open</div>
+          <div class="tip-cta">Tap to explore &rarr;</div>
         </div>
       </div>
     </div>
