@@ -339,15 +339,35 @@ async function getAnalytics() {
   } catch(e) { console.error('Analytics error:', e); return { error: e.message }; }
 }
 
+// ─── CHAT PAGE BUILDER ─────────────────────────────────────────────────────
+// Accepts a branding object and returns a fully branded HTML page.
+// Default branding = Stacked. White-label = venue's own logo/colour/botname.
+function buildChatPage(b = {}) {
+  const logoUrl = b.logo_url || 'https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg';
+  const primaryColor = b.primary_color || '#0F9BFF';
+  const botName = b.bot_name || 'Stacked Chat';
+  const welcomeMsg = b.welcome_message || 'AI support for hospitality tech — enter your details to get started.';
+  const welcomeHeading = b.welcome_heading || 'What can we fix<br>for you today?';
+  const poweredBy = b.white_label ? '' : '<a href="https://stackedchat.io" target="_blank" rel="noopener" style="display:block;text-align:center;padding:8px;font-size:11px;color:#94a3b8;text-decoration:none;font-family:Inter,sans-serif;">Powered by <strong style="color:#0F9BFF">Stacked Chat</strong></a>';
+  // Inject branding into the template
+  return STACKED_CHAT_TEMPLATE
+    .replace(/\{\{LOGO_URL\}\}/g, logoUrl)
+    .replace(/\{\{PRIMARY_COLOR\}\}/g, primaryColor)
+    .replace(/\{\{BOT_NAME\}\}/g, botName)
+    .replace(/\{\{WELCOME_MSG\}\}/g, welcomeMsg)
+    .replace(/\{\{WELCOME_HEADING\}\}/g, welcomeHeading)
+    .replace(/\{\{POWERED_BY\}\}/g, poweredBy);
+}
+
 // ─── STACKED CHAT PAGE ────────────────────────────────────────────────────
 // Gate has venue autocomplete: user types, dropdown shows matching venues,
 // they pick one (joins) or hit "Create new venue" (creates).
-const STACKED_CHAT = `<!DOCTYPE html>
+const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Stacked Chat</title>
+<title>{{BOT_NAME}}</title>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Righteous&display=swap" rel="stylesheet">
@@ -355,7 +375,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
     --cream: #eef4fb; --cream-dark: #d4e6f7;
-    --orange: #0F9BFF; --orange-light: #3db0ff;
+    --orange: {{PRIMARY_COLOR}}; --orange-light: {{PRIMARY_COLOR}}cc;
     --brown: #0d2540; --brown-mid: #3a6080;
     --white: #ffffff; --green: #2a9d5c; --red: #d64545;
     --shadow: 0 2px 16px rgba(15,155,255,0.10);
@@ -655,9 +675,9 @@ const STACKED_CHAT = `<!DOCTYPE html>
 <!-- ─── GATE ─── -->
 <div id="gate">
   <div class="gate-card">
-    <img class="gate-logo" id="gateWordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
+    <img class="gate-logo" id="gateWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
     <h2>Fix it fast.</h2>
-    <p>AI support for hospitality tech — enter your details to get started.</p>
+    <p>{{WELCOME_MSG}}</p>
     <input class="gate-input" type="text" id="gateName" placeholder="Your name" autocomplete="given-name">
 
     <!-- Venue autocomplete -->
@@ -683,7 +703,7 @@ const STACKED_CHAT = `<!DOCTYPE html>
 <div id="app">
   <header>
     <a href="https://wearestacked.io" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:flex-start;text-decoration:none;gap:2px;">
-      <img class="header-logo" id="headerIcon" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
+      <img class="header-logo" id="headerIcon" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
       <span style="font-family:'Righteous',sans-serif;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--orange);padding-left:1px;margin-top:2px;">CHAT</span>
     </a>
     <div class="header-actions">
@@ -751,9 +771,9 @@ const STACKED_CHAT = `<!DOCTYPE html>
     </div>
     <div id="messages">
       <div class="welcome" id="welcome">
-        <img class="welcome-wordmark" id="welcomeWordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
+        <img class="welcome-wordmark" id="welcomeWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
         <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Hospitality tech support, powered by AI</span></div>
-        <h2>What can we fix<br>for you today?</h2>
+        <h2>{{WELCOME_HEADING}}</h2>
         <p id="welcomeVenue">Ask anything about your hospitality tech.</p>
         <div class="quick-grid" id="quickGrid"></div>
         <button class="shift-check-btn" onclick="openShiftCheck()" id="shiftCheckBtn">
@@ -1624,6 +1644,7 @@ function closeCvModal() {
   const b = document.getElementById('cvModalBody'); while(b.firstChild) b.removeChild(b.firstChild);
 }
 </script>
+{{POWERED_BY}}
 </body>
 </html>`;
 
@@ -1831,8 +1852,69 @@ tbody tr:hover td{background:var(--surface2)}
   </div>
 
   <div class="tab-panel" id="tab-venues">
-    <div class="page-header"><div><div class="page-title">Venues</div><div class="page-sub" id="venueCount">&mdash;</div></div></div>
+    <div class="page-header">
+      <div><div class="page-title">Venues</div><div class="page-sub" id="venueCount">&mdash;</div></div>
+      <button class="btn btn-primary" onclick="showBrandingModal()">+ Set up branding</button>
+    </div>
     <div id="venueGrid" class="venue-grid"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- Branding Modal -->
+  <div id="brandingModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px">
+    <div style="background:var(--surface);border-radius:12px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">
+        <div style="font-size:15px;font-weight:600;color:var(--text)">Venue Branding</div>
+        <button onclick="closeBrandingModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3)">&#x2715;</button>
+      </div>
+      <div style="padding:24px;display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Venue</label>
+          <select id="bVenueSelect" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+            <option value="">Loading venues...</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Logo URL</label>
+          <input id="bLogoUrl" type="url" placeholder="https://yoursite.com/logo.png" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Link to a PNG or SVG — ideally on a transparent background</div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Brand colour</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input id="bColorPicker" type="color" value="#0F9BFF" style="width:44px;height:36px;border:1px solid var(--border2);border-radius:6px;cursor:pointer;padding:2px">
+            <input id="bColorHex" type="text" value="#0F9BFF" placeholder="#0F9BFF" style="flex:1;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)" oninput="syncColor(this.value)">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Bot name</label>
+          <input id="bBotName" type="text" placeholder="e.g. Roxy — Côte Support" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Welcome message (login screen)</label>
+          <input id="bWelcomeMsg" type="text" placeholder="e.g. Your dedicated tech support, powered by AI" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Welcome heading (chat screen)</label>
+          <input id="bWelcomeHeading" type="text" placeholder="e.g. What can we fix for you today?" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
+          <input type="checkbox" id="bWhiteLabel" style="width:16px;height:16px;cursor:pointer">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text)">White-label (hide &ldquo;Powered by Stacked&rdquo;)</div>
+            <div style="font-size:11px;color:var(--text3)">Available on Group plan</div>
+          </div>
+        </div>
+        <div id="bPreview" style="border:1px solid var(--border);border-radius:8px;padding:14px;background:var(--surface2);display:flex;align-items:center;gap:12px">
+          <img id="bPreviewLogo" src="" style="height:28px;max-width:120px;object-fit:contain;display:none">
+          <div>
+            <div id="bPreviewName" style="font-size:13px;font-weight:600;color:var(--text)">Bot name preview</div>
+            <div id="bPreviewUrl" style="font-size:11px;color:var(--text3);margin-top:2px"></div>
+          </div>
+          <div id="bPreviewSwatch" style="width:28px;height:28px;border-radius:6px;margin-left:auto;flex-shrink:0;background:#0F9BFF"></div>
+        </div>
+        <button class="btn btn-primary" id="bSaveBtn" onclick="saveBranding()" style="width:100%;justify-content:center;padding:10px">Save branding</button>
+      </div>
+    </div>
   </div>
 
   <div class="tab-panel" id="tab-documents">
@@ -2070,6 +2152,24 @@ function renderVenues(venues) {
       '<div class="venue-last">Last active: '+lastD+'</div>'+
       '</div>';
   }).join('');
+  // Load actual venue records for branding links
+  fetch('/venues/all').then(r=>r.json()).then(function(venueDbs){
+    venueDbs.forEach(function(vdb){
+      if(!vdb.slug)return;
+      const cards=el.querySelectorAll('.venue-card');
+      cards.forEach(function(card){
+        if(card.querySelector('.venue-card-name').textContent.trim().replace(/[^\w\s]/g,'').trim().toLowerCase()===vdb.name.toLowerCase()){
+          const branded=vdb.primary_color||vdb.logo_url||vdb.bot_name;
+          const link='stackedchat.io/chat/'+vdb.slug;
+          let extra='<div class="venue-last" style="margin-top:4px;display:flex;align-items:center;gap:8px">';
+          extra+='<a href="https://'+link+'" target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:600">/chat/'+vdb.slug+' &rarr;</a>';
+          if(branded)extra+='<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">Branded</span>';
+          extra+='</div>';
+          card.insertAdjacentHTML('beforeend',extra);
+        }
+      });
+    });
+  }).catch(function(){});
 }
 
 var allDocs=[];
@@ -2273,6 +2373,84 @@ function playVideoEnc(enc){playVideo(JSON.parse(decodeURIComponent(enc)));}
 function playVideo(v){document.getElementById('vmodalTitle').textContent=v.title||'Video';var body=document.getElementById('vmodalBody');while(body.firstChild)body.removeChild(body.firstChild);if(v.type==='youtube'&&v.yt_id){var ifr=document.createElement('iframe');ifr.src='https://www.youtube.com/embed/'+v.yt_id+'?autoplay=1&rel=0';ifr.frameBorder='0';ifr.allowFullscreen=true;ifr.setAttribute('allow','autoplay;encrypted-media;fullscreen');ifr.style.cssText='display:block;width:100%;aspect-ratio:16/9';body.appendChild(ifr);}else{var vid=document.createElement('video');vid.src=v.url;vid.controls=true;vid.autoplay=true;vid.style.cssText='width:100%;aspect-ratio:16/9';body.appendChild(vid);}document.getElementById('vmodal').style.display='flex';}
 function closeVModal(){document.getElementById('vmodal').style.display='none';var b=document.getElementById('vmodalBody');while(b.firstChild)b.removeChild(b.firstChild);}
 async function deleteVideo(id,btn){if(!confirm('Delete this video?'))return;btn.disabled=true;try{await fetch('/videos/'+id,{method:'DELETE'});notify('Deleted','green');loadVideos();}catch(e){notify('Error: '+e.message,'red');btn.disabled=false;}}
+
+// ─── BRANDING MODAL ───────────────────────────────────────────────────────
+let _allVenues = [];
+async function showBrandingModal() {
+  document.getElementById('brandingModal').style.display = 'flex';
+  if (!_allVenues.length) {
+    try {
+      const r = await fetch('/venues/all');
+      _allVenues = await r.json();
+      const sel = document.getElementById('bVenueSelect');
+      sel.innerHTML = '<option value="">Select a venue...</option>' +
+        _allVenues.map(v => '<option value="' + esc(v.id) + '" data-slug="' + esc(v.slug||'') + '">' + esc(v.name) + '</option>').join('');
+      sel.onchange = function() {
+        const opt = this.options[this.selectedIndex];
+        const venue = _allVenues.find(v => String(v.id) === this.value);
+        if (venue) {
+          if (venue.logo_url) document.getElementById('bLogoUrl').value = venue.logo_url;
+          if (venue.primary_color) { document.getElementById('bColorHex').value = venue.primary_color; document.getElementById('bColorPicker').value = venue.primary_color; }
+          if (venue.bot_name) document.getElementById('bBotName').value = venue.bot_name;
+          if (venue.welcome_message) document.getElementById('bWelcomeMsg').value = venue.welcome_message;
+          if (venue.welcome_heading) document.getElementById('bWelcomeHeading').value = venue.welcome_heading;
+          document.getElementById('bWhiteLabel').checked = !!venue.white_label;
+          updatePreview();
+        }
+      };
+    } catch(e) { notify('Could not load venues', 'red'); }
+  }
+  updatePreview();
+}
+function closeBrandingModal() { document.getElementById('brandingModal').style.display = 'none'; }
+function syncColor(hex) {
+  if (/^#[0-9a-fA-F]{6}$/.test(hex)) document.getElementById('bColorPicker').value = hex;
+  updatePreview();
+}
+document.addEventListener('DOMContentLoaded', function() {
+  var cp = document.getElementById('bColorPicker');
+  if (cp) cp.oninput = function() { document.getElementById('bColorHex').value = this.value; updatePreview(); };
+  ['bLogoUrl','bBotName','bWelcomeMsg'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.oninput = updatePreview;
+  });
+});
+function updatePreview() {
+  var logo = document.getElementById('bLogoUrl').value.trim();
+  var name = document.getElementById('bBotName').value.trim() || 'Your Bot';
+  var color = document.getElementById('bColorHex').value.trim() || '#0F9BFF';
+  var sel = document.getElementById('bVenueSelect');
+  var opt = sel ? sel.options[sel.selectedIndex] : null;
+  var slug = opt ? (opt.dataset ? opt.dataset.slug : '') : '';
+  var previewLogo = document.getElementById('bPreviewLogo');
+  if (logo) { previewLogo.src = logo; previewLogo.style.display = ''; } else { previewLogo.style.display = 'none'; }
+  document.getElementById('bPreviewName').textContent = name;
+  document.getElementById('bPreviewSwatch').style.background = color;
+  document.getElementById('bPreviewUrl').textContent = slug ? 'stackedchat.io/chat/' + slug : '';
+}
+async function saveBranding() {
+  var venueId = document.getElementById('bVenueSelect').value;
+  if (!venueId) { notify('Select a venue first', 'red'); return; }
+  var btn = document.getElementById('bSaveBtn'); btn.disabled = true; btn.textContent = 'Saving...';
+  var payload = {
+    logo_url: document.getElementById('bLogoUrl').value.trim() || null,
+    primary_color: document.getElementById('bColorHex').value.trim() || null,
+    bot_name: document.getElementById('bBotName').value.trim() || null,
+    welcome_message: document.getElementById('bWelcomeMsg').value.trim() || null,
+    welcome_heading: document.getElementById('bWelcomeHeading').value.trim() || null,
+    white_label: document.getElementById('bWhiteLabel').checked
+  };
+  try {
+    var r = await fetch('/venue/' + venueId + '/branding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    var data = await r.json();
+    if (data.ok) {
+      notify('Branding saved!', 'green');
+      _allVenues = []; // reset cache
+      closeBrandingModal();
+      loadAnalytics();
+    } else { notify('Error: ' + (data.error || 'unknown'), 'red'); }
+  } catch(e) { notify('Error: ' + e.message, 'red'); }
+  btn.disabled = false; btn.textContent = 'Save branding';
+}
 
 loadAnalytics();
 loadVideos();
@@ -3018,10 +3196,66 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
     }); return;
   }
 
+  // ─── VENUE BRANDING SAVE ──────────────────────────────────────────────
+  if (method === 'POST' && url.startsWith('/venue/') && url.endsWith('/branding')) {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const id = url.split('/venue/')[1].split('/branding')[0];
+        const payload = JSON.parse(body);
+        const allowed = ['logo_url','primary_color','bot_name','welcome_message','welcome_heading','white_label'];
+        const update = {};
+        allowed.forEach(k => { if (payload[k] !== undefined) update[k] = payload[k]; });
+        await sbFetch('/rest/v1/venues?id=eq.' + id, { method: 'PATCH', headers: { 'Prefer': 'return=minimal' }, body: update });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: true }));
+      } catch(e) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    }); return;
+  }
+
+  // ─── VENUE LIST FOR ADMIN ──────────────────────────────────────────────
+  if (method === 'GET' && url === '/venues/all') {
+    try {
+      const r = await sbFetch('/rest/v1/venues?select=*&order=name.asc&limit=200');
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify(Array.isArray(r.data) ? r.data : []));
+    } catch(e) {
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify([]));
+    }
+    return;
+  }
+
+  // ─── BRANDED CHAT PAGE (/chat/:slug) ──────────────────────────────────
+  if (method === 'GET' && url.startsWith('/chat/')) {
+    const slug = url.split('/chat/')[1].split('?')[0].toLowerCase();
+    try {
+      const r = await sbFetch('/rest/v1/venues?select=*&slug=eq.' + encodeURIComponent(slug) + '&limit=1');
+      const venue = Array.isArray(r.data) && r.data[0] ? r.data[0] : null;
+      const branding = venue ? {
+        logo_url: venue.logo_url || null,
+        primary_color: venue.primary_color || null,
+        bot_name: venue.bot_name || null,
+        welcome_message: venue.welcome_message || null,
+        welcome_heading: venue.welcome_heading || null,
+        white_label: venue.white_label || false
+      } : {};
+      res.writeHead(200, {'Content-Type':'text/html','Cache-Control':'no-store'});
+      res.end(buildChatPage(branding));
+    } catch(e) {
+      res.writeHead(200, {'Content-Type':'text/html','Cache-Control':'no-store'});
+      res.end(buildChatPage());
+    }
+    return;
+  }
+
   // ─── MAIN CHAT PAGE ────────────────────────────────────────────────────
   if (method === 'GET' && (url === '/' || url === '')) {
     res.writeHead(200, {'Content-Type':'text/html','Cache-Control':'no-store'});
-    res.end(STACKED_CHAT); return;
+    res.end(buildChatPage()); return;
   }
 
   res.writeHead(404); res.end('Not found');
