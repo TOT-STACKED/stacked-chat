@@ -4,6 +4,7 @@ const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yuzlfocqovwhqdpitvxj.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
+const CRON_SECRET = process.env.CRON_SECRET || 'stacked-cron-secret';
 
 const KNOWLEDGE_BASE = `
 You have access to a comprehensive knowledge base of hospitality technology vendor guides.
@@ -515,6 +516,13 @@ const STACKED_CHAT = `<!DOCTYPE html>
   .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; color: #fff; transition: background 0.15s; }
   .modal-submit:hover { background: var(--orange-light); }
   .toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--brown); color: #fff; border-radius: 20px; padding: 10px 20px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap; }
+  .reminder-banner { display: flex; align-items: center; gap: 12px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 12px 16px; margin: 8px 16px; cursor: pointer; transition: box-shadow 0.15s; }
+  .reminder-banner:hover { box-shadow: 0 4px 16px rgba(34,197,94,0.15); }
+  .reminder-banner .rem-icon { font-size: 22px; flex-shrink: 0; }
+  .reminder-banner .rem-body { flex: 1; }
+  .reminder-banner .rem-title { font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: #15803d; }
+  .reminder-banner .rem-sub { font-family: 'Inter', sans-serif; font-size: 12px; color: #16a34a; }
+  .reminder-banner .rem-cta { font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; color: #15803d; white-space: nowrap; }
   .escalation-banner { display: flex; align-items: flex-start; gap: 12px; background: #fff8f0; border: 1.5px solid #f59e42; border-radius: 16px; padding: 14px 16px; margin: 0 0 4px 42px; max-width: min(calc(100vw - 90px), 520px); }
   .escalation-banner .esc-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
   .escalation-banner .esc-body { flex: 1; }
@@ -713,6 +721,14 @@ const STACKED_CHAT = `<!DOCTYPE html>
   </div>
 
   <main>
+    <div id="shiftReminder" style="display:none" class="reminder-banner" onclick="dismissReminder()">
+      <div class="rem-icon">☀️</div>
+      <div class="rem-body">
+        <div class="rem-title">Good morning — time for your shift check</div>
+        <div class="rem-sub">Tap to run through your systems before service</div>
+      </div>
+      <div class="rem-cta">Start →</div>
+    </div>
     <div id="messages">
       <div class="welcome" id="welcome">
         <img class="welcome-wordmark" id="welcomeWordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
@@ -833,14 +849,36 @@ window.addEventListener('DOMContentLoaded', () => {
   renderQuickBtns();
   loadSocialProof();
   loadPredictiveFixes();
-  renderQRCode();
   renderTipOfTheDay();
   const saved = localStorage.getItem('stacked_user');
   if (saved) {
     user = JSON.parse(saved);
     showApp();
   }
+  checkShiftReminder();
 });
+
+function checkShiftReminder() {
+  const hour = new Date().getHours();
+  if (hour < 7 || hour >= 11) return; // only show 7am–11am
+  const today = new Date().toDateString();
+  const lastCheck = localStorage.getItem('stacked_last_shift_check');
+  if (lastCheck === today) return; // already done today
+  const banner = document.getElementById('shiftReminder');
+  if (banner) banner.style.display = 'flex';
+}
+
+function dismissReminder() {
+  const banner = document.getElementById('shiftReminder');
+  if (banner) banner.style.display = 'none';
+  openShiftCheck();
+}
+
+function markShiftCheckDone() {
+  localStorage.setItem('stacked_last_shift_check', new Date().toDateString());
+  const banner = document.getElementById('shiftReminder');
+  if (banner) banner.style.display = 'none';
+}
 
 // ─── VENUE AUTOCOMPLETE ───────────────────────────────────────────────────
 async function handleVenueInput(val) {
@@ -1292,7 +1330,7 @@ function scGetHelp() {
 
 function scFinish() {
   closeShiftCheck();
-  // Update button to show it's been done today
+  markShiftCheckDone();
   const btn = document.getElementById('shiftCheckBtn');
   if (btn) {
     btn.innerHTML = '✅ Shift check done';
@@ -2593,6 +2631,37 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
       res.end(JSON.stringify([]));
     }
     return;
+  }
+
+  // ─── CRON: SHIFT CHECK REMINDER ───────────────────────────────────────
+  if (method === 'POST' && url === '/cron/remind') {
+    const params = new URL(url, 'http://localhost');
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { secret } = JSON.parse(body || '{}');
+        if (secret !== CRON_SECRET) { res.writeHead(401); res.end('Unauthorised'); return; }
+        // Fetch recent active venues
+        const vr = await sbFetch('/rest/v1/venues?select=name,id&order=created_at.desc&limit=100');
+        const venues = Array.isArray(vr.data) ? vr.data : [];
+        const day = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
+        const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        if (SLACK_WEBHOOK_URL) {
+          const text = [
+            `☀️ *Good morning — time for your shift check!*`,
+            `It's ${day} at ${time}. Before service kicks off, make sure your tech is green across the board.`,
+            ``,
+            `*${venues.length} venue${venues.length !== 1 ? 's' : ''} active on Stacked Chat.*`,
+            `Open the app and hit *Start of shift check* to log your system status.`,
+          ].join('\n');
+          await sendSlackAlert({ venue: 'All venues', userName: 'Cron', email: '', issue: text, turns: 0 });
+        }
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: true, venueCount: venues.length }));
+      } catch(e) {
+        res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
+      }
+    }); return;
   }
 
   // ─── MAIN CHAT PAGE ────────────────────────────────────────────────────
