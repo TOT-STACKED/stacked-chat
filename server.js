@@ -1854,24 +1854,87 @@ tbody tr:hover td{background:var(--surface2)}
   </div>
 
   <div class="tab-panel" id="tab-videos">
-    <div class="page-header"><div><div class="page-title">Video Library</div><div class="page-sub">Videos surfaced in chat when relevant</div></div></div>
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-header"><span class="card-title">Add video</span></div>
+    <div class="page-header">
+      <div><div class="page-title">Video Library</div><div class="page-sub" id="videoCount">Videos surfaced in chat when relevant</div></div>
+    </div>
+
+    <!-- YouTube Importer -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title">&#x1F4FA; Import from YouTube</span><span class="card-meta">Search by vendor name &mdash; tick &amp; bulk import</span></div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <input id="ytSearch" type="text" placeholder="e.g. Lightspeed Restaurant, Square POS, Deputy App..." style="flex:1;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)" onkeydown="if(event.key==='Enter')searchYouTube()">
+        <select id="ytCategory" style="padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+          <option value="">No category</option>
+          <option value="epos">EPOS / POS</option>
+          <option value="payments">Payments</option>
+          <option value="wifi">WiFi / Network</option>
+          <option value="printer">Printers / KDS</option>
+          <option value="bookings">Bookings / Reservations</option>
+          <option value="workforce">Workforce / Rota</option>
+          <option value="ordering">Online Ordering</option>
+          <option value="loyalty">Loyalty / CRM</option>
+          <option value="general">General</option>
+        </select>
+        <button class="btn btn-primary" id="ytSearchBtn" onclick="searchYouTube()">&#x1F50D; Search</button>
+      </div>
+      <div id="ytResults" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span id="ytResultCount" style="font-size:12px;color:var(--text3)"></span>
+          <div style="display:flex;gap:8px">
+            <button class="btn" onclick="ytSelectAll()">Select all</button>
+            <button class="btn btn-primary" id="ytImportBtn" onclick="importSelected()" style="display:none">&#x2B07; Import selected (<span id="ytSelCount">0</span>)</button>
+          </div>
+        </div>
+        <div id="ytGrid" class="video-grid"></div>
+      </div>
+      <div id="ytNoKey" style="display:none;padding:12px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;font-size:13px;color:#92400e">
+        &#x26A0; Add <strong>YOUTUBE_API_KEY</strong> to your Render environment variables to enable YouTube search.
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#92400e;font-weight:600"> Get a free key &rarr;</a>
+      </div>
+    </div>
+
+    <!-- Manual add -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title">Add single video</span></div>
       <div class="video-drop-zone" id="videoDrop" ondragover="vDragOver(event)" ondragleave="vDragLeave(event)" ondrop="vDrop(event)" onclick="document.getElementById('videoFileInput').click()">
         <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/*" style="display:none" onchange="handleVideoFiles(this.files)">
         <div style="font-size:32px">&#x1F3A5;</div>
         <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:8px">Drag &amp; drop an MP4 here</div>
-        <div style="font-size:12px;color:var(--text3)">or click to browse &mdash; or paste a YouTube / MP4 URL below</div>
+        <div style="font-size:12px;color:var(--text3)">or click to browse &mdash; or paste a URL below</div>
       </div>
       <div id="videoUploadList"></div>
-      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;margin-top:10px">
         <input id="vidUrl" type="url" placeholder="YouTube URL or direct MP4 URL" style="flex:2;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-        <input id="vidTitle" type="text" placeholder="Title (optional)" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        <input id="vidTitle" type="text" placeholder="Title" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
       </div>
       <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
         <input id="vidDesc" type="text" placeholder="Keywords (e.g. Square POS setup)" style="flex:1;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-        <button class="btn btn-primary" id="addVidBtn" onclick="addVideo()">+ Add URL</button>
+        <select id="vidCat" style="padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+          <option value="">No category</option>
+          <option value="epos">EPOS / POS</option>
+          <option value="payments">Payments</option>
+          <option value="wifi">WiFi / Network</option>
+          <option value="printer">Printers / KDS</option>
+          <option value="bookings">Bookings / Reservations</option>
+          <option value="workforce">Workforce / Rota</option>
+          <option value="ordering">Online Ordering</option>
+          <option value="loyalty">Loyalty / CRM</option>
+          <option value="general">General</option>
+        </select>
+        <button class="btn btn-primary" id="addVidBtn" onclick="addVideo()">+ Add</button>
       </div>
+    </div>
+
+    <!-- Library with filter -->
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="filterVideos('',this)">All</button>
+      <button class="filter-btn" onclick="filterVideos('epos',this)">EPOS</button>
+      <button class="filter-btn" onclick="filterVideos('payments',this)">Payments</button>
+      <button class="filter-btn" onclick="filterVideos('wifi',this)">WiFi</button>
+      <button class="filter-btn" onclick="filterVideos('printer',this)">Printers</button>
+      <button class="filter-btn" onclick="filterVideos('bookings',this)">Bookings</button>
+      <button class="filter-btn" onclick="filterVideos('workforce',this)">Workforce</button>
+      <button class="filter-btn" onclick="filterVideos('ordering',this)">Ordering</button>
     </div>
     <div id="videoGrid" class="video-grid"><div class="empty">Loading...</div></div>
   </div>
@@ -2116,8 +2179,95 @@ function vDragOver(e){e.preventDefault();document.getElementById('videoDrop').cl
 function vDragLeave(){document.getElementById('videoDrop').classList.remove('drag-over');}
 function vDrop(e){e.preventDefault();document.getElementById('videoDrop').classList.remove('drag-over');handleVideoFiles(e.dataTransfer.files);}
 async function handleVideoFiles(files){const list=document.getElementById('videoUploadList');for(const file of files){if(!file.type.startsWith('video/')){notify('Only video files please','red');continue;}const itemId='vup_'+Date.now();const item=document.createElement('div');item.style.cssText='padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;margin-bottom:6px;border:1px solid var(--border)';item.textContent=file.name;list.appendChild(item);try{const b64=await new Promise((res,rej)=>{const reader=new FileReader();reader.onload=e=>res(e.target.result);reader.onerror=rej;reader.readAsDataURL(file);});const r=await fetch('/videos/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:b64,title:file.name.replace(/\\.[^.]+$/,''),description:'',type:'mp4',is_upload:true})});const data=await r.json();if(data.ok){notify('Video uploaded!','green');loadVideos();}else{notify('Upload error: '+(data.error||'unknown'),'red');}}catch(e){notify('Upload failed: '+e.message,'red');}}}
-async function addVideo(){const u=document.getElementById('vidUrl').value.trim();if(!u){notify('Paste a URL first','red');return;}const t=document.getElementById('vidTitle').value.trim();const d=document.getElementById('vidDesc').value.trim();const btn=document.getElementById('addVidBtn');btn.disabled=true;btn.textContent='Adding...';try{const r=await fetch('/videos/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u,title:t,description:d})});const data=await r.json();if(data.ok){notify('Video added!','green');['vidUrl','vidTitle','vidDesc'].forEach(id=>document.getElementById(id).value='');loadVideos();}else{notify('Error: '+(data.error||'unknown'),'red');}}catch(e){notify('Error: '+e.message,'red');}btn.disabled=false;btn.textContent='+ Add URL';}
-async function loadVideos(){var el=document.getElementById('videoGrid');if(!el)return;el.innerHTML='<div class="empty" style="color:var(--text3)">Loading...</div>';try{var r=await fetch('/videos');var vids=await r.json();el.innerHTML='';if(!Array.isArray(vids)||!vids.length){var emp=document.createElement('div');emp.className='empty';emp.textContent='No videos yet.';el.appendChild(emp);return;}vids.forEach(function(v){var card=document.createElement('div');card.className='video-card';var thumbEl;if(v.thumbnail){thumbEl=document.createElement('img');thumbEl.className='video-thumb';thumbEl.src=v.thumbnail;}else{thumbEl=document.createElement('div');thumbEl.className='video-thumb-empty';thumbEl.textContent=v.type==='youtube'?'\▶':'🎬';}thumbEl.dataset.v=encodeURIComponent(JSON.stringify(v));thumbEl.onclick=function(){playVideoEnc(this.dataset.v);};card.appendChild(thumbEl);var info=document.createElement('div');info.className='video-info';var titleEl=document.createElement('div');titleEl.className='video-title';titleEl.textContent=v.title||'Untitled';info.appendChild(titleEl);if(v.description){var descEl=document.createElement('div');descEl.className='video-desc';descEl.textContent=v.description;info.appendChild(descEl);}var footer=document.createElement('div');footer.className='video-footer';var badge=document.createElement('span');badge.className='vbadge '+(v.type||'mp4');badge.textContent=(v.type||'').toLowerCase()==='youtube'?'YouTube':'MP4';var delBtn=document.createElement('button');delBtn.className='btn-del';delBtn.textContent='Delete';delBtn.dataset.id=v.id;delBtn.onclick=function(){deleteVideo(this.dataset.id,this);};footer.appendChild(badge);footer.appendChild(delBtn);info.appendChild(footer);card.appendChild(info);el.appendChild(card);});}catch(e){el.innerHTML='<div class="empty" style="color:var(--red)">Error: '+e.message+'</div>';}}
+async function addVideo(){const u=document.getElementById('vidUrl').value.trim();if(!u){notify('Paste a URL first','red');return;}const t=document.getElementById('vidTitle').value.trim();const d=document.getElementById('vidDesc').value.trim();const cat=document.getElementById('vidCat').value;const btn=document.getElementById('addVidBtn');btn.disabled=true;btn.textContent='Adding...';try{const r=await fetch('/videos/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u,title:t,description:d,category:cat})});const data=await r.json();if(data.ok){notify('Video added!','green');['vidUrl','vidTitle','vidDesc'].forEach(id=>document.getElementById(id).value='');document.getElementById('vidCat').value='';loadVideos();}else{notify('Error: '+(data.error||'unknown'),'red');}}catch(e){notify('Error: '+e.message,'red');}btn.disabled=false;btn.textContent='+ Add';}
+
+let _ytResults=[], _videoFilter='';
+async function searchYouTube(){
+  const q=document.getElementById('ytSearch').value.trim();
+  if(!q){notify('Enter a vendor name to search','red');return;}
+  const btn=document.getElementById('ytSearchBtn');btn.disabled=true;btn.textContent='Searching...';
+  try{
+    const r=await fetch('/youtube/search?q='+encodeURIComponent(q)+'&max=12');
+    const data=await r.json();
+    btn.disabled=false;btn.textContent='🔍 Search';
+    if(data.error){
+      if(data.error.includes('YOUTUBE_API_KEY')){document.getElementById('ytNoKey').style.display='';document.getElementById('ytResults').style.display='none';}
+      else notify('YouTube error: '+data.error,'red');
+      return;
+    }
+    document.getElementById('ytNoKey').style.display='none';
+    _ytResults=data.items||[];
+    document.getElementById('ytResultCount').textContent=_ytResults.length+' results for "'+q+'"';
+    document.getElementById('ytResults').style.display='';
+    renderYtGrid(_ytResults);
+  }catch(e){btn.disabled=false;btn.textContent='🔍 Search';notify('Search failed: '+e.message,'red');}
+}
+function renderYtGrid(items){
+  const grid=document.getElementById('ytGrid');
+  if(!items.length){grid.innerHTML='<div class="empty">No results</div>';return;}
+  grid.innerHTML=items.map((v,i)=>'<div class="video-card" id="ytc'+i+'" style="cursor:pointer;position:relative" onclick="ytToggle('+i+',this)">'+
+    '<div style="position:absolute;top:8px;left:8px;z-index:2;width:22px;height:22px;border-radius:4px;border:2px solid #fff;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center" id="ytchk'+i+'"></div>'+
+    '<img class="video-thumb" src="'+esc(v.thumbnail)+'" onerror="this.style.display=\'none\'">'+
+    '<div class="video-info"><div class="video-title">'+esc(v.title)+'</div>'+
+    '<div class="video-desc">'+esc(v.channel)+'</div>'+
+    '<div class="video-footer"><span class="vbadge youtube">YouTube</span></div></div></div>').join('');
+  updateYtSelCount();
+}
+function ytToggle(i,card){
+  const chk=document.getElementById('ytchk'+i);
+  const selected=card.dataset.selected==='1';
+  if(selected){card.dataset.selected='0';card.style.outline='';chk.innerHTML='';chk.style.background='rgba(0,0,0,0.4)';}
+  else{card.dataset.selected='1';card.style.outline='2px solid var(--blue)';chk.innerHTML='✓';chk.style.background='var(--blue)';chk.style.color='#fff';chk.style.fontWeight='700';chk.style.fontSize='13px';}
+  updateYtSelCount();
+}
+function ytSelectAll(){
+  document.querySelectorAll('#ytGrid .video-card').forEach((card,i)=>{
+    card.dataset.selected='1';card.style.outline='2px solid var(--blue)';
+    const chk=document.getElementById('ytchk'+i);if(chk){chk.innerHTML='✓';chk.style.background='var(--blue)';chk.style.color='#fff';chk.style.fontWeight='700';chk.style.fontSize='13px';}
+  });
+  updateYtSelCount();
+}
+function updateYtSelCount(){
+  const n=document.querySelectorAll('#ytGrid .video-card[data-selected="1"]').length;
+  document.getElementById('ytSelCount').textContent=n;
+  document.getElementById('ytImportBtn').style.display=n>0?'':'none';
+}
+async function importSelected(){
+  const cat=document.getElementById('ytCategory').value;
+  const selected=[];
+  document.querySelectorAll('#ytGrid .video-card[data-selected="1"]').forEach(card=>{
+    const i=parseInt(card.id.replace('ytc',''));
+    if(!isNaN(i)&&_ytResults[i])selected.push(_ytResults[i]);
+  });
+  if(!selected.length){notify('Select at least one video','red');return;}
+  const btn=document.getElementById('ytImportBtn');btn.disabled=true;btn.innerHTML='Importing...';
+  try{
+    const r=await fetch('/youtube/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({videos:selected,category:cat})});
+    const data=await r.json();
+    if(data.ok){notify('Imported '+data.added+' video'+(data.added!==1?'s':'')+'!','green');loadVideos();document.getElementById('ytResults').style.display='none';document.getElementById('ytSearch').value='';}
+    else notify('Import error: '+(data.error||'unknown'),'red');
+  }catch(e){notify('Error: '+e.message,'red');}
+  btn.disabled=false;btn.innerHTML='&#x2B07; Import selected (<span id="ytSelCount">0</span>)';
+}
+
+let _allVideos=[];
+function filterVideos(cat,btn){
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  _videoFilter=cat;
+  const filtered=cat?_allVideos.filter(v=>(v.category||'')=== cat):_allVideos;
+  renderVideoGrid(filtered);
+}
+function renderVideoGrid(vids){
+  var el=document.getElementById('videoGrid');
+  const vc=document.getElementById('videoCount');
+  if(vc)vc.textContent=_allVideos.length+' video'+(  _allVideos.length!==1?'s':'')+' in library';
+  el.innerHTML='';
+  if(!Array.isArray(vids)||!vids.length){var emp=document.createElement('div');emp.className='empty';emp.textContent='No videos'+(  _videoFilter?' in this category':' yet')+'.';el.appendChild(emp);return;}
+  const catLabels={epos:'EPOS',payments:'Payments',wifi:'WiFi',printer:'Printers',bookings:'Bookings',workforce:'Workforce',ordering:'Ordering',loyalty:'Loyalty',general:'General'};
+  vids.forEach(function(v){var card=document.createElement('div');card.className='video-card';var thumbEl;if(v.thumbnail){thumbEl=document.createElement('img');thumbEl.className='video-thumb';thumbEl.src=v.thumbnail;}else{thumbEl=document.createElement('div');thumbEl.className='video-thumb-empty';thumbEl.textContent=v.type==='youtube'?'▶':'🎬';}thumbEl.dataset.v=encodeURIComponent(JSON.stringify(v));thumbEl.onclick=function(){playVideoEnc(this.dataset.v);};card.appendChild(thumbEl);var info=document.createElement('div');info.className='video-info';var titleEl=document.createElement('div');titleEl.className='video-title';titleEl.textContent=v.title||'Untitled';info.appendChild(titleEl);if(v.description){var descEl=document.createElement('div');descEl.className='video-desc';descEl.textContent=v.description;info.appendChild(descEl);}var footer=document.createElement('div');footer.className='video-footer';var badge=document.createElement('span');badge.className='vbadge '+(v.type||'mp4');badge.textContent=(v.type||'').toLowerCase()==='youtube'?'YouTube':'MP4';var catBadge='';if(v.category&&catLabels[v.category]){var cb=document.createElement('span');cb.className='vbadge';cb.style.cssText='background:var(--surface2);color:var(--text2);border:1px solid var(--border)';cb.textContent=catLabels[v.category];footer.appendChild(cb);}var delBtn=document.createElement('button');delBtn.className='btn-del';delBtn.textContent='Delete';delBtn.dataset.id=v.id;delBtn.onclick=function(){deleteVideo(this.dataset.id,this);};footer.appendChild(badge);footer.appendChild(delBtn);info.appendChild(footer);card.appendChild(info);el.appendChild(card);});
+}
+async function loadVideos(){var el=document.getElementById('videoGrid');if(!el)return;el.innerHTML='<div class="empty" style="color:var(--text3)">Loading...</div>';try{var r=await fetch('/videos');var vids=await r.json();_allVideos=Array.isArray(vids)?vids:[];renderVideoGrid(_videoFilter?_allVideos.filter(v=>(v.category||'')===_videoFilter):_allVideos);}catch(e){el.innerHTML='<div class="empty" style="color:var(--red)">Error: '+e.message+'</div>';}}
 function playVideoEnc(enc){playVideo(JSON.parse(decodeURIComponent(enc)));}
 function playVideo(v){document.getElementById('vmodalTitle').textContent=v.title||'Video';var body=document.getElementById('vmodalBody');while(body.firstChild)body.removeChild(body.firstChild);if(v.type==='youtube'&&v.yt_id){var ifr=document.createElement('iframe');ifr.src='https://www.youtube.com/embed/'+v.yt_id+'?autoplay=1&rel=0';ifr.frameBorder='0';ifr.allowFullscreen=true;ifr.setAttribute('allow','autoplay;encrypted-media;fullscreen');ifr.style.cssText='display:block;width:100%;aspect-ratio:16/9';body.appendChild(ifr);}else{var vid=document.createElement('video');vid.src=v.url;vid.controls=true;vid.autoplay=true;vid.style.cssText='width:100%;aspect-ratio:16/9';body.appendChild(vid);}document.getElementById('vmodal').style.display='flex';}
 function closeVModal(){document.getElementById('vmodal').style.display='none';var b=document.getElementById('vmodalBody');while(b.firstChild)b.removeChild(b.firstChild);}
@@ -2567,19 +2717,25 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
         let relevantVideos = [];
         let finalReply = reply;
         try {
-          const vidsR = await sbFetch('/rest/v1/videos?select=*&order=created_at.desc&limit=100');
+          const vidsR = await sbFetch('/rest/v1/videos?select=*&order=created_at.desc&limit=200');
           if (Array.isArray(vidsR.data) && vidsR.data.length > 0) {
             const explicitly = /video|watch|tutorial|show me|how to|walkthrough|demo|guide/i.test(message);
-            const msgWords = message.toLowerCase().split(/\s+/).filter(w=>w.length>3);
+            // Match against both user message AND bot reply for better relevance
+            const searchText = (message + ' ' + reply).toLowerCase();
+            const searchWords = searchText.split(/\s+/).filter(w=>w.length>3);
             const scored = vidsR.data.map(v => {
-              const t = ((v.title||'') + ' ' + (v.description||'')).toLowerCase();
-              const hits = msgWords.filter(w=>t.includes(w)).length;
+              const t = ((v.title||'') + ' ' + (v.description||'') + ' ' + (v.category||'')).toLowerCase();
+              const hits = searchWords.filter(w=>t.includes(w)).length;
               return { v, hits };
             });
-            const best = scored.sort((a,b)=>b.hits-a.hits)[0];
-            if (best && (explicitly ? best.hits >= 1 : best.hits >= 2)) {
-              relevantVideos = [best.v];
-              finalReply = reply + '\n\n[STACKEDVIDEO:' + JSON.stringify(best.v) + ']';
+            const threshold = explicitly ? 1 : 2;
+            relevantVideos = scored
+              .filter(s => s.hits >= threshold)
+              .sort((a,b) => b.hits - a.hits)
+              .slice(0, 3)
+              .map(s => s.v);
+            if (relevantVideos.length > 0) {
+              finalReply = reply + '\n\n[STACKEDVIDEO:' + JSON.stringify(relevantVideos[0]) + ']';
             }
           }
         } catch(e) {}
@@ -2615,7 +2771,7 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
         }
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
@@ -2681,12 +2837,12 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
     let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { url: videoUrl, title, description, tenant } = JSON.parse(body);
+        const { url: videoUrl, title, description, tenant, category } = JSON.parse(body);
         if (!videoUrl) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'No URL'})); return; }
         let type = 'mp4', thumbnail = '', ytId = null;
         const ytMatch = videoUrl.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
         if (ytMatch) { ytId = ytMatch[1]; type = 'youtube'; thumbnail = 'https://img.youtube.com/vi/' + ytId + '/mqdefault.jpg'; }
-        const record = { url: videoUrl, title: title || ytId || 'Untitled', description: description || '', type, thumbnail, tenant: tenant || 'stacked', yt_id: ytId || null };
+        const record = { url: videoUrl, title: title || ytId || 'Untitled', description: description || '', type, thumbnail, tenant: tenant || 'stacked', yt_id: ytId || null, category: category || '' };
         const r = await sbFetch('/rest/v1/videos', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: record });
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ ok: true, video: Array.isArray(r.data) ? r.data[0] : r.data }));
@@ -2701,6 +2857,74 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
       res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true}));
     } catch(e) { res.writeHead(500, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:e.message})); }
     return;
+  }
+
+  // ─── YOUTUBE SEARCH ────────────────────────────────────────────────────────
+  if (method === 'GET' && url.startsWith('/youtube/search')) {
+    const ytKey = process.env.YOUTUBE_API_KEY;
+    if (!ytKey) {
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({error:'YOUTUBE_API_KEY not set'})); return;
+    }
+    try {
+      const params = new URL(url, 'http://localhost');
+      const q = params.searchParams.get('q') || '';
+      const maxResults = Math.min(parseInt(params.searchParams.get('max')||'12'), 25);
+      if (!q) { res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({items:[]})); return; }
+      const ytUrl = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=' + maxResults + '&q=' + encodeURIComponent(q + ' tutorial how to') + '&key=' + ytKey;
+      const ytRes = await fetch(ytUrl);
+      const ytData = await ytRes.json();
+      if (ytData.error) { res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:ytData.error.message})); return; }
+      const items = (ytData.items || []).map(item => ({
+        yt_id: item.id.videoId,
+        title: item.snippet.title,
+        description: item.snippet.description,
+        thumbnail: item.snippet.thumbnails?.medium?.url || ('https://img.youtube.com/vi/' + item.id.videoId + '/mqdefault.jpg'),
+        channel: item.snippet.channelTitle,
+        url: 'https://www.youtube.com/watch?v=' + item.id.videoId,
+        type: 'youtube'
+      }));
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({items}));
+    } catch(e) {
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({error:e.message}));
+    }
+    return;
+  }
+
+  // ─── YOUTUBE BULK IMPORT ───────────────────────────────────────────────────
+  if (method === 'POST' && url === '/youtube/import') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { videos, category } = JSON.parse(body);
+        if (!Array.isArray(videos) || !videos.length) {
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({ok:false,error:'No videos provided'})); return;
+        }
+        let added = 0;
+        for (const v of videos) {
+          try {
+            await sbFetch('/rest/v1/videos', {
+              method: 'POST',
+              headers: { 'Prefer': 'return=minimal' },
+              body: {
+                url: v.url, title: v.title, description: v.description || '',
+                type: 'youtube', thumbnail: v.thumbnail, yt_id: v.yt_id,
+                category: category || '', tenant: 'stacked'
+              }
+            });
+            added++;
+          } catch(e) { console.error('Import error:', e.message); }
+        }
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ok:true, added}));
+      } catch(e) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ok:false, error:e.message}));
+      }
+    }); return;
   }
 
   // ─── HEALTH CHECK SAVE ─────────────────────────────────────────────────
