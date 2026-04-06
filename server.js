@@ -2182,7 +2182,7 @@ function vDrop(e){e.preventDefault();document.getElementById('videoDrop').classL
 async function handleVideoFiles(files){const list=document.getElementById('videoUploadList');for(const file of files){if(!file.type.startsWith('video/')){notify('Only video files please','red');continue;}const itemId='vup_'+Date.now();const item=document.createElement('div');item.style.cssText='padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;margin-bottom:6px;border:1px solid var(--border)';item.textContent=file.name;list.appendChild(item);try{const b64=await new Promise((res,rej)=>{const reader=new FileReader();reader.onload=e=>res(e.target.result);reader.onerror=rej;reader.readAsDataURL(file);});const r=await fetch('/videos/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:b64,title:file.name.replace(/\\.[^.]+$/,''),description:'',type:'mp4',is_upload:true})});const data=await r.json();if(data.ok){notify('Video uploaded!','green');loadVideos();}else{notify('Upload error: '+(data.error||'unknown'),'red');}}catch(e){notify('Upload failed: '+e.message,'red');}}}
 async function addVideo(){const u=document.getElementById('vidUrl').value.trim();if(!u){notify('Paste a URL first','red');return;}const t=document.getElementById('vidTitle').value.trim();const d=document.getElementById('vidDesc').value.trim();const cat=document.getElementById('vidCat').value;const btn=document.getElementById('addVidBtn');btn.disabled=true;btn.textContent='Adding...';try{const r=await fetch('/videos/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:u,title:t,description:d,category:cat})});const data=await r.json();if(data.ok){notify('Video added!','green');['vidUrl','vidTitle','vidDesc'].forEach(id=>document.getElementById(id).value='');document.getElementById('vidCat').value='';loadVideos();}else{notify('Error: '+(data.error||'unknown'),'red');}}catch(e){notify('Error: '+e.message,'red');}btn.disabled=false;btn.textContent='+ Add';}
 
-let _ytResults=[], _videoFilter='';
+let _ytResults=[];
 async function searchYouTube(){
   const q=document.getElementById('ytSearch').value.trim();
   if(!q){notify('Enter a vendor name to search','red');return;}
@@ -2251,7 +2251,7 @@ async function importSelected(){
   btn.disabled=false;btn.innerHTML='&#x2B07; Import selected (<span id="ytSelCount">0</span>)';
 }
 
-let _allVideos=[];
+let _allVideos=[], _videoFilter='';
 function filterVideos(cat,btn){
   document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
   if(btn)btn.classList.add('active');
@@ -2275,6 +2275,7 @@ function closeVModal(){document.getElementById('vmodal').style.display='none';va
 async function deleteVideo(id,btn){if(!confirm('Delete this video?'))return;btn.disabled=true;try{await fetch('/videos/'+id,{method:'DELETE'});notify('Deleted','green');loadVideos();}catch(e){notify('Error: '+e.message,'red');btn.disabled=false;}}
 
 loadAnalytics();
+loadVideos();
 setInterval(loadAnalytics,60000);
 </script>
 </body>
