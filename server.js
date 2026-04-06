@@ -1319,6 +1319,7 @@ async function sendMessage() {
     });
     const data = await res.json();
     const reply = data.response || "Sorry, I couldn't get a response. Please try again.";
+    const supportUrl = data.supportUrl || null;
     lastBotMsg = reply;
     typing.remove();
     let videoData = null, displayReply = reply;
@@ -1327,7 +1328,7 @@ async function sendMessage() {
       const vtagEnd = reply.indexOf(']', vtagStart);
       if (vtagEnd > -1) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
     }
-    addMessage('assistant', displayReply, true, videoData);
+    addMessage('assistant', displayReply, true, videoData, supportUrl);
     messages.push({ role: 'assistant', content: displayReply });
     await saveConversation();
   } catch(e) {
@@ -1342,7 +1343,7 @@ async function sendMessage() {
 
 function hideWelcome() { const w = document.getElementById('welcome'); if (w) w.remove(); }
 
-function addMessage(role, content, showTicket, video) {
+function addMessage(role, content, showTicket, video, supportUrl) {
   const msgs = document.getElementById('messages');
   const wrap = document.createElement('div'); wrap.className = 'msg ' + role;
   const avatar = document.createElement('div'); avatar.className = 'msg-avatar';
@@ -1360,51 +1361,45 @@ function addMessage(role, content, showTicket, video) {
     bubble.innerHTML = t;
   } else { bubble.textContent = content; }
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
-  if (role === 'assistant') {
-    var urlRegex = new RegExp("https?://[^\\s)>\\]]+", "g");
-    const links = [...new Set(content.match(urlRegex) || [])].slice(0, 4);
-    if (links.length) {
-      const map = {
-        'squareup.com':'📦 Square support','sumup.com':'💳 SumUp support','zettle.com':'💳 Zettle support',
-        'worldpay.com':'💳 Worldpay support','stripe.com':'💳 Stripe support','dojo.tech':'💳 Dojo support',
-        'adyen.com':'💳 Adyen support','elavon.co.uk':'💳 Elavon support','paymentsense.com':'💳 PaymentSense support',
-        'tyl.co.uk':'💳 Tyl support','barclaycard.co.uk':'💳 Barclaycard support','pleo.io':'💳 Pleo support',
-        'lightspeedhq.com':'🖥 Lightspeed support','tevalis.com':'🖥 Tevalis support','eposnow.com':'🖥 EPOS Now support',
-        'vitamojo.com':'🍽 Vita Mojo support','zonal.co.uk':'🖥 Zonal support','icrtouch.com':'🖥 ICRTouch support',
-        'toasttab.com':'🖥 Toast support','tabology.com':'🖥 Tabology support','storekit.com':'🖥 Storekit support',
-        'getpepper.io':'🖥 Pepper support','partech.com':'🖥 Par Brink support','revelsystems.com':'🖥 Revel support',
-        'opentable.com':'📅 OpenTable support','resdiary.com':'📅 ResDiary support','sevenrooms.com':'📅 SevenRooms support',
-        'designmynight.com':'📅 Collins support','resy.com':'📅 Resy support','quandoo.com':'📅 Quandoo support',
-        'exploretock.com':'📅 Tock support','eatapp.co':'📅 Eat App support','waitwhile.com':'📅 Waitwhile support',
-        'fourth.com':'👥 Fourth support','deputy.com':'👥 Deputy support','getsona.com':'👥 Sona support',
-        'rotaready.com':'👥 Rotaready support','bizimply.com':'👥 Bizimply support','planday.com':'👥 Planday support',
-        's4labour.co.uk':'👥 S4Labour support','hotschedules.com':'👥 HotSchedules support','workforce.com':'👥 Workforce.com support',
-        'harri.com':'👥 Harri support','nory.ai':'👥 Nory support','humanforce.com':'👥 Humanforce support',
-        'deliverect.com':'📦 Deliverect support','flipdish.com':'📦 Flipdish support','slerp.com':'📦 Slerp support',
-        'orderswift.com':'📦 Orderswift support','yoello.com':'📦 Yoello support','tryotter.com':'📦 Otter support',
-        'airship.com':'🎯 Airship support','stampede.ai':'🎯 Stampede support','yumpingo.com':'🎯 Yumpingo support',
-        'eagleeye.com':'🎯 Eagle Eye support','klaviyo.com':'🎯 Klaviyo support',
-        'apicbase.com':'📋 Apicbase support','nutritics.com':'📋 Nutritics support','crunchtime.com':'📋 Crunchtime support',
-        'marketman.com':'📋 Marketman support','kitchencut.com':'📋 Kitchen CUT support','winnowsolutions.com':'📋 Winnow support',
-        'mews.com':'🏨 Mews support','cloudbeds.com':'🏨 Cloudbeds support','guestline.net':'🏨 Guestline support',
-        'clock-software.com':'🏨 Clock PMS support','oracle.com':'🏨 Opera support',
-        'tenzo.io':'📊 Tenzo support','otainsight.com':'📊 OTA Insight support',
-        'purple.ai':'📶 Purple Wi-Fi support','meraki.com':'📶 Cisco Meraki support',
-        'revinate.com':'💬 Revinate support','guestrevu.com':'💬 GuestRevu support',
-        'hibob.com':'👤 HiBob support','personio.de':'👤 Personio support','bamboohr.com':'👤 BambooHR support',
-        'typsy.com':'🎓 Typsy support','beekeeper.io':'🎓 Beekeeper support',
-      };
-      var label = function(u) { try { var h = new URL(u).hostname.replace('www.',''); var entries = Object.keys(map); for (var k=0;k<entries.length;k++){if(h.includes(entries[k]))return map[entries[k]];} return h; } catch(e){return u;} };
-      const lr = document.createElement('div'); lr.className = 'link-row';
-      links.forEach(function(u) {
-        var a = document.createElement('a');
-        a.className = 'link-pill';
-        a.href = u; a.target = '_blank'; a.rel = 'noopener';
-        a.textContent = '↗ ' + label(u);
-        lr.appendChild(a);
-      });
-      msgs.appendChild(lr);
-    }
+  if (role === 'assistant' && supportUrl) {
+    const pillMap = {
+      'squareup.com':'📦 Square support','sumup.com':'💳 SumUp support','zettle.com':'💳 Zettle support',
+      'worldpay.com':'💳 Worldpay support','stripe.com':'💳 Stripe support','dojo.tech':'💳 Dojo support',
+      'adyen.com':'💳 Adyen support','elavon.co.uk':'💳 Elavon support','paymentsense.com':'💳 PaymentSense support',
+      'tyl.co.uk':'💳 Tyl support','barclaycard.co.uk':'💳 Barclaycard support','pleo.io':'💳 Pleo support',
+      'lightspeedhq.com':'🖥 Lightspeed support','tevalis.com':'🖥 Tevalis support','eposnow.com':'🖥 EPOS Now support',
+      'vitamojo.com':'🍽 Vita Mojo support','zonal.co.uk':'🖥 Zonal support','icrtouch.com':'🖥 ICRTouch support',
+      'toasttab.com':'🖥 Toast support','tabology.com':'🖥 Tabology support','storekit.com':'🖥 Storekit support',
+      'getpepper.io':'🖥 Pepper support','partech.com':'🖥 Par Brink support','revelsystems.com':'🖥 Revel support',
+      'opentable.com':'📅 OpenTable support','resdiary.com':'📅 ResDiary support','sevenrooms.com':'📅 SevenRooms support',
+      'designmynight.com':'📅 Collins support','resy.com':'📅 Resy support','quandoo.com':'📅 Quandoo support',
+      'exploretock.com':'📅 Tock support','eatapp.co':'📅 Eat App support','waitwhile.com':'📅 Waitwhile support',
+      'fourth.com':'👥 Fourth support','deputy.com':'👥 Deputy support','getsona.com':'👥 Sona support',
+      'rotaready.com':'👥 Rotaready support','bizimply.com':'👥 Bizimply support','planday.com':'👥 Planday support',
+      's4labour.co.uk':'👥 S4Labour support','hotschedules.com':'👥 HotSchedules support','workforce.com':'👥 Workforce.com support',
+      'harri.com':'👥 Harri support','nory.ai':'👥 Nory support','humanforce.com':'👥 Humanforce support',
+      'deliverect.com':'📦 Deliverect support','flipdish.com':'📦 Flipdish support','slerp.com':'📦 Slerp support',
+      'orderswift.com':'📦 Orderswift support','yoello.com':'📦 Yoello support','tryotter.com':'📦 Otter support',
+      'airship.com':'🎯 Airship support','stampede.ai':'🎯 Stampede support','yumpingo.com':'🎯 Yumpingo support',
+      'eagleeye.com':'🎯 Eagle Eye support','klaviyo.com':'🎯 Klaviyo support',
+      'apicbase.com':'📋 Apicbase support','nutritics.com':'📋 Nutritics support','crunchtime.com':'📋 Crunchtime support',
+      'marketman.com':'📋 Marketman support','kitchencut.com':'📋 Kitchen CUT support','winnowsolutions.com':'📋 Winnow support',
+      'mews.com':'🏨 Mews support','cloudbeds.com':'🏨 Cloudbeds support','guestline.net':'🏨 Guestline support',
+      'clock-software.com':'🏨 Clock PMS support','oracle.com':'🏨 Opera support',
+      'tenzo.io':'📊 Tenzo support','otainsight.com':'📊 OTA Insight support',
+      'purple.ai':'📶 Purple Wi-Fi support','meraki.com':'📶 Cisco Meraki support',
+      'revinate.com':'💬 Revinate support','guestrevu.com':'💬 GuestRevu support',
+      'hibob.com':'👤 HiBob support','personio.de':'👤 Personio support','bamboohr.com':'👤 BambooHR support',
+      'typsy.com':'🎓 Typsy support','beekeeper.io':'🎓 Beekeeper support',
+    };
+    var pillLabel = (function(u) {
+      try { var h = new URL(u).hostname.replace('www.',''); var ks = Object.keys(pillMap); for (var k=0;k<ks.length;k++){if(h.includes(ks[k]))return pillMap[ks[k]];} return h; } catch(e){return u;}
+    })(supportUrl);
+    const lr = document.createElement('div'); lr.className = 'link-row';
+    const a = document.createElement('a');
+    a.className = 'link-pill'; a.href = supportUrl; a.target = '_blank'; a.rel = 'noopener';
+    a.textContent = '↗ ' + pillLabel;
+    lr.appendChild(a); msgs.appendChild(lr);
   }
   if (role === 'assistant' && showTicket) {
     const tr = document.createElement('div'); tr.className = 'ticket-row';
@@ -2367,17 +2362,26 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
         });
 
         const rawReply = apiRes.content?.[0]?.text || 'Sorry, I could not get a response. Please try again.';
-        let reply = rawReply.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1 $2');
-        // Ensure a support URL pill always appears — inject one if Claude didn't include it
-        if (!/https?:\/\//.test(reply)) {
-          const combined = (message + ' ' + reply).toLowerCase();
-          for (const [vendor, url] of Object.entries(VENDOR_SUPPORT_URLS)) {
-            if (combined.includes(vendor)) {
-              reply = reply + '\n\n' + url;
-              break;
-            }
-          }
+
+        // Detect supportUrl BEFORE cleaning — user message first (most accurate), then Claude's reply
+        let supportUrl = null;
+        const userMsgLower = message.toLowerCase();
+        for (const [vendor, url] of Object.entries(VENDOR_SUPPORT_URLS)) {
+          if (userMsgLower.includes(vendor)) { supportUrl = url; break; }
         }
+        if (!supportUrl) {
+          const mlm = rawReply.match(/\]\((https?:\/\/[^)]+)\)/);
+          if (mlm) supportUrl = mlm[1];
+          else { const pm = rawReply.match(/https?:\/\/[^\s)>\]]+/); if (pm) supportUrl = pm[0]; }
+        }
+
+        // Clean reply: strip markdown link syntax (keep label text), remove bare URLs
+        let reply = rawReply
+          .replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, '$1')
+          .replace(/https?:\/\/[^\s)>\]]+/g, '')
+          .replace(/[ \t]+\n/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
 
         let relevantVideos = [];
         let finalReply = reply;
@@ -2400,7 +2404,7 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
         } catch(e) {}
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, videos:relevantVideos}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, videos:relevantVideos}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
