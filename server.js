@@ -252,7 +252,7 @@ async function getAnalytics() {
   try {
     const [convsR, ticketsR, docsR, healthR] = await Promise.all([
       sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=200'),
-      sbFetch('/rest/v1/tickets?select=id,email,name,venue,issue,status,created_at&order=created_at.desc&limit=50'),
+      sbFetch('/rest/v1/tickets?select=id,email,name,venue,issue,status,escalated,created_at&order=created_at.desc&limit=100'),
       sbFetch('/rest/v1/documents?select=filename,created_at&order=created_at.desc&limit=1000'),
       sbFetch('/rest/v1/health_checks?select=*&order=checked_at.desc&limit=200'),
     ]);
@@ -309,12 +309,32 @@ async function getAnalytics() {
       });
     });
 
+    // Build venue stats
+    const venueMap = {};
+    convs.forEach(c => {
+      const vk = c.venue || 'Unknown venue';
+      if (!venueMap[vk]) venueMap[vk] = { venue: vk, convs: 0, msgs: 0, lastSeen: c.created_at };
+      venueMap[vk].convs++;
+      venueMap[vk].msgs += (c.messages || []).filter(m => m.role === 'user').length;
+      if (new Date(c.created_at) > new Date(venueMap[vk].lastSeen)) venueMap[vk].lastSeen = c.created_at;
+    });
+    tickets.forEach(t => {
+      const vk = t.venue || 'Unknown venue';
+      if (!venueMap[vk]) venueMap[vk] = { venue: vk, convs: 0, msgs: 0, lastSeen: t.created_at };
+      if (!venueMap[vk].tickets) venueMap[vk].tickets = 0;
+      venueMap[vk].tickets++;
+      if (t.escalated) { if (!venueMap[vk].escalated) venueMap[vk].escalated = 0; venueMap[vk].escalated++; }
+    });
+    const venueStats = Object.values(venueMap).sort((a, b) => b.convs - a.convs);
+
     return {
       totalConvs: convs.length, totalMessages: allMessages.length,
-      openTickets: tickets.filter(t => t.status === 'open').length, totalDocs: uniqueDocs.length,
+      openTickets: tickets.filter(t => t.status === 'open').length,
+      escalatedTickets: tickets.filter(t => t.escalated).length,
+      totalDocs: uniqueDocs.length,
       topTopics, topVendors, recentConvs: convs.slice(0, 10), tickets, docs: uniqueDocs,
       healthChecks: healthChecks.slice(0, 50), venueHealth, systemIssueCounts,
-      totalChecks: healthChecks.length
+      totalChecks: healthChecks.length, venueStats
     };
   } catch(e) { console.error('Analytics error:', e); return { error: e.message }; }
 }
@@ -1672,8 +1692,33 @@ tbody tr:hover td{background:var(--surface2)}
 .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.02em}
 .badge.open{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
 .badge.closed{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.badge.escalated{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
 .close-btn{padding:4px 10px;font-size:11px;font-weight:600;border-radius:4px;border:1px solid var(--green);color:var(--green);background:none;cursor:pointer;font-family:inherit;transition:all 0.1s}
 .close-btn:hover{background:var(--green);color:#fff}
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-family:inherit;transition:all 0.1s}
+.filter-btn:hover{border-color:var(--blue);color:var(--blue)}
+.filter-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.filter-btn.red-active.active{background:var(--red);border-color:var(--red)}
+.kpi.red .kpi-value{color:var(--red)}
+.conv-thread{display:none;margin-top:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:240px;overflow-y:auto}
+.conv-item.open .conv-thread{display:block}
+.conv-item{cursor:pointer;padding:10px 0;border-bottom:1px solid var(--border)}
+.conv-item:last-child{border-bottom:none}
+.thread-msg{display:flex;gap:8px;margin-bottom:8px}
+.thread-msg:last-child{margin-bottom:0}
+.thread-role{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);width:44px;flex-shrink:0;padding-top:2px}
+.thread-role.user{color:var(--blue)}
+.thread-content{font-size:12px;color:var(--text2);line-height:1.5}
+.venue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.venue-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
+.venue-card-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.venue-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+.venue-stats{display:flex;gap:16px;margin-top:8px}
+.venue-stat{text-align:center}
+.venue-stat-num{font-size:18px;font-weight:700;color:var(--text);line-height:1}
+.venue-stat-label{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:0.05em}
+.venue-last{font-size:11px;color:var(--text3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
 .conv-item{padding:10px 0;border-bottom:1px solid var(--border)}
 .conv-item:last-child{border-bottom:none}
 .conv-top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
@@ -1734,8 +1779,9 @@ tbody tr:hover td{background:var(--surface2)}
     <div class="divider"></div>
     <nav class="header-nav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
-      <button class="nav-item" onclick="showTab('tickets')">Tickets</button>
+      <button class="nav-item" onclick="showTab('tickets')">Tickets <span id="navEscBadge" style="display:none;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:0 5px;font-size:10px;font-weight:700;margin-left:4px"></span></button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
+      <button class="nav-item" onclick="showTab('venues')">Venues</button>
       <button class="nav-item" onclick="showTab('documents')">Knowledge Base</button>
       <button class="nav-item" onclick="showTab('videos')">&#x1F3A5; Videos</button>
       <button class="nav-item" onclick="showTab('health')">&#x2705; Shift Checks</button>
@@ -1750,10 +1796,11 @@ tbody tr:hover td{background:var(--surface2)}
 <div class="container">
   <div class="tab-panel active" id="tab-dashboard">
     <div class="page-header"><div><div class="page-title">Overview</div><div class="page-sub">All activity across Stacked Chat</div></div></div>
-    <div class="kpi-grid">
+    <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
       <div class="kpi"><div class="kpi-label">Conversations</div><div class="kpi-value" id="kpiConvs"><span class="shimmer"></span></div></div>
       <div class="kpi"><div class="kpi-label">Messages sent</div><div class="kpi-value" id="kpiMsgs"><span class="shimmer"></span></div></div>
       <div class="kpi"><div class="kpi-label">Open tickets</div><div class="kpi-value" id="kpiTickets"><span class="shimmer"></span></div></div>
+      <div class="kpi" id="kpiEscCard"><div class="kpi-label">Escalated</div><div class="kpi-value" id="kpiEsc"><span class="shimmer"></span></div></div>
       <div class="kpi"><div class="kpi-label">Docs indexed</div><div class="kpi-value" id="kpiDocs"><span class="shimmer"></span></div></div>
     </div>
     <div class="grid-2">
@@ -1769,12 +1816,23 @@ tbody tr:hover td{background:var(--surface2)}
 
   <div class="tab-panel" id="tab-tickets">
     <div class="page-header"><div><div class="page-title">Support tickets</div><div class="page-sub" id="ticketCount">&mdash;</div></div></div>
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="filterTickets('all',this)">All</button>
+      <button class="filter-btn" onclick="filterTickets('open',this)">Open</button>
+      <button class="filter-btn red-active" onclick="filterTickets('escalated',this)">&#x26A0; Escalated</button>
+      <button class="filter-btn" onclick="filterTickets('closed',this)">Closed</button>
+    </div>
     <div class="card"><div id="ticketsTable"><div class="empty">Loading...</div></div></div>
   </div>
 
   <div class="tab-panel" id="tab-conversations">
     <div class="page-header"><div><div class="page-title">Conversations</div><div class="page-sub" id="convCount">&mdash;</div></div></div>
     <div class="card"><div id="convsTable"><div class="empty">Loading...</div></div></div>
+  </div>
+
+  <div class="tab-panel" id="tab-venues">
+    <div class="page-header"><div><div class="page-title">Venues</div><div class="page-sub" id="venueCount">&mdash;</div></div></div>
+    <div id="venueGrid" class="venue-grid"><div class="empty">Loading...</div></div>
   </div>
 
   <div class="tab-panel" id="tab-documents">
@@ -1852,7 +1910,7 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','tickets','conversations','documents','videos','health'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','tickets','conversations','venues','documents','videos','health'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='videos') loadVideos();
 }
@@ -1868,6 +1926,11 @@ async function loadAnalytics() {
     document.getElementById('kpiMsgs').textContent = (a.totalMessages||0).toLocaleString();
     document.getElementById('kpiTickets').textContent = (a.openTickets||0).toLocaleString();
     document.getElementById('kpiDocs').textContent = (a.totalDocs||0).toLocaleString();
+    const escCount = a.escalatedTickets || 0;
+    document.getElementById('kpiEsc').textContent = escCount.toLocaleString();
+    document.getElementById('kpiEscCard').classList.toggle('red', escCount > 0);
+    const navBadge = document.getElementById('navEscBadge');
+    if (escCount > 0) { navBadge.textContent = escCount; navBadge.style.display = ''; } else { navBadge.style.display = 'none'; }
     document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('ticketCount').textContent = a.tickets.length + ' ticket' + (a.tickets.length!==1?'s':'');
     document.getElementById('convCount').textContent = a.totalConvs + ' conversation' + (a.totalConvs!==1?'s':'');
@@ -1887,15 +1950,61 @@ async function loadAnalytics() {
     const rc=document.getElementById('recentConvs');const convs=(a.recentConvs||[]).slice(0,6);
     if(!convs.length){rc.innerHTML='<div class="empty">No conversations yet</div>';}
     else{rc.innerHTML=convs.map(c=>{const first=(c.messages||[]).find(m=>m.role==='user');const count=(c.messages||[]).filter(m=>m.role==='user').length;const d=new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'});return '<div class="conv-item"><div class="conv-top"><span class="conv-name">'+esc(c.name||'Unknown')+'</span>'+(c.venue?'<span class="conv-venue">'+esc(c.venue)+'</span>':'')+'<span class="conv-date">'+d+' &middot; '+count+' msg'+(count!==1?'s':'')+'</span></div><div class="conv-preview">'+esc((first?.content||'Chat session').substring(0,100))+'</div></div>';}).join('');}
-    const tt=document.getElementById('ticketsTable');
-    if(!a.tickets.length){tt.innerHTML='<div class="empty">No tickets yet</div>';}
-    else{tt.innerHTML='<table><thead><tr><th>User</th><th>Venue</th><th>Issue</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>'+a.tickets.map(t=>'<tr><td><div class="td-primary">'+esc(t.name)+'</div><div class="td-muted">'+esc(t.email)+'</div></td><td>'+esc(t.venue||'&mdash;')+'</td><td class="td-truncate">'+esc(t.issue||'&mdash;')+'</td><td><span class="badge '+(t.status||'open')+'">'+esc(t.status||'open')+'</span></td><td>'+new Date(t.created_at).toLocaleDateString('en-GB')+'</td><td>'+(t.status==='open'?'<button class="close-btn" onclick="closeTicket('+t.id+')">Close</button>':'')+'</td></tr>').join('')+'</tbody></table>';}
+    window._allTickets = a.tickets;
+    renderTicketTable(a.tickets);
     const ct=document.getElementById('convsTable');
     if(!a.recentConvs.length){ct.innerHTML='<div class="empty">No conversations yet</div>';}
-    else{ct.innerHTML='<table><thead><tr><th>User</th><th>Venue</th><th>First message</th><th>Msgs</th><th>Date</th></tr></thead><tbody>'+a.recentConvs.map(c=>{const first=(c.messages||[]).find(m=>m.role==='user');const count=(c.messages||[]).filter(m=>m.role==='user').length;return '<tr><td><div class="td-primary">'+esc(c.name||'Unknown')+'</div></td><td>'+esc(c.venue||'&mdash;')+'</td><td class="td-truncate" style="max-width:300px">'+esc((first?.content||'&mdash;').substring(0,100))+'</td><td>'+count+'</td><td>'+new Date(c.created_at).toLocaleDateString('en-GB')+'</td></tr>';}).join('')+'</tbody></table>';}
+    else{ct.innerHTML='<div>'+a.recentConvs.map(c=>{const first=(c.messages||[]).find(m=>m.role==='user');const count=(c.messages||[]).filter(m=>m.role==='user').length;const d=new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'});const thread=(c.messages||[]).map(m=>'<div class="thread-msg"><div class="thread-role '+(m.role==='user'?'user':'')+'">'+esc(m.role==='user'?'You':'Bot')+'</div><div class="thread-content">'+esc((m.content||'').substring(0,300))+'</div></div>').join('');return '<div class="conv-item" onclick="this.classList.toggle(\'open\')" title="Click to expand"><div class="conv-top"><span class="conv-name">'+esc(c.name||'Unknown')+'</span>'+(c.venue?'<span class="conv-venue">'+esc(c.venue)+'</span>':'')+'<span class="conv-date">'+d+' &middot; '+count+' msg'+(count!==1?'s':'')+'</span></div><div class="conv-preview">'+esc((first?.content||'Chat session').substring(0,100))+'</div><div class="conv-thread">'+thread+'</div></div>';}).join('')+'</div>';}
+    renderVenues(a.venueStats || []);
     renderDocs(a.docs);
     renderHealthData(a);
   } catch(e) { notify('Failed: '+e.message,'red'); console.error(e); }
+}
+
+function renderTicketTable(tickets) {
+  const tt=document.getElementById('ticketsTable');
+  if(!tickets.length){tt.innerHTML='<div class="empty">No tickets found</div>';return;}
+  tt.innerHTML='<table><thead><tr><th>User</th><th>Venue</th><th>Issue</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>'+
+    tickets.map(t=>{
+      const isEsc=t.escalated;
+      const statusBadge=isEsc?'<span class="badge escalated">&#x26A0; Escalated</span>':'<span class="badge '+(t.status||'open')+'">'+esc(t.status||'open')+'</span>';
+      return '<tr'+(isEsc?' style="background:#fff5f5"':'')+'><td><div class="td-primary">'+esc(t.name||'Unknown')+'</div><div class="td-muted">'+esc(t.email||'')+'</div></td>'+
+        '<td>'+esc(t.venue||'&mdash;')+'</td>'+
+        '<td class="td-truncate">'+esc(t.issue||'&mdash;')+'</td>'+
+        '<td>'+statusBadge+'</td>'+
+        '<td>'+new Date(t.created_at).toLocaleDateString('en-GB')+'</td>'+
+        '<td>'+(t.status==='open'?'<button class="close-btn" onclick="closeTicket('+t.id+')">Close</button>':'')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+function filterTickets(filter, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  const all = window._allTickets || [];
+  let filtered = all;
+  if(filter==='open') filtered = all.filter(t=>t.status==='open');
+  else if(filter==='closed') filtered = all.filter(t=>t.status==='closed');
+  else if(filter==='escalated') filtered = all.filter(t=>t.escalated);
+  document.getElementById('ticketCount').textContent = filtered.length + ' ticket' + (filtered.length!==1?'s':'') + (filter!=='all'?' ('+filter+')':'');
+  renderTicketTable(filtered);
+}
+function renderVenues(venues) {
+  const el=document.getElementById('venueGrid');
+  const vc=document.getElementById('venueCount');
+  if(vc) vc.textContent = venues.length + ' venue' + (venues.length!==1?'s':'') + ' active';
+  if(!venues||!venues.length){if(el)el.innerHTML='<div class="empty">No venues yet</div>';return;}
+  el.innerHTML=venues.map(v=>{
+    const lastD = new Date(v.lastSeen).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    const escPart = v.escalated ? '<span style="color:var(--red);font-size:11px;font-weight:600;margin-left:4px">&#x26A0; '+v.escalated+' escalated</span>' : '';
+    return '<div class="venue-card">'+
+      '<div class="venue-card-name">&#x1F3E2; '+esc(v.venue)+escPart+'</div>'+
+      '<div class="venue-stats">'+
+        '<div class="venue-stat"><div class="venue-stat-num">'+v.convs+'</div><div class="venue-stat-label">Chats</div></div>'+
+        '<div class="venue-stat"><div class="venue-stat-num">'+v.msgs+'</div><div class="venue-stat-label">Messages</div></div>'+
+        '<div class="venue-stat"><div class="venue-stat-num">'+(v.tickets||0)+'</div><div class="venue-stat-label">Tickets</div></div>'+
+      '</div>'+
+      '<div class="venue-last">Last active: '+lastD+'</div>'+
+      '</div>';
+  }).join('');
 }
 
 var allDocs=[];
