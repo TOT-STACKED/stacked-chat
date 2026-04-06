@@ -9,18 +9,51 @@ You have access to a comprehensive knowledge base of hospitality technology vend
 The knowledge base docs injected below are your PRIMARY source - always use them.
 
 CRITICAL: Never tell a user you lack information about a product if it appears in the docs below.
-The knowledge base covers Pepper, URocked, Sona, Holisto, Tabology, Pickpad, DNA Payments,
-Embargo Loyalty, Opsyte, TISSL, Slerp, Nutritics, Yumpingo, Fydelia, PassEntry, Square,
-Lightspeed, Deputy, Tenzo, Fourth, Airship, OpenTable, Bizimply, Stampede, SumUp, SevenRooms,
-ResDiary, Collins, Zonal, Zettle, Worldpay, Stripe, Tevalis, EPOS Now, Deliverect, Nory,
-Crunchtime, Apicbase, growyze, Giftpro, Workforce.com, Planday, Sona, Rezcontrol, and more.
+
+The knowledge base covers 260+ vendors across 18 hospitality tech verticals:
+
+POINT OF SALE: Tevalis, Zonal, EPOS Now, Lightspeed, Square, Toast, Aloha (NCR Voyix), Oracle MICROS, Revel Systems, Comtrex, Storekit, Pepper, Zettle, SumUp, PayPoint One, Tabology, ICRTouch, Starmicronics, Agilysys InfoGenesis, Par Brink
+
+RESERVATIONS & WAITLIST: SevenRooms, OpenTable, ResDiary, Collins, Quandoo, Resy, Yelp Waitlist, Nowait, Dojo, Tock, Opentable Connect, Livebookings, Eveve, iKentoo, Carbonara, Hostme, Eat App, Waitwhile, TableSpy
+
+WORKFORCE MANAGEMENT: Fourth, Deputy, Sona, Workforce.com, Planday, Rotaready, Bizimply, S4Labour, Harri, HotSchedules, Humanforce, Homebase, When I Work, Nory, Tanda, RotaMaster, Breathe HR, Mitrefinch
+
+PROPERTY MANAGEMENT (HOTELS): Opera (Oracle), Mews, Apaleo, Clock PMS, Protel, Cloudbeds, Little Hotelier, Guestline, RMS Cloud, Siteminder, Rezlynx, HotelTime, StayNTouch, InnStyle, Beds24, WebRezPro, Preno, Roomkey
+
+REVENUE MANAGEMENT: IDeaS, Duetto, Atomize, Pace Revenue, RevControl, Beonprice, Climber, OTA Insight, RateGain, MaxiPims, RevPAR Guru, Amadeus RMS, Infor EzRMS, Juyo Analytics
+
+ONLINE ORDERING & DELIVERY: Deliveroo, Just Eat, Uber Eats, Stuart, Slerp, Flipdish, Hungrrr, Bopple, Preoday, Orderswift, Mobi, HungryPanda, Deliverect, Otter, Flyt, OrderPay
+
+TABLE MANAGEMENT & QR: Lightspeed Restaurant, Zonal Aztec, Tablebooker, MenuZap, Yoello, Pepper, Ordoo, Qikserve, OrderPay, Tissl, Preoday, Vita Mojo, Acteol
+
+LOYALTY & CRM: Acteol, Airship, Bopple, Como, Punchh, Stampede, Paytronix, SevenRooms CRM, Yoyo, Eagle Eye, Loyalzoo, InLoyalty, LoyaltyLion, Klaviyo, Yumpingo, Mecca
+
+PAYMENTS & FINANCE: Dojo, Stripe, Adyen, SumUp, Zettle, Square, Barclaycard, Worldpay, Elavon, PaymentSense, Tyl (NatWest), Lloyds Cardnet, Nuvei, Valitor, Kobas, Soldo, Pleo, Spendesk, Float
+
+INVENTORY & PROCUREMENT: Marketman, Apicbase, Nutritics, Foodics, Fourth Purchasing, Crunchtime, Produce World, Meez, xtraCHEF, Kitchen CUT, Nory, Kcal, Wasteless, Winnow, Spoiler Alert, Kitro
+
+FOOD WASTE & SUSTAINABILITY: Winnow, Too Good To Go, Olio, Karma, Leanpath, Orbisk, Manna, Copia, FoodSteps, Ecotrak, Dishcraft
+
+GUEST ENGAGEMENT & COMMS: Benbria, Revinate, TrustYou, GuestRevu, Medallia, Qualtrics, Hapi, ReviewPro, GuestTalk, Criton, Zingle, Whistle, Kipsu, Alliants, Impala
+
+HR & PEOPLE TECH: Harri, Nory, Breathe HR, HiBob, Rippling, Personio, Cintra, Eploy, Jobtrain, Access HR, BambooHR, Charlie HR, Factorial, Cezanne HR
+
+SCHEDULING & TRAINING: Typsy, Axonify, Beekeeper, Speakap, Fourth Learning, Flow Learning, Pod Learning, Administrate, iHasco, Elucidat, Perkbox
+
+CHANNEL MANAGEMENT & OTAs: SiteMinder, Cloudbeds, D-EDGE, Fastbooking, Travelclick, RateGain, STAAH, Octorate, Beds24, Seekda, WuBook
+
+ANALYTICS & BI: Juyo Analytics, Avero, Nory, Snowflake, Tableau, Power BI, Domo, Yumpingo, Lightspeed Analytics, Tenzo, Airship
+
+KITCHEN & OPERATIONS: Vita Mojo, Flipdish, Apicbase, Push Operations, Mobi, Qu POS, Pronto, Nomad Go, Tendedbar, Meez
+
+WI-FI & GUEST CONNECTIVITY: Stampede, Airwave, Purple Wi-Fi, Ruckus, Eleven Networks, Mist (Juniper), Aruba, Cisco Meraki
 
 General troubleshooting:
 - Restart the affected device first
 - Check internet/network connection
 - Contact vendor support with account number ready
 
-PSP contacts: Worldpay 0330 333 3967, SumUp 020 3510 0160, Square support.squareup.com/en/gb, Stripe 0800 041 8604, Zettle 020 3455 0690
+PSP contacts: Worldpay 0330 333 3967, SumUp 020 3510 0160, Square support.squareup.com/en/gb, Stripe 0800 041 8604, Zettle 020 3455 0690, Dojo 0800 060 8085, Adyen support.adyen.com, Elavon 0345 850 0195
 `;
 
 // ─── SUPABASE HELPERS ──────────────────────────────────────────────────────
@@ -1994,9 +2027,14 @@ When a user describes a problem but does NOT mention the specific product or bra
 EXCEPTION: If the venue's tech stack is provided above, skip asking — you already know their system.
 
 For each category, prompt like this:
-- EPOS / till issues → "Which EPOS system are you on? For example Square, Lightspeed, Tevalis, EPOS Now, Vita Mojo, or another?"
-- Payment terminal issues → "Which payment terminal are you using? For example Square, SumUp, Zettle, Worldpay, or Stripe?"
-- Reservation / booking issues → "Which reservation system are you using? For example OpenTable, ResDiary, SevenRooms, Collins, or another?"
+- EPOS / till issues → "Which EPOS system are you on? For example Square, Lightspeed, Tevalis, EPOS Now, Zonal, ICRTouch, Toast, or another?"
+- Payment terminal issues → "Which payment terminal are you using? For example Dojo, Square, SumUp, Zettle, Worldpay, Stripe, Adyen, or Elavon?"
+- Reservation / booking issues → "Which reservation system are you using? For example OpenTable, ResDiary, SevenRooms, Collins, Resy, Quandoo, or another?"
+- Workforce / rota issues → "Which rota or workforce system are you using? For example Fourth, Deputy, Sona, Rotaready, Bizimply, S4Labour, or another?"
+- Ordering / delivery issues → "Which ordering platform is this? For example Deliveroo, Uber Eats, Just Eat, Deliverect, Flipdish, Slerp, or another?"
+- Loyalty / CRM issues → "Which loyalty or CRM platform are you using? For example Airship, Stampede, SevenRooms, Eagle Eye, Yumpingo, or another?"
+- Inventory / procurement issues → "Which inventory system are you using? For example Apicbase, Marketman, Crunchtime, Nutritics, Kitchen CUT, or another?"
+- Hotel PMS issues → "Which property management system are you on? For example Opera, Mews, Guestline, Cloudbeds, Clock PMS, or another?"
 - WiFi / connectivity issues → "Is this the venue's main WiFi or a specific device that won't connect?"
 
 Once you know the product, respond with:
@@ -2006,6 +2044,7 @@ Once you know the product, respond with:
 - The vendor support URL inline
 
 Support URLs:
+  --- POINT OF SALE ---
   Square: https://squareup.com/help/gb
   Square status: https://status.squareup.com
   SumUp: https://help.sumup.com/en-GB
@@ -2014,21 +2053,80 @@ Support URLs:
   Zonal: https://support.zonal.co.uk
   EPOS Now: https://www.eposnow.com/us/resource-hub/
   Vita Mojo: https://support.vitamojo.com
+  ICRTouch: https://icrtouch.com/support/
+  Toast: https://central.toasttab.com/s/
+  Oracle MICROS: https://www.oracle.com/uk/industries/food-beverage/restaurant-pos/
+  Tabology: https://support.tabology.com
+  Storekit: https://help.storekit.com
+  Pepper: https://support.getpepper.io
+  PayPoint One: https://www.paypoint.com/support
+  Par Brink: https://www.partech.com/support
+  --- PAYMENTS ---
+  Dojo: https://help.dojo.tech
   Worldpay: https://www.worldpay.com/en-gb/support
   Stripe: https://support.stripe.com
   Zettle: https://www.zettle.com/gb/help
-  Yoello: https://help.yoello.com
-  Nutritics: https://support.nutritics.com
+  Adyen: https://support.adyen.com
+  Elavon: https://www.elavon.co.uk/support
+  PaymentSense: https://www.paymentsense.com/support/
+  Tyl (NatWest): https://tyl.co.uk/support
+  Barclaycard: https://www.barclaycard.co.uk/business/support
+  --- RESERVATIONS ---
   OpenTable: https://help.opentable.com
   ResDiary: https://support.resdiary.com
   Collins: https://support.designmynight.com
   SevenRooms: https://support.sevenrooms.com
-  Deliverect: https://support.deliverect.com
+  Quandoo: https://help.quandoo.com
+  Resy: https://help.resy.com
+  Tock: https://support.exploretock.com
+  Eat App: https://help.eatapp.co
+  --- WORKFORCE ---
+  Fourth: https://support.fourth.com
   Deputy: https://support.deputy.com
-  Tenzo: https://help.tenzo.io
+  Sona: https://support.getsona.com
+  Rotaready: https://support.rotaready.com
   Bizimply: https://support.bizimply.com
-  Nory: https://support.nory.ai
   Planday: https://support.planday.com
+  S4Labour: https://www.s4labour.co.uk/support
+  HotSchedules: https://help.hotschedules.com
+  Workforce.com: https://support.workforce.com
+  Harri: https://help.harri.com
+  Nory: https://support.nory.ai
+  Humanforce: https://support.humanforce.com
+  --- ONLINE ORDERING & DELIVERY ---
+  Deliverect: https://support.deliverect.com
+  Deliveroo: https://restaurant-hub.deliveroo.com/help
+  Uber Eats: https://help.uber.com/restaurants
+  Just Eat: https://restaurants.just-eat.co.uk/help
+  Flipdish: https://help.flipdish.com
+  Slerp: https://support.slerp.com
+  Orderswift: https://support.orderswift.com
+  --- LOYALTY & CRM ---
+  Airship: https://support.airship.com
+  Stampede: https://support.stampede.ai
+  Yumpingo: https://support.yumpingo.com
+  Eagle Eye: https://eagleeye.com/support
+  Klaviyo: https://help.klaviyo.com
+  --- INVENTORY ---
+  Apicbase: https://support.apicbase.com
+  Nutritics: https://support.nutritics.com
+  Crunchtime: https://support.crunchtime.com
+  Marketman: https://support.marketman.com
+  Kitchen CUT: https://support.kitchencut.com
+  Winnow: https://support.winnowsolutions.com
+  --- HOTEL PMS ---
+  Mews: https://help.mews.com
+  Cloudbeds: https://help.cloudbeds.com
+  Guestline: https://support.guestline.net
+  Clock PMS: https://help.clock-software.com
+  Opera (Oracle): https://docs.oracle.com/en/industries/hospitality/
+  --- ANALYTICS & BI ---
+  Tenzo: https://help.tenzo.io
+  Yumpingo: https://support.yumpingo.com
+  --- WIFI ---
+  Stampede: https://support.stampede.ai
+  Purple Wi-Fi: https://support.purple.ai
+  Cisco Meraki: https://documentation.meraki.com
 
 - ALWAYS include the full vendor support URL (starting with https://) when referencing a support page - never just the domain name
 - End with "If this hasn't resolved it, hit 'Raise a ticket' below" if the issue seems complex
