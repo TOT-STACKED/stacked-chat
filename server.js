@@ -1815,7 +1815,7 @@ async function sendMessage() {
     if (shouldEscalate) {
       const msgs = document.getElementById('messages');
       const banner = document.createElement('div'); banner.className = 'escalation-banner';
-      banner.innerHTML = '<div class="esc-icon">🚨</div><div class="esc-body"><div class="esc-title">We\'ve flagged this for our team</div><div class="esc-sub">A member of the Stacked team has been alerted and will follow up with you shortly.</div></div>';
+      banner.innerHTML = '<div class="esc-icon">&#x1F6A8;</div><div class="esc-body"><div class="esc-title">We&#39;ve flagged this for our team</div><div class="esc-sub">A member of the Stacked team has been alerted and will follow up with you shortly.</div></div>';
       msgs.appendChild(banner);
       msgs.scrollTop = msgs.scrollHeight;
     }
