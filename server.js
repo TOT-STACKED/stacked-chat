@@ -1808,8 +1808,8 @@ async function sendMessage() {
     let videoData = null, displayReply = reply;
     const vtagStart = reply.indexOf('[STACKEDVIDEO:');
     if (vtagStart > -1) {
-      const vtagEnd = reply.indexOf(']', vtagStart);
-      if (vtagEnd > -1) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
+      const vtagEnd = reply.lastIndexOf(']'); // use lastIndexOf — titles may contain ] characters
+      if (vtagEnd > vtagStart) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
     }
     addMessage('assistant', displayReply, true, videoData, supportUrl);
     if (shouldEscalate) {
@@ -3252,9 +3252,9 @@ const server = http.createServer(async (req, res) => {
             const threshold = explicitly ? 1 : 2;
             const topVideos = scored.filter(s => s.hits >= threshold).sort((a,b) => b.hits - a.hits).slice(0, 3).map(s => s.v);
             if (topVideos.length > 0) {
-              videoContext = '\n\nVIDEO LIBRARY — you DO have these videos available for this topic:\n' +
-                topVideos.map(v => '- "' + v.title + '"' + (v.description ? ' — ' + v.description : '') + (v.category ? ' [' + v.category + ']' : '')).join('\n') +
-                '\nIMPORTANT: Acknowledge these videos exist. Say something like "I have a video guide for this" — the system will attach it automatically. Do NOT say you lack video content.';
+              videoContext = '\n\nVIDEO LIBRARY — you have these videos for this topic:\n' +
+                topVideos.map(v => '- "' + v.title + '"' + (v.description ? ' (' + v.description + ')' : '')).join('\n') +
+                '\nIMPORTANT: Briefly mention the video by title and say it is attached below. Keep it to one short sentence. Do NOT say "the system will attach it" or anything technical about how it works.';
             } else if (preloadedVideos.length > 0) {
               videoContext = '\n\nVIDEO LIBRARY: You have ' + preloadedVideos.length + ' videos in your library but none closely match this specific query. Do not claim you have no video content — just focus on text troubleshooting for now.';
             }
