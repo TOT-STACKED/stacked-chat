@@ -2053,6 +2053,11 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
 .nav-item{padding:5px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;transition:all 0.1s}
 .nav-item:hover{background:var(--surface2);color:var(--text)}
 .nav-item.active{background:var(--surface2);color:var(--text);font-weight:600}
+.nav-divider{width:1px;height:16px;background:var(--border2);margin:0 4px}
+.sub-tab-bar{display:flex;gap:4px;margin:16px 0 20px;border-bottom:1px solid var(--border);padding-bottom:0}
+.sub-tab{padding:7px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:1px solid transparent;border-bottom:none;background:none;font-family:inherit;transition:all 0.1s;margin-bottom:-1px}
+.sub-tab:hover{color:var(--text);background:var(--surface2)}
+.sub-tab.active{background:var(--surface);color:var(--text);font-weight:600;border-color:var(--border);border-bottom-color:var(--surface)}
 .header-right{display:flex;align-items:center;gap:10px}
 .update-text{font-size:12px;color:var(--text3)}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-family:inherit;transition:all 0.1s}
@@ -2183,11 +2188,12 @@ tbody tr:hover td{background:var(--surface2)}
     <div class="divider"></div>
     <nav class="header-nav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
+      <div class="nav-divider"></div>
       <button class="nav-item" onclick="showTab('tickets')">Tickets <span id="navEscBadge" style="display:none;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:0 5px;font-size:10px;font-weight:700;margin-left:4px"></span></button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('venues')">Venues</button>
-      <button class="nav-item" onclick="showTab('documents')">Knowledge Base</button>
-      <button class="nav-item" onclick="showTab('videos')">&#x1F3A5; Videos</button>
+      <div class="nav-divider"></div>
+      <button class="nav-item" onclick="showTab('content')">&#x1F4DA; Content</button>
       <button class="nav-item" onclick="showTab('health')">&#x2705; Shift Checks</button>
     </nav>
   </div>
@@ -2300,8 +2306,17 @@ tbody tr:hover td{background:var(--surface2)}
     </div>
   </div>
 
-  <div class="tab-panel" id="tab-documents">
-    <div class="page-header"><div><div class="page-title">Knowledge Base</div><div class="page-sub">Documents indexed for AI responses</div></div></div>
+  <div class="tab-panel" id="tab-content">
+    <div class="page-header" style="margin-bottom:0">
+      <div><div class="page-title">Content</div><div class="page-sub">Videos and knowledge base docs surfaced in chat</div></div>
+    </div>
+    <div class="sub-tab-bar">
+      <button class="sub-tab active" id="stVideos" onclick="showContentTab('videos')">&#x1F3A5; Videos</button>
+      <button class="sub-tab" id="stDocs" onclick="showContentTab('documents')">&#x1F4DA; Knowledge Base</button>
+    </div>
+
+    <!-- ── VIDEOS PANEL ───────────────────────────────────────────── -->
+    <div id="contentVideos">
     <div class="card" style="margin-bottom:16px">
       <div class="card-header"><span class="card-title">&#x1F310; Scrape vendor help centres</span><span class="card-meta">Fetch and index docs directly from vendor support sites</span></div>
       <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
@@ -2432,7 +2447,57 @@ tbody tr:hover td{background:var(--surface2)}
       <button class="filter-btn" onclick="filterVideos('ordering',this)">Ordering</button>
     </div>
     <div id="videoGrid" class="video-grid"><div class="empty">Loading...</div></div>
-  </div>
+    </div><!-- end #contentVideos -->
+
+    <!-- ── KNOWLEDGE BASE PANEL ──────────────────────────────────── -->
+    <div id="contentDocs" style="display:none">
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title">&#x1F310; Scrape vendor help centres</span><span class="card-meta">Fetch and index docs directly from vendor support sites</span></div>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <input id="scrapeUrl" type="url" placeholder="https://help.lightspeedhq.com/hc/en-gb/articles/..." style="flex:2;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        <input id="scrapeVendor" type="text" placeholder="Vendor name (e.g. Lightspeed)" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        <button class="btn btn-primary" onclick="doScrapeUrl()" id="scrapeBtn">&#x1F4E5; Scrape</button>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Quick scrape &mdash; known vendor help centres <span style="font-weight:400;color:var(--text3)">(uses Zendesk API where available &mdash; up to 150 articles per vendor)</span></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="quickScrapeList">
+        <button class="filter-btn" onclick="quickScrape('https://support.lightspeedhq.com/hc/en-gb','Lightspeed Restaurant',this)">Lightspeed</button>
+        <button class="filter-btn" onclick="quickScrape('https://squareup.com/help/gb/en/article/5148-getting-started-with-square-for-restaurants','Square',this)">Square</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.eposnow.com/hc/en-gb','EPOS Now',this)">EPOS Now</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.deputy.com/hc/en-us','Deputy',this)">Deputy</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.sevenrooms.com/hc/en-us','SevenRooms',this)">SevenRooms</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.opentable.com/hc/en-us','OpenTable',this)">OpenTable</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.deliverect.com/hc/en-us','Deliverect',this)">Deliverect</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.mews.com/hc/en-us','Mews',this)">Mews</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.marketman.com/hc/en-us','Marketman',this)">Marketman</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.resdiary.com/hc/en-gb','ResDiary',this)">ResDiary</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.zonal.co.uk/hc/en-gb','Zonal',this)">Zonal</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.tevalis.com/hc/en-gb','Tevalis',this)">Tevalis</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.flipdish.com/hc/en-us','Flipdish',this)">Flipdish</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.airship.com/hc/en-gb','Airship',this)">Airship</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.stampede.ai/hc/en-gb','Stampede',this)">Stampede</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.fourth.com/hc/en-gb','Fourth',this)">Fourth</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.rotaready.com/hc/en-gb','Rotaready',this)">Rotaready</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.collins.uk/hc/en-gb','Collins',this)">Collins</button>
+      </div>
+      <div id="scrapeStatus" style="margin-top:10px;font-size:13px;padding:8px 0;color:var(--text3)"></div>
+    </div>
+    <div class="card">
+      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFiles(event)">
+        <div style="font-size:28px">&#x1F4C4;</div>
+        <div class="drop-title">Drop files to index</div>
+        <div class="drop-sub">Supports .txt and .md &mdash; up to 10MB each</div>
+      </div>
+      <input type="file" id="fileInput" multiple accept=".txt,.md" style="display:none" onchange="handleFiles(this.files)">
+      <div id="uploadList" style="margin-top:12px"></div>
+      <div style="margin-top:16px;margin-bottom:8px;display:flex;gap:8px">
+        <input type="text" id="docSearch" placeholder="Search knowledge base..." oninput="filterDocs(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);outline:none">
+        <span id="docCount" style="font-size:12px;color:var(--text3);white-space:nowrap;align-self:center"></span>
+      </div>
+      <div id="docList" style="margin-top:12px"><div class="empty">Loading documents...</div></div>
+    </div>
+    </div><!-- end #contentDocs -->
+
+  </div><!-- end #tab-content -->
   <div class="tab-panel" id="tab-health">
     <div class="page-header"><div><div class="page-title">Shift Checks</div><div class="page-sub">Venue health checks logged at start of service</div></div></div>
     <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
@@ -2468,9 +2533,16 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','tickets','conversations','venues','documents','videos','health'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','tickets','conversations','venues','content','health'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
-  if (id==='videos') loadVideos();
+  if (id==='content') loadVideos();
+}
+function showContentTab(sub) {
+  const showVideos = sub === 'videos';
+  document.getElementById('contentVideos').style.display = showVideos ? '' : 'none';
+  document.getElementById('contentDocs').style.display = showVideos ? 'none' : '';
+  document.getElementById('stVideos').classList.toggle('active', showVideos);
+  document.getElementById('stDocs').classList.toggle('active', !showVideos);
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 let actChart, donutChart;
