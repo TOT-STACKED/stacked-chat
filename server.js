@@ -2008,16 +2008,18 @@ function openCvModal(enc) {
   document.getElementById('cvModalTitle').textContent = v.title || 'Video';
   const body = document.getElementById('cvModalBody');
   while(body.firstChild) body.removeChild(body.firstChild);
-  if (v.type === 'youtube' && v.yt_id) {
+  if (v.yt_id) {
     const ifr = document.createElement('iframe');
     ifr.src = 'https://www.youtube.com/embed/' + v.yt_id + '?autoplay=1&rel=0';
     ifr.frameBorder = '0'; ifr.allowFullscreen = true;
-    ifr.setAttribute('allow','autoplay;encrypted-media;fullscreen');
-    ifr.style.cssText = 'display:block;width:100%;aspect-ratio:16/9';
+    ifr.setAttribute('allow','autoplay; encrypted-media; fullscreen; picture-in-picture');
+    ifr.style.cssText = 'display:block;width:100%;aspect-ratio:16/9;border:0';
     body.appendChild(ifr);
-  } else {
+  } else if (v.url) {
     const vid = document.createElement('video'); vid.src = v.url; vid.controls = true; vid.autoplay = true;
     vid.style.cssText = 'width:100%;aspect-ratio:16/9'; body.appendChild(vid);
+  } else {
+    body.textContent = 'Video unavailable.';
   }
   document.getElementById('cvModal').style.display = 'flex';
 }
@@ -3241,22 +3243,23 @@ const server = http.createServer(async (req, res) => {
           const allVidsR = await sbFetch('/rest/v1/videos?select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200');
           if (Array.isArray(allVidsR.data) && allVidsR.data.length > 0) {
             preloadedVideos = allVidsR.data;
-            const searchText = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
-            const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
-            const explicitly = /video|watch|tutorial|show me|how to|walkthrough|demo|guide/i.test(message);
+            // Score against user message only — not history or AI reply — to stay specific
+            const STOP = new Set(['this','that','with','your','have','from','they','will','what','when','about','just','been','some','more','also','into','very','can','how','its','are','was','the','and','for','not','but','you','our','get']);
+            const explicitly = /\bvideo\b|\bwatch\b|\btutorial\b|\bguide\b|\bwalkthrough\b|\bdemo\b/i.test(message);
+            const msgWords = [...new Set(message.toLowerCase().split(/[\s,?!.;:()\[\]]+/).filter(w => w.length >= 4 && !STOP.has(w)))];
             const scored = preloadedVideos.map(v => {
               const t = ((v.title||'') + ' ' + (v.description||'') + ' ' + (v.category||'')).toLowerCase();
-              const hits = searchWords.filter(w => t.includes(w)).length;
+              const hits = msgWords.filter(w => t.includes(w)).length;
               return { v, hits };
             });
-            const threshold = explicitly ? 1 : 2;
-            const topVideos = scored.filter(s => s.hits >= threshold).sort((a,b) => b.hits - a.hits).slice(0, 3).map(s => s.v);
+            const threshold = explicitly ? 1 : 3;
+            const topVideos = scored.filter(s => s.hits >= threshold).sort((a,b) => b.hits - a.hits).slice(0, 2).map(s => s.v);
             if (topVideos.length > 0) {
-              videoContext = '\n\nVIDEO LIBRARY — you have these videos for this topic:\n' +
+              videoContext = '\n\nVIDEO LIBRARY — you have a relevant video for this topic:\n' +
                 topVideos.map(v => '- "' + v.title + '"' + (v.description ? ' (' + v.description + ')' : '')).join('\n') +
-                '\nIMPORTANT: Briefly mention the video by title and say it is attached below. Keep it to one short sentence. Do NOT say "the system will attach it" or anything technical about how it works.';
+                '\nIMPORTANT: Mention the video title naturally in one sentence (e.g. "I also have a video guide — \\"Title\\" — attached below"). Do NOT say "the system will attach" or use technical language.';
             } else if (preloadedVideos.length > 0) {
-              videoContext = '\n\nVIDEO LIBRARY: You have ' + preloadedVideos.length + ' videos in your library but none closely match this specific query. Do not claim you have no video content — just focus on text troubleshooting for now.';
+              videoContext = '\n\nVIDEO LIBRARY: ' + preloadedVideos.length + ' videos available but none closely match this query. Do not mention videos unless asked.';
             }
           }
         } catch(e) {}
@@ -3439,22 +3442,21 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         let relevantVideos = [];
         let finalReply = reply;
         try {
-          // Reuse already-fetched videos — no second Supabase call needed
+          // Reuse already-fetched videos — score against user message only (not AI reply)
           if (preloadedVideos.length > 0) {
-            const explicitly = /video|watch|tutorial|show me|how to|walkthrough|demo|guide/i.test(message);
-            // Match against both user message AND bot reply for better relevance
-            const searchText = (message + ' ' + reply).toLowerCase();
-            const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
+            const STOP = new Set(['this','that','with','your','have','from','they','will','what','when','about','just','been','some','more','also','into','very','can','how','its','are','was','the','and','for','not','but','you','our','get']);
+            const explicitly = /\bvideo\b|\bwatch\b|\btutorial\b|\bguide\b|\bwalkthrough\b|\bdemo\b/i.test(message);
+            const msgWords = [...new Set(message.toLowerCase().split(/[\s,?!.;:()\[\]]+/).filter(w => w.length >= 4 && !STOP.has(w)))];
             const scored = preloadedVideos.map(v => {
               const t = ((v.title||'') + ' ' + (v.description||'') + ' ' + (v.category||'')).toLowerCase();
-              const hits = searchWords.filter(w => t.includes(w)).length;
+              const hits = msgWords.filter(w => t.includes(w)).length;
               return { v, hits };
             });
-            const threshold = explicitly ? 1 : 2;
+            const threshold = explicitly ? 1 : 3;
             relevantVideos = scored
               .filter(s => s.hits >= threshold)
               .sort((a,b) => b.hits - a.hits)
-              .slice(0, 3)
+              .slice(0, 1)
               .map(s => s.v);
             if (relevantVideos.length > 0) {
               finalReply = reply + '\n\n[STACKEDVIDEO:' + JSON.stringify(relevantVideos[0]) + ']';
