@@ -712,6 +712,8 @@ function buildChatPage(b = {}) {
   const welcomeMsg = b.welcome_message || 'AI support for hospitality tech — enter your details to get started.';
   const welcomeHeading = b.welcome_heading || 'What can we fix<br>for you today?';
   const poweredBy = b.white_label ? '' : '<a href="https://stackedchat.io" target="_blank" rel="noopener" style="display:block;text-align:center;padding:8px;font-size:11px;color:#94a3b8;text-decoration:none;font-family:Inter,sans-serif;">Powered by <strong style="color:#0F9BFF">Stacked Chat</strong></a>';
+  const presetVenueId = b.venue_id || '';
+  const presetVenueName = (b.venue_name || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
   // Inject branding into the template
   return STACKED_CHAT_TEMPLATE
     .replace(/\{\{LOGO_URL\}\}/g, logoUrl)
@@ -719,7 +721,9 @@ function buildChatPage(b = {}) {
     .replace(/\{\{BOT_NAME\}\}/g, botName)
     .replace(/\{\{WELCOME_MSG\}\}/g, welcomeMsg)
     .replace(/\{\{WELCOME_HEADING\}\}/g, welcomeHeading)
-    .replace(/\{\{POWERED_BY\}\}/g, poweredBy);
+    .replace(/\{\{POWERED_BY\}\}/g, poweredBy)
+    .replace(/\{\{VENUE_ID\}\}/g, presetVenueId)
+    .replace(/\{\{VENUE_NAME\}\}/g, presetVenueName);
 }
 
 // ─── STACKED CHAT PAGE ────────────────────────────────────────────────────
@@ -1231,6 +1235,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 // ─── CONFIG ───────────────────────────────────────────────────────────────
 const SERVER_URL = 'https://toast-support-bot.onrender.com';
 const SUPABASE_URL = 'https://yuzlfocqovwhqdpitvxj.supabase.co';
+// Preset venue — injected server-side when page is served via /chat/:slug
+const PRESET_VENUE_ID = '{{VENUE_ID}}';
+const PRESET_VENUE_NAME = '{{VENUE_NAME}}';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
 const ICON_URL = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iODgiIHZpZXdCb3g9IjAgMCA1NiA4OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNTUuNDE1MiA2Mi45OTM1QzU1LjQzMzQgNjYuNzMxNyA1NC45MDYxIDcwLjA4MDkgNTMuODQwNyA3My4wMzM2QzUyLjc3MTYgNzUuOTkgNTEuMTA5NyA3OC41MjQ2IDQ4Ljg1NTIgODAuNjQxQzQ2LjU5NyA4Mi43NTc0IDQzLjczNTEgODQuMzc5MiA0MC4yNjIzIDg1LjQ5OTJDMzYuNzg5NiA4Ni42MTkyIDMyLjY1NSA4Ny4xOTAyIDI3Ljg2MjIgODcuMjEyQzIzLjA2OTQgODcuMjMwMiAxOC45MTY2IDg2LjY5NTYgMTUuNDExMSA4NS42MDQ3QzExLjkwMiA4NC41MTM4IDkuMDI1NjEgODIuOTE3NCA2Ljc3ODMxIDgwLjgxOTJDNC41MzEwMSA3OC43MjQ2IDIuODU4MjYgNzYuMjAwOSAxLjc2NzM0IDczLjI1NTRDMC42NzY0MjEgNzAuMzEgMC4xMjAwNTEgNjYuOTY4MSAwLjEwNTUwNiA2My4yMjk5TDQuOTgxNDVlLTA1IDQ5Ljk4NjFDLTAuMDA3MjIzIDQ4LjQwNDMgMC43ODE4NzcgNDcuNjExNSAyLjM2MDA4IDQ3LjYwNDJMMTEuOTA1NiA0Ny41NjQyQzEyLjUwOTMgNDguMTYwNiAxMy4xNzExIDQ4LjcwNjEgMTMuODgwMiA0OS4yMDQzQzE1Ljg2OTMgNTAuNTk3IDE4LjI5ODQgNTEuNTI3OSAyMS4xNjc2IDUxLjk5N0MyNC4wMzMxIDUyLjQ2MjUgMjcuMzQyMiA1Mi40MjYxIDMxLjA5MTMgNTEuODgwN0MzNC44NDQxIDUxLjMzNTIgMzguMDE1IDUwLjQzMzQgNDAuNjExNCA0OS4xNzE1QzQxLjY4NzggNDguNjQ3OSA0Mi42NzMzIDQ4LjA2NjEgNDMuNTY3OCA0Ny40Mjk3TDUyLjkzMTYgNDcuMzg5N0M1NC41MTM0IDQ3LjM4MjQgNTUuMzA2MSA0OC4xNjc5IDU1LjMxMzQgNDkuNzQ5N0w1NS40MTUyIDYyLjk5MzVaIiBmaWxsPSIjMEY5QkZGIi8+PHBhdGggZD0iTTQzLjU2OTQgNDcuNDMwN0M0Mi42NzQ4IDQ4LjA2NyA0MS42ODk0IDQ4LjY0ODkgNDAuNjEzIDQ5LjE3MjVDMzguMDE2NiA1MC40MzQzIDM0Ljg0NTcgNTEuMzM2MiAzMS4wOTI5IDUxLjg4MTZDMjcuMzQzOCA1Mi40MjcxIDI0LjAzNDYgNTIuNDYzNCAyMS4xNjkyIDUxLjk5OEMxOC4zIDUxLjUyODkgMTUuODcwOSA1MC41OTggMTMuODgxOCA0OS4yMDUyQzEzLjE3MjcgNDguNzA3IDEyLjUxMDkgNDguMTYxNiAxMS45MDcyIDQ3LjU2NTJMNDMuNTY5NCA0Ny40MzA3WiIgZmlsbD0iIzE0NDI2NCIvPjxwYXRoIGQ9Ik00OS44NjA5IDM3LjkxNjVDNDkuMzUxOCA0MC4zNDU3IDQ4LjMzIDQyLjUxMyA0Ni43OTkxIDQ0LjQyMjFDNDUuOTAwOSA0NS41MzQ4IDQ0LjgyNDUgNDYuNTM4NSA0My41NjYzIDQ3LjQyOTRMMTEuOTA0MSA0Ny41NjM5QzEwLjgwNTkgNDYuNDgzOSA5Ljg3ODYzIDQ1LjI0MDMgOS4xMjIyNiA0My44MzY2QzcuOTQwNDMgNDEuNjQ3NSA3LjEzNjc4IDM5LjA5NDcgNi43MTQ5NiAzNi4xNjc0TDUuMTY5NDkgMjUuODEwOUM0Ljk5MTMgMjQuNTc0NiA1LjUxODU4IDIzLjg2NTUgNi43NTQ5NiAyMy42ODczTDEyLjI2NDEgMjIuODg3M0MxMy4xMjIzIDIzLjUyMzYgMTQuMTAwNSAyNC4wODczIDE1LjE5MTQgMjQuNTc4MkMxNy4yODYgMjUuNTIgMTkuODIwNiAyNi4xNjM3IDIyLjc5ODggMjYuNTEyOEMyNS43NzM0IDI2Ljg1ODIgMjguMzgwNyAyNi44MTQ2IDMwLjYyMDcgMjYuMzgxOUMzMi44NjA3IDI1Ljk0NTUgMzQuNzU4OSAyNS4xNTY0IDM2LjMxODkgMjQuMDE0NkMzNy44NzUzIDIyLjg2OTEgMzkuMDk3MiAyMS40MjE4IDM5Ljk4NDQgMTkuNjY5MUM0MC4xMjYzIDE5LjM4NTQgNDAuMjYwOCAxOS4wOTgxIDQwLjM4MDggMTguOEw0Ni4zMjI3IDE3LjkzODFDNDcuNTU5MSAxNy43NTYzIDQ4LjI2NDUgMTguMjg3MiA0OC40NDY0IDE5LjUyMzZMNDkuOTg4MiAyOS44ODAxQzUwLjQxMzYgMzIuODAzNyA1MC4zNyAzNS40ODM4IDQ5Ljg2MDkgMzcuOTE2NVoiIGZpbGw9IiMwRjlCRkYiLz48cGF0aCBkPSJNNDAuMzgxMyAxOC44MDA4QzQwLjI2MTMgMTkuMDk5IDQwLjEyNjggMTkuMzg2MiAzOS45ODUgMTkuNjY5OUMzOS4wOTc3IDIxLjQyMjYgMzcuODc1OSAyMi44Njk5IDM2LjMxOTUgMjQuMDE1NEMzNC43NTk1IDI1LjE1NzIgMzIuODYxMyAyNS45NDYzIDMwLjYyMTIgMjYuMzgyN0MyOC4zODEyIDI2LjgxNTQgMjUuNzczOSAyNi44NTkxIDIyLjc5OTMgMjYuNTEzNkMxOS44MjExIDI2LjE2NDUgMTcuMjg2NSAyNS41MjA5IDE1LjE5MiAyNC41NzlDMTQuMTAxIDI0LjA4ODEgMTMuMTIyOCAyMy41MjQ1IDEyLjI2NDYgMjIuODg4MUw0MC4zODEzIDE4LjgwMDhaIiBmaWxsPSIjMTQ0MjY0Ii8+PHBhdGggZD0iTTQyLjY1MDQgNS4zMzEyOEw0MS43MTk0IDEzLjU1NjhDNDEuNDkwNCAxNS41MDU5IDQxLjA0NjcgMTcuMjU1MSA0MC4zODEyIDE4LjgwMDVMMTIuMjY0NiAyMi44ODc5QzExLjQ3OTEgMjIuMzA2IDEwLjc4ODIgMjEuNjYyNCAxMC4xOTU0IDIwLjk2MDZDOC45NTkwNyAxOS40OTE0IDguMTExNzggMTcuODAwNSA3LjY1MzYgMTUuODkxNEM3LjE5OTA1IDEzLjk3ODcgNy4xMDgxMyAxMS44NjU5IDcuMzc3MjMgOS41NDIyNEw4LjMwODE1IDEuMzE2NjlDOC40MjQ1MSAwLjMzNDg2MiA4Ljk3MzYxIC0wLjA5Nzg2OTkgOS45NTE4IDAuMDE4NDk1MUw0MS4zNDg1IDMuNjg3NjNDNDIuMzMwNCAzLjgwMDM2IDQyLjc2MzEgNC4zNDk0NSA0Mi42NTA0IDUuMzMxMjhaIiBmaWxsPSIjMEY5QkZGIi8+PC9zdmc+Cg==';
 
@@ -1241,8 +1248,8 @@ let conversationId = null;
 let lastBotMsg = '';
 
 // Venue autocomplete state
-let selectedVenueId = null;
-let selectedVenueName = null;
+let selectedVenueId = PRESET_VENUE_ID || null;
+let selectedVenueName = PRESET_VENUE_NAME || null;
 let selectedIsNew = false;
 let venueSearchTimeout = null;
 let dropdownBlurTimeout = null;
@@ -1253,6 +1260,19 @@ window.addEventListener('DOMContentLoaded', () => {
   loadSocialProof();
   loadPredictiveFixes();
   renderTipOfTheDay();
+
+  // If this is a branded slug page, hide the venue picker and show a locked badge
+  if (PRESET_VENUE_ID && PRESET_VENUE_NAME) {
+    const venueWrap = document.querySelector('.venue-wrap');
+    const venueConfirmed = document.getElementById('venueConfirmed');
+    const venueConfirmedName = document.getElementById('venueConfirmedName');
+    const vcChange = document.querySelector('.vc-change');
+    if (venueWrap) venueWrap.style.display = 'none';
+    if (venueConfirmedName) venueConfirmedName.textContent = PRESET_VENUE_NAME;
+    if (venueConfirmed) venueConfirmed.style.display = 'flex';
+    if (vcChange) vcChange.style.display = 'none'; // no "Change" link on locked pages
+  }
+
   const saved = localStorage.getItem('stacked_user');
   if (saved) {
     user = JSON.parse(saved);
@@ -3830,7 +3850,9 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${venueContext}`;
         bot_name: venue.bot_name || null,
         welcome_message: venue.welcome_message || null,
         welcome_heading: venue.welcome_heading || null,
-        white_label: venue.white_label || false
+        white_label: venue.white_label || false,
+        venue_id: venue.id || null,
+        venue_name: venue.name || null
       } : {};
       res.writeHead(200, {'Content-Type':'text/html','Cache-Control':'no-store'});
       res.end(buildChatPage(branding));
