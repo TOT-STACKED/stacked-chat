@@ -3290,6 +3290,33 @@ const server = http.createServer(async (req, res) => {
           }
         } catch(e) {}
 
+        // ── Pre-fetch videos so the AI knows they exist ───────────────────
+        let videoContext = '';
+        let preloadedVideos = [];
+        try {
+          const allVidsR = await sbFetch('/rest/v1/videos?select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200');
+          if (Array.isArray(allVidsR.data) && allVidsR.data.length > 0) {
+            preloadedVideos = allVidsR.data;
+            const searchText = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
+            const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
+            const explicitly = /video|watch|tutorial|show me|how to|walkthrough|demo|guide/i.test(message);
+            const scored = preloadedVideos.map(v => {
+              const t = ((v.title||'') + ' ' + (v.description||'') + ' ' + (v.category||'')).toLowerCase();
+              const hits = searchWords.filter(w => t.includes(w)).length;
+              return { v, hits };
+            });
+            const threshold = explicitly ? 1 : 2;
+            const topVideos = scored.filter(s => s.hits >= threshold).sort((a,b) => b.hits - a.hits).slice(0, 3).map(s => s.v);
+            if (topVideos.length > 0) {
+              videoContext = '\n\nVIDEO LIBRARY — you DO have these videos available for this topic:\n' +
+                topVideos.map(v => '- "' + v.title + '"' + (v.description ? ' — ' + v.description : '') + (v.category ? ' [' + v.category + ']' : '')).join('\n') +
+                '\nIMPORTANT: Acknowledge these videos exist. Say something like "I have a video guide for this" — the system will attach it automatically. Do NOT say you lack video content.';
+            } else if (preloadedVideos.length > 0) {
+              videoContext = '\n\nVIDEO LIBRARY: You have ' + preloadedVideos.length + ' videos in your library but none closely match this specific query. Do not claim you have no video content — just focus on text troubleshooting for now.';
+            }
+          }
+        } catch(e) {}
+
         const systemPrompt = `You are the Stacked Chat assistant — a friendly, direct AI support bot for hospitality operators in the UK. You specialise in hospitality technology troubleshooting.
 
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
@@ -3413,7 +3440,7 @@ Support URLs:
 - End with "If this hasn't resolved it, hit 'Raise a ticket' below" if the issue seems complex
 
 KNOWLEDGE BASE:
-${KNOWLEDGE_BASE}${vendorContext}${docContext}${venueContext}`;
+${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
 
         const messages = history.slice(-8).map(m => ({role:m.role,content:m.content}));
         if (!messages.length || messages[messages.length-1].content !== message) {
@@ -3468,15 +3495,15 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${venueContext}`;
         let relevantVideos = [];
         let finalReply = reply;
         try {
-          const vidsR = await sbFetch('/rest/v1/videos?select=*&order=created_at.desc&limit=200');
-          if (Array.isArray(vidsR.data) && vidsR.data.length > 0) {
+          // Reuse already-fetched videos — no second Supabase call needed
+          if (preloadedVideos.length > 0) {
             const explicitly = /video|watch|tutorial|show me|how to|walkthrough|demo|guide/i.test(message);
             // Match against both user message AND bot reply for better relevance
             const searchText = (message + ' ' + reply).toLowerCase();
-            const searchWords = searchText.split(/\s+/).filter(w=>w.length>3);
-            const scored = vidsR.data.map(v => {
+            const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
+            const scored = preloadedVideos.map(v => {
               const t = ((v.title||'') + ' ' + (v.description||'') + ' ' + (v.category||'')).toLowerCase();
-              const hits = searchWords.filter(w=>t.includes(w)).length;
+              const hits = searchWords.filter(w => t.includes(w)).length;
               return { v, hits };
             });
             const threshold = explicitly ? 1 : 2;
