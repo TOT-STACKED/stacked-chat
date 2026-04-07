@@ -3765,14 +3765,15 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${venueContext}`;
           let pagesFetched = 0;
           const maxPages = 5; // up to 150 articles
 
+          let apiBlocked = false;
           while (pageUrl && pagesFetched < maxPages) {
             const apiRes = await fetch(pageUrl, {
               headers: { ...browserHeaders, 'Accept': 'application/json' },
               signal: AbortSignal.timeout(20000)
             });
             if (!apiRes.ok) {
-              // If API blocked, fall through to HTML scrape below
-              if (pagesFetched === 0) throw new Error('Zendesk API returned ' + apiRes.status + ' — site may block scraping');
+              // 401/403 = API locked — fall through to HTML scrape silently
+              if (pagesFetched === 0) apiBlocked = true;
               break;
             }
             const apiData = await apiRes.json();
@@ -3785,11 +3786,13 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${venueContext}`;
             pagesFetched++;
           }
 
-          if (allText.length < 100) throw new Error('No content returned from Zendesk API');
-          const result = await saveChunks(allText, vendor || parsedUrl.hostname, scrapeUrl);
-          res.writeHead(200, {'Content-Type':'application/json'});
-          res.end(JSON.stringify({ ok: true, ...result, method: 'zendesk-api' }));
-          return;
+          if (!apiBlocked && allText.length >= 100) {
+            const result = await saveChunks(allText, vendor || parsedUrl.hostname, scrapeUrl);
+            res.writeHead(200, {'Content-Type':'application/json'});
+            res.end(JSON.stringify({ ok: true, ...result, method: 'zendesk-api' }));
+            return;
+          }
+          // API blocked or empty — fall through to HTML scrape below
         }
 
         // ── Standard HTML scrape ───────────────────────────────────────────
@@ -3802,7 +3805,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${venueContext}`;
         const html = await fetchRes.text();
         const text = stripHtml(html);
 
-        if (text.length < 100) throw new Error('Page returned too little content — site likely requires JavaScript rendering. Try linking to a specific article URL instead.');
+        if (text.length < 100) throw new Error('Page returned too little content — site requires JavaScript rendering. Try a direct article URL instead of the help centre homepage.');
 
         const result = await saveChunks(text, vendor || parsedUrl.hostname, scrapeUrl);
         res.writeHead(200, {'Content-Type':'application/json'});
