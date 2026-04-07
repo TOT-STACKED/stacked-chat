@@ -2289,7 +2289,7 @@ tbody tr:hover td{background:var(--surface2)}
         <input id="scrapeVendor" type="text" placeholder="Vendor name (e.g. Lightspeed)" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
         <button class="btn btn-primary" onclick="doScrapeUrl()" id="scrapeBtn">&#x1F4E5; Scrape</button>
       </div>
-      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Quick scrape &mdash; known vendor help centres</div>
+      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Quick scrape &mdash; known vendor help centres <span style="font-weight:400;color:var(--text3)">(uses Zendesk API where available — up to 150 articles per vendor)</span></div>
       <div style="display:flex;flex-wrap:wrap;gap:6px" id="quickScrapeList">
         <button class="filter-btn" onclick="quickScrape('https://support.lightspeedhq.com/hc/en-gb','Lightspeed Restaurant',this)">Lightspeed</button>
         <button class="filter-btn" onclick="quickScrape('https://squareup.com/help/gb/en/article/5148-getting-started-with-square-for-restaurants','Square',this)">Square</button>
@@ -2298,11 +2298,19 @@ tbody tr:hover td{background:var(--surface2)}
         <button class="filter-btn" onclick="quickScrape('https://support.sevenrooms.com/hc/en-us','SevenRooms',this)">SevenRooms</button>
         <button class="filter-btn" onclick="quickScrape('https://help.opentable.com/hc/en-us','OpenTable',this)">OpenTable</button>
         <button class="filter-btn" onclick="quickScrape('https://support.deliverect.com/hc/en-us','Deliverect',this)">Deliverect</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.mews.com/hc/en-us','Mews',this)">Mews</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.mews.com/hc/en-us','Mews',this)">Mews</button>
         <button class="filter-btn" onclick="quickScrape('https://support.marketman.com/hc/en-us','Marketman',this)">Marketman</button>
         <button class="filter-btn" onclick="quickScrape('https://help.resdiary.com/hc/en-gb','ResDiary',this)">ResDiary</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.zonal.co.uk/hc/en-gb','Zonal',this)">Zonal</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.tevalis.com/hc/en-gb','Tevalis',this)">Tevalis</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.flipdish.com/hc/en-us','Flipdish',this)">Flipdish</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.airship.com/hc/en-gb','Airship',this)">Airship</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.stampede.ai/hc/en-gb','Stampede',this)">Stampede</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.fourth.com/hc/en-gb','Fourth',this)">Fourth</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.rotaready.com/hc/en-gb','Rotaready',this)">Rotaready</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.collins.uk/hc/en-gb','Collins',this)">Collins</button>
       </div>
-      <div id="scrapeStatus" style="margin-top:10px;font-size:12px;color:var(--text3)"></div>
+      <div id="scrapeStatus" style="margin-top:10px;font-size:13px;padding:8px 0;color:var(--text3)"></div>
     </div>
     <div class="card">
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFiles(event)">
@@ -2452,43 +2460,58 @@ async function doScrapeUrl() {
   const vendor = document.getElementById('scrapeVendor').value.trim();
   if (!url) { notify('Enter a URL to scrape', 'red'); return; }
   const btn = document.getElementById('scrapeBtn');
+  const st = document.getElementById('scrapeStatus');
   btn.disabled = true; btn.textContent = 'Scraping...';
-  document.getElementById('scrapeStatus').textContent = 'Fetching ' + url + '...';
+  st.style.color = 'var(--text3)';
+  st.textContent = 'Fetching ' + url + ' — this may take up to 30 seconds...';
   try {
     const r = await fetch('/scrape', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url, vendor }) });
     const data = await r.json();
     if (data.ok) {
+      const method = data.method === 'zendesk-api' ? 'Zendesk API' : 'HTML';
       notify('Scraped ' + data.chunks + ' chunks from ' + (vendor || url), 'green');
-      document.getElementById('scrapeStatus').textContent = 'Indexed ' + data.chunks + ' chunks (' + Math.round(data.chars/1000) + 'k chars) as "' + data.filename + '"';
+      st.style.color = 'var(--green,#22c55e)';
+      st.textContent = '\u2705 Indexed ' + data.chunks + ' chunks (' + Math.round(data.chars/1000) + 'k chars) via ' + method + ' as "' + data.filename + '"';
       document.getElementById('scrapeUrl').value = '';
       document.getElementById('scrapeVendor').value = '';
       setTimeout(loadAnalytics, 1000);
     } else {
       notify('Scrape failed: ' + (data.error || 'unknown'), 'red');
-      document.getElementById('scrapeStatus').textContent = 'Failed: ' + (data.error || 'Unknown error');
+      st.style.color = '#ef4444';
+      st.textContent = '\u274C Failed: ' + (data.error || 'Unknown error');
     }
-  } catch(e) { notify('Error: ' + e.message, 'red'); }
-  btn.disabled = false; btn.textContent = 'Scrape';
+  } catch(e) { notify('Error: ' + e.message, 'red'); st.style.color='#ef4444'; st.textContent='\u274C '+e.message; }
+  btn.disabled = false; btn.textContent = '\uD83D\uDCE5 Scrape';
 }
 
 async function quickScrape(url, vendor, btn) {
   btn.disabled = true; btn.textContent = vendor + '...';
-  document.getElementById('scrapeStatus').textContent = 'Scraping ' + vendor + '...';
+  const st = document.getElementById('scrapeStatus');
+  st.style.color = 'var(--text3)';
+  st.textContent = 'Fetching ' + vendor + ' help centre — this may take up to 30 seconds...';
   try {
     const r = await fetch('/scrape', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url, vendor }) });
     const data = await r.json();
     if (data.ok) {
+      const method = data.method === 'zendesk-api' ? 'Zendesk API' : 'HTML';
       notify(vendor + ': ' + data.chunks + ' chunks indexed', 'green');
-      document.getElementById('scrapeStatus').textContent = vendor + ': indexed ' + data.chunks + ' chunks';
-      btn.textContent = vendor + ' done';
-      btn.style.background = 'var(--green)'; btn.style.color = '#fff'; btn.style.border = 'none';
+      st.style.color = 'var(--green,#22c55e)';
+      st.textContent = '\u2705 ' + vendor + ': indexed ' + data.chunks + ' chunks (' + Math.round(data.chars/1000) + 'k chars) via ' + method + ' \u2014 "' + data.filename + '"';
+      btn.textContent = '\u2705 ' + vendor;
+      btn.style.background = 'var(--green,#22c55e)'; btn.style.color = '#fff'; btn.style.border = 'none';
       setTimeout(loadAnalytics, 1000);
     } else {
       notify(vendor + ' scrape failed: ' + (data.error||''), 'red');
-      document.getElementById('scrapeStatus').textContent = vendor + ': ' + (data.error || 'Failed');
+      st.style.color = '#ef4444';
+      st.textContent = '\u274C ' + vendor + ': ' + (data.error || 'Failed');
       btn.disabled = false; btn.textContent = vendor;
     }
-  } catch(e) { notify('Error: ' + e.message, 'red'); btn.disabled = false; btn.textContent = vendor; }
+  } catch(e) {
+    notify('Error: ' + e.message, 'red');
+    st.style.color = '#ef4444';
+    st.textContent = '\u274C ' + vendor + ': ' + e.message;
+    btn.disabled = false; btn.textContent = vendor;
+  }
 }
 
 async function loadAnalytics() {
@@ -3693,46 +3716,98 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${venueContext}`;
         const { url: scrapeUrl, vendor } = JSON.parse(body);
         if (!scrapeUrl) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'No URL'})); return; }
 
-        // Fetch the page
+        const browserHeaders = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-GB,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Cache-Control': 'no-cache'
+        };
+
+        function stripHtml(html) {
+          return html
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+            .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, ' ')
+            .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, ' ')
+            .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, ' ')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#\d+;/g, ' ')
+            .replace(/\s{3,}/g, '\n\n')
+            .trim();
+        }
+
+        async function saveChunks(text, vendorName, srcUrl) {
+          const filename = vendorName + ' - scraped ' + new Date().toISOString().substring(0,10);
+          const chunkSize = 1200;
+          const chunks = [];
+          for (let i = 0; i < Math.min(text.length, 60000); i += chunkSize) {
+            chunks.push({ filename, content: text.substring(i, i + chunkSize), chunk_index: chunks.length });
+          }
+          await sbFetch('/rest/v1/documents?filename=ilike.' + encodeURIComponent('%' + vendorName + '%scraped%'), { method: 'DELETE' }).catch(() => {});
+          for (const chunk of chunks) {
+            await sbFetch('/rest/v1/documents', { method: 'POST', headers: { 'Prefer': 'return=minimal' }, body: chunk });
+          }
+          return { chunks: chunks.length, chars: text.length, filename };
+        }
+
+        // ── Zendesk Help Centre detection ──────────────────────────────────
+        // URLs like https://support.lightspeedhq.com/hc/en-gb
+        // or https://help.deputy.com/hc/en-us
+        // Zendesk exposes a public JSON API at /api/v2/help_center/<locale>/articles.json
+        const parsedUrl = new URL(scrapeUrl);
+        const hcMatch = parsedUrl.pathname.match(/^\/hc\/([a-z]{2}(?:-[a-z]{2})?)/i);
+        if (hcMatch) {
+          const locale = hcMatch[1];
+          const baseApi = parsedUrl.origin + '/api/v2/help_center/' + locale + '/articles.json?per_page=30&sort_by=updated_at&sort_order=desc';
+          let allText = '';
+          let pageUrl = baseApi;
+          let pagesFetched = 0;
+          const maxPages = 5; // up to 150 articles
+
+          while (pageUrl && pagesFetched < maxPages) {
+            const apiRes = await fetch(pageUrl, {
+              headers: { ...browserHeaders, 'Accept': 'application/json' },
+              signal: AbortSignal.timeout(20000)
+            });
+            if (!apiRes.ok) {
+              // If API blocked, fall through to HTML scrape below
+              if (pagesFetched === 0) throw new Error('Zendesk API returned ' + apiRes.status + ' — site may block scraping');
+              break;
+            }
+            const apiData = await apiRes.json();
+            const articles = apiData.articles || [];
+            for (const article of articles) {
+              const articleText = article.title + '\n' + stripHtml(article.body || '');
+              allText += articleText + '\n\n---\n\n';
+            }
+            pageUrl = apiData.next_page || null;
+            pagesFetched++;
+          }
+
+          if (allText.length < 100) throw new Error('No content returned from Zendesk API');
+          const result = await saveChunks(allText, vendor || parsedUrl.hostname, scrapeUrl);
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({ ok: true, ...result, method: 'zendesk-api' }));
+          return;
+        }
+
+        // ── Standard HTML scrape ───────────────────────────────────────────
         const fetchRes = await fetch(scrapeUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StackedChat/1.0; support-bot)' },
-          signal: AbortSignal.timeout(15000)
+          headers: browserHeaders,
+          signal: AbortSignal.timeout(20000),
+          redirect: 'follow'
         });
-        if (!fetchRes.ok) throw new Error('Fetch failed: ' + fetchRes.status);
+        if (!fetchRes.ok) throw new Error('HTTP ' + fetchRes.status + ' — site may block scraping or require login');
         const html = await fetchRes.text();
+        const text = stripHtml(html);
 
-        // Strip HTML - keep meaningful text
-        let text = html
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-          .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, ' ')
-          .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, ' ')
-          .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, ' ')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#\d+;/g, ' ')
-          .replace(/\s{3,}/g, '\n\n')
-          .trim();
+        if (text.length < 100) throw new Error('Page returned too little content — site likely requires JavaScript rendering. Try linking to a specific article URL instead.');
 
-        if (text.length < 100) throw new Error('Page returned too little content - may require JavaScript rendering');
-
-        // Chunk and store
-        const filename = (vendor || new URL(scrapeUrl).hostname) + ' - scraped ' + new Date().toISOString().substring(0,10);
-        const chunkSize = 1200;
-        const chunks = [];
-        for (let i = 0; i < Math.min(text.length, 24000); i += chunkSize) {
-          chunks.push({ filename, content: text.substring(i, i + chunkSize), chunk_index: chunks.length });
-        }
-
-        // Delete old chunks for this vendor first
-        await sbFetch('/rest/v1/documents?filename=ilike.' + encodeURIComponent('%' + (vendor || new URL(scrapeUrl).hostname) + '%scraped%'), { method: 'DELETE' }).catch(() => {});
-
-        // Save new chunks
-        for (const chunk of chunks) {
-          await sbFetch('/rest/v1/documents', { method: 'POST', headers: { 'Prefer': 'return=minimal' }, body: chunk });
-        }
-
+        const result = await saveChunks(text, vendor || parsedUrl.hostname, scrapeUrl);
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok: true, chunks: chunks.length, chars: text.length, filename }));
+        res.end(JSON.stringify({ ok: true, ...result, method: 'html' }));
+
       } catch(e) {
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ ok: false, error: e.message }));
