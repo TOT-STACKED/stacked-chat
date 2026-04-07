@@ -2317,137 +2317,81 @@ tbody tr:hover td{background:var(--surface2)}
 
     <!-- ── VIDEOS PANEL ───────────────────────────────────────────── -->
     <div id="contentVideos">
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-header"><span class="card-title">&#x1F310; Scrape vendor help centres</span><span class="card-meta">Fetch and index docs directly from vendor support sites</span></div>
-      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
-        <input id="scrapeUrl" type="url" placeholder="https://help.lightspeedhq.com/hc/en-gb/articles/..." style="flex:2;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-        <input id="scrapeVendor" type="text" placeholder="Vendor name (e.g. Lightspeed)" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-        <button class="btn btn-primary" onclick="doScrapeUrl()" id="scrapeBtn">&#x1F4E5; Scrape</button>
-      </div>
-      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Quick scrape &mdash; known vendor help centres <span style="font-weight:400;color:var(--text3)">(uses Zendesk API where available — up to 150 articles per vendor)</span></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px" id="quickScrapeList">
-        <button class="filter-btn" onclick="quickScrape('https://support.lightspeedhq.com/hc/en-gb','Lightspeed Restaurant',this)">Lightspeed</button>
-        <button class="filter-btn" onclick="quickScrape('https://squareup.com/help/gb/en/article/5148-getting-started-with-square-for-restaurants','Square',this)">Square</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.eposnow.com/hc/en-gb','EPOS Now',this)">EPOS Now</button>
-        <button class="filter-btn" onclick="quickScrape('https://help.deputy.com/hc/en-us','Deputy',this)">Deputy</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.sevenrooms.com/hc/en-us','SevenRooms',this)">SevenRooms</button>
-        <button class="filter-btn" onclick="quickScrape('https://help.opentable.com/hc/en-us','OpenTable',this)">OpenTable</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.deliverect.com/hc/en-us','Deliverect',this)">Deliverect</button>
-        <button class="filter-btn" onclick="quickScrape('https://help.mews.com/hc/en-us','Mews',this)">Mews</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.marketman.com/hc/en-us','Marketman',this)">Marketman</button>
-        <button class="filter-btn" onclick="quickScrape('https://help.resdiary.com/hc/en-gb','ResDiary',this)">ResDiary</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.zonal.co.uk/hc/en-gb','Zonal',this)">Zonal</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.tevalis.com/hc/en-gb','Tevalis',this)">Tevalis</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.flipdish.com/hc/en-us','Flipdish',this)">Flipdish</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.airship.com/hc/en-gb','Airship',this)">Airship</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.stampede.ai/hc/en-gb','Stampede',this)">Stampede</button>
-        <button class="filter-btn" onclick="quickScrape('https://help.fourth.com/hc/en-gb','Fourth',this)">Fourth</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.rotaready.com/hc/en-gb','Rotaready',this)">Rotaready</button>
-        <button class="filter-btn" onclick="quickScrape('https://support.collins.uk/hc/en-gb','Collins',this)">Collins</button>
-      </div>
-      <div id="scrapeStatus" style="margin-top:10px;font-size:13px;padding:8px 0;color:var(--text3)"></div>
-    </div>
-    <div class="card">
-      <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFiles(event)">
-        <div style="font-size:28px">&#x1F4C4;</div>
-        <div class="drop-title">Drop files to index</div>
-        <div class="drop-sub">Supports .txt and .md &mdash; up to 10MB each</div>
-      </div>
-      <input type="file" id="fileInput" multiple accept=".txt,.md" style="display:none" onchange="handleFiles(this.files)">
-      <div id="uploadList" style="margin-top:12px"></div>
-      <div style="margin-top:16px;margin-bottom:8px;display:flex;gap:8px">
-        <input type="text" id="docSearch" placeholder="Search knowledge base..." oninput="filterDocs(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);outline:none">
-        <span id="docCount" style="font-size:12px;color:var(--text3);white-space:nowrap;align-self:center"></span>
-      </div>
-      <div id="docList" style="margin-top:12px"><div class="empty">Loading documents...</div></div>
-    </div>
-  </div>
-
-  <div class="tab-panel" id="tab-videos">
-    <div class="page-header">
-      <div><div class="page-title">Video Library</div><div class="page-sub" id="videoCount">Videos surfaced in chat when relevant</div></div>
-    </div>
-
-    <!-- YouTube Importer -->
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-header"><span class="card-title">&#x1F4FA; Import from YouTube</span><span class="card-meta">Search by vendor name &mdash; tick &amp; bulk import</span></div>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <input id="ytSearch" type="text" placeholder="e.g. Lightspeed Restaurant, Square POS, Deputy App..." style="flex:1;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)" onkeydown="if(event.key==='Enter')searchYouTube()">
-        <select id="ytCategory" style="padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-          <option value="">No category</option>
-          <option value="epos">EPOS / POS</option>
-          <option value="payments">Payments</option>
-          <option value="wifi">WiFi / Network</option>
-          <option value="printer">Printers / KDS</option>
-          <option value="bookings">Bookings / Reservations</option>
-          <option value="workforce">Workforce / Rota</option>
-          <option value="ordering">Online Ordering</option>
-          <option value="loyalty">Loyalty / CRM</option>
-          <option value="general">General</option>
-        </select>
-        <button class="btn btn-primary" id="ytSearchBtn" onclick="searchYouTube()">&#x1F50D; Search</button>
-      </div>
-      <div id="ytResults" style="display:none">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <span id="ytResultCount" style="font-size:12px;color:var(--text3)"></span>
-          <div style="display:flex;gap:8px">
-            <button class="btn" onclick="ytSelectAll()">Select all</button>
-            <button class="btn btn-primary" id="ytImportBtn" onclick="importSelected()" style="display:none">&#x2B07; Import selected (<span id="ytSelCount">0</span>)</button>
-          </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">&#x1F4FA; Import from YouTube</span><span class="card-meta">Search by vendor name &mdash; tick &amp; bulk import</span></div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <input id="ytSearch" type="text" placeholder="e.g. Lightspeed Restaurant, Square POS, Deputy App..." style="flex:1;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)" onkeydown="if(event.key==='Enter')searchYouTube()">
+          <select id="ytCategory" style="padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+            <option value="">No category</option>
+            <option value="epos">EPOS / POS</option>
+            <option value="payments">Payments</option>
+            <option value="wifi">WiFi / Network</option>
+            <option value="printer">Printers / KDS</option>
+            <option value="bookings">Bookings / Reservations</option>
+            <option value="workforce">Workforce / Rota</option>
+            <option value="ordering">Online Ordering</option>
+            <option value="loyalty">Loyalty / CRM</option>
+            <option value="general">General</option>
+          </select>
+          <button class="btn btn-primary" id="ytSearchBtn" onclick="searchYouTube()">&#x1F50D; Search</button>
         </div>
-        <div id="ytGrid" class="video-grid"></div>
+        <div id="ytResults" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span id="ytResultCount" style="font-size:12px;color:var(--text3)"></span>
+            <div style="display:flex;gap:8px">
+              <button class="btn" onclick="ytSelectAll()">Select all</button>
+              <button class="btn btn-primary" id="ytImportBtn" onclick="importSelected()" style="display:none">&#x2B07; Import selected (<span id="ytSelCount">0</span>)</button>
+            </div>
+          </div>
+          <div id="ytGrid" class="video-grid"></div>
+        </div>
+        <div id="ytNoKey" style="display:none;padding:12px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;font-size:13px;color:#92400e">
+          &#x26A0; Add <strong>YOUTUBE_API_KEY</strong> to your Render environment variables to enable YouTube search.
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#92400e;font-weight:600"> Get a free key &rarr;</a>
+        </div>
       </div>
-      <div id="ytNoKey" style="display:none;padding:12px;background:#fef3c7;border:1px solid #fde68a;border-radius:6px;font-size:13px;color:#92400e">
-        &#x26A0; Add <strong>YOUTUBE_API_KEY</strong> to your Render environment variables to enable YouTube search.
-        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:#92400e;font-weight:600"> Get a free key &rarr;</a>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header"><span class="card-title">Add single video</span></div>
+        <div class="video-drop-zone" id="videoDrop" ondragover="vDragOver(event)" ondragleave="vDragLeave(event)" ondrop="vDrop(event)" onclick="document.getElementById('videoFileInput').click()">
+          <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/*" style="display:none" onchange="handleVideoFiles(this.files)">
+          <div style="font-size:32px">&#x1F3A5;</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:8px">Drag &amp; drop an MP4 here</div>
+          <div style="font-size:12px;color:var(--text3)">or click to browse &mdash; or paste a URL below</div>
+        </div>
+        <div id="videoUploadList"></div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;margin-top:10px">
+          <input id="vidUrl" type="url" placeholder="YouTube URL or direct MP4 URL" style="flex:2;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+          <input id="vidTitle" type="text" placeholder="Title" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <input id="vidDesc" type="text" placeholder="Keywords (e.g. Square POS setup)" style="flex:1;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+          <select id="vidCat" style="padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+            <option value="">No category</option>
+            <option value="epos">EPOS / POS</option>
+            <option value="payments">Payments</option>
+            <option value="wifi">WiFi / Network</option>
+            <option value="printer">Printers / KDS</option>
+            <option value="bookings">Bookings / Reservations</option>
+            <option value="workforce">Workforce / Rota</option>
+            <option value="ordering">Online Ordering</option>
+            <option value="loyalty">Loyalty / CRM</option>
+            <option value="general">General</option>
+          </select>
+          <button class="btn btn-primary" id="addVidBtn" onclick="addVideo()">+ Add</button>
+        </div>
       </div>
+      <div class="filter-bar">
+        <button class="filter-btn active" onclick="filterVideos('',this)">All</button>
+        <button class="filter-btn" onclick="filterVideos('epos',this)">EPOS</button>
+        <button class="filter-btn" onclick="filterVideos('payments',this)">Payments</button>
+        <button class="filter-btn" onclick="filterVideos('wifi',this)">WiFi</button>
+        <button class="filter-btn" onclick="filterVideos('printer',this)">Printers</button>
+        <button class="filter-btn" onclick="filterVideos('bookings',this)">Bookings</button>
+        <button class="filter-btn" onclick="filterVideos('workforce',this)">Workforce</button>
+        <button class="filter-btn" onclick="filterVideos('ordering',this)">Ordering</button>
+      </div>
+      <div id="videoGrid" class="video-grid"><div class="empty">Loading...</div></div>
     </div>
-
-    <!-- Manual add -->
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-header"><span class="card-title">Add single video</span></div>
-      <div class="video-drop-zone" id="videoDrop" ondragover="vDragOver(event)" ondragleave="vDragLeave(event)" ondrop="vDrop(event)" onclick="document.getElementById('videoFileInput').click()">
-        <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/*" style="display:none" onchange="handleVideoFiles(this.files)">
-        <div style="font-size:32px">&#x1F3A5;</div>
-        <div style="font-size:14px;font-weight:600;color:var(--text);margin-top:8px">Drag &amp; drop an MP4 here</div>
-        <div style="font-size:12px;color:var(--text3)">or click to browse &mdash; or paste a URL below</div>
-      </div>
-      <div id="videoUploadList"></div>
-      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;margin-top:10px">
-        <input id="vidUrl" type="url" placeholder="YouTube URL or direct MP4 URL" style="flex:2;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-        <input id="vidTitle" type="text" placeholder="Title" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-      </div>
-      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
-        <input id="vidDesc" type="text" placeholder="Keywords (e.g. Square POS setup)" style="flex:1;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-        <select id="vidCat" style="padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-          <option value="">No category</option>
-          <option value="epos">EPOS / POS</option>
-          <option value="payments">Payments</option>
-          <option value="wifi">WiFi / Network</option>
-          <option value="printer">Printers / KDS</option>
-          <option value="bookings">Bookings / Reservations</option>
-          <option value="workforce">Workforce / Rota</option>
-          <option value="ordering">Online Ordering</option>
-          <option value="loyalty">Loyalty / CRM</option>
-          <option value="general">General</option>
-        </select>
-        <button class="btn btn-primary" id="addVidBtn" onclick="addVideo()">+ Add</button>
-      </div>
-    </div>
-
-    <!-- Library with filter -->
-    <div class="filter-bar">
-      <button class="filter-btn active" onclick="filterVideos('',this)">All</button>
-      <button class="filter-btn" onclick="filterVideos('epos',this)">EPOS</button>
-      <button class="filter-btn" onclick="filterVideos('payments',this)">Payments</button>
-      <button class="filter-btn" onclick="filterVideos('wifi',this)">WiFi</button>
-      <button class="filter-btn" onclick="filterVideos('printer',this)">Printers</button>
-      <button class="filter-btn" onclick="filterVideos('bookings',this)">Bookings</button>
-      <button class="filter-btn" onclick="filterVideos('workforce',this)">Workforce</button>
-      <button class="filter-btn" onclick="filterVideos('ordering',this)">Ordering</button>
-    </div>
-    <div id="videoGrid" class="video-grid"><div class="empty">Loading...</div></div>
-    </div><!-- end #contentVideos -->
 
     <!-- ── KNOWLEDGE BASE PANEL ──────────────────────────────────── -->
     <div id="contentDocs" style="display:none">
