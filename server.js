@@ -58,6 +58,369 @@ General troubleshooting:
 PSP contacts: Worldpay 0330 333 3967, SumUp 020 3510 0160, Square support.squareup.com/en/gb, Stripe 0800 041 8604, Zettle 020 3455 0690, Dojo 0800 060 8085, Adyen support.adyen.com, Elavon 0345 850 0195
 `;
 
+// ─── VENDOR PROFILES ─────────────────────────────────────────────────────
+const VENDOR_PROFILES = {
+  'lightspeed': `LIGHTSPEED RESTAURANT
+Support: 0800 023 2777 | support.lightspeedhq.com/hc/en-gb | Chat available in app
+Common issues and fixes:
+1. OFFLINE MODE - Till shows "offline": Check internet connection. Go to Settings > Connectivity. If on Wi-Fi, try switching to a wired connection or mobile hotspot. Lightspeed requires a stable connection - it caches recent data so you can still process cash sales. Reconnect and sync when back online.
+2. RECEIPT/KITCHEN PRINTER NOT PRINTING: Check printer is powered on and paper loaded. In Back Office > Configuration > Printers, verify the printer IP address matches the printer's actual IP (print a self-test page from the printer to confirm). Restart the Lightspeed app after any printer changes.
+3. CARD PAYMENTS FAILING: If integrated payments (via Dojo, Square, or Worldpay), check the card reader is connected and paired. Go to POS Settings > Payment > Card. If reader shows offline, restart it. For persistent issues, contact your payment provider - Lightspeed only handles the integration, not the payment processing itself.
+4. MENU NOT SYNCING TO POS: Changes made in Back Office take up to 2 minutes to sync. Force sync: close and reopen the Lightspeed POS app. If still not showing, check you published the changes in Back Office (look for the blue "Publish" button).
+5. STAFF CAN'T LOG IN: Check the employee has an active account in Back Office > Employees. Ensure their PIN is set (4 digits). If using card swipe login, re-pair the card reader in Settings. For forgotten PINs, a manager can reset in Back Office.
+6. END OF DAY / Z-REPORT MISSING: Ensure all open tables are closed before running end of day. Go to Reports > End of Day in Back Office. If the report won't generate, check no floor tables are in "open" state.
+Error codes: ERR_NETWORK = connectivity issue. ERR_SYNC = sync failed, force close and reopen app. 401 = authentication expired, log out and back in.
+Pro tips: Always keep the app updated. Use Lightspeed Back Office on desktop for menu changes. Set up automated daily reports by email in Back Office > Reports > Scheduled.`,
+
+  'square': `SQUARE FOR RESTAURANTS
+Support: squareup.com/help/gb/en | 0800 098 8008 (UK) | Live chat in Square Dashboard
+Common issues and fixes:
+1. SQUARE READER NOT CONNECTING: Ensure Bluetooth is enabled on the device. Open Square app > More > Hardware > Square Reader and tap "Connect". If reader not showing, hold the reader button for 3 seconds to enter pairing mode. Try forgetting the device in Bluetooth settings and re-pairing. Charge the reader if LED is flashing red.
+2. PAYMENT DECLINED / READER ERROR: First check the card reader has a connection (Wi-Fi or mobile data). If offline, Square can take offline payments (enable in Settings > Offline Payments). For chip/PIN issues, clean the chip reader slot. If contactless fails, ask customer to insert card.
+3. OFFLINE PAYMENTS MODE: Go to Account > Settings > Offline Payments > Enable Offline Payments. Transactions are stored and processed when connectivity returns. Note: offline payments carry risk - Square will decline cards if total offline exceeds your limit.
+4. END OF DAY REPORT NOT MATCHING: Go to Reports > Transactions and filter by today. Check for any voided or refunded transactions. The "Sales Summary" report shows net sales after refunds. Ensure all staff have closed their drawers if using separate cash drawers.
+5. STAFF MANAGEMENT / PASSCODE ISSUES: Go to Team > Team Members. Each member needs a unique passcode for the POS. Reset via Dashboard. Ensure the employee has the correct permissions role assigned - this controls what they can access on the till.
+6. SQUARE DASHBOARD NOT LOADING: Clear browser cache, try incognito mode. Check status.squareup.com for any outages. Try logging out and back in. If on the app, force close and reopen.
+Error codes: CARD_DECLINED = issuing bank declined (try different card). READER_ERROR = hardware issue, restart reader. NETWORK_ERROR = no internet connection.
+Pro tips: Use Square's free virtual terminal for phone orders. Enable tipping prompts in Settings > Checkout > Tipping. Use item modifiers for customisations rather than separate items.`,
+
+  'epos now': `EPOS NOW
+Support: 0800 2465 256 | support.eposnow.com | Live chat available 24/7
+Common issues and fixes:
+1. SYSTEM OFFLINE / GREY SCREEN: Check internet connection first. EPOS Now requires internet to function fully - it does not have a true offline mode. Restart the router, then restart the EPOS Now terminal. If using broadband, check the router admin panel for connectivity issues. If problem persists, use the EPOS Now app on a tablet as a backup.
+2. TILL CRASHED / FROZEN SCREEN: Hold the power button for 10 seconds to force restart. If the Windows-based terminal, press Ctrl+Alt+Delete and end the EPOS Now process, then relaunch. Check for Windows updates that may be running in the background.
+3. RECEIPT PRINTER NOT WORKING: In Back Office > Devices > Printers, check the printer is listed and active. Verify IP address is correct (print a test page from the printer itself). Ensure the printer is on the same network as the till. Restart both the printer and till. Check paper is loaded correctly and not jammed.
+4. CARD MACHINE NOT PAIRING (Paymentsense/Dojo integration): Go to Back Office > Integrations > Card Payment. Click "Re-pair" and follow the on-screen steps. The card machine must be on and connected to Wi-Fi. If using Paymentsense, call 0800 048 4422 for pairing support.
+5. SOFTWARE UPDATE FAILED: Updates are pushed overnight. If an update fails, go to Back Office > System > Updates and try manually applying. Ensure the terminal stays powered on and connected overnight. If update won't apply, contact EPOS Now support with your account number.
+6. ITEM NOT FOUND / WRONG PRICE: Go to Back Office > Products and search for the item. Check the price and that it is set to "active". If a product is showing wrong price on the till, force a sync: Back Office > System > Sync Data.
+Error codes: CONNECTION_TIMEOUT = internet issue. SYNC_FAILED = check Back Office > System > Sync log. LICENSE_ERROR = call support, may be billing issue.
+Pro tips: Use EPOS Now Orderpad app on tablets for tableside ordering. Enable "Offline Mode Lite" in settings for basic cash sales during outages. Regularly export your product list as a CSV backup.`,
+
+  'icrtouch': `ICRTOUCH (TouchPoint POS)
+Support: icrtouch.com/support | Contact your ICRTouch reseller first | 01227 811 811
+Common issues and fixes:
+1. TOUCHPOINT OFFLINE / WON'T LOAD: Check network connection between the TouchPoint terminal and the BackOffice server (or cloud). ICRTouch can operate in standalone mode if configured - check with your reseller. Restart the TouchPoint application from the Windows taskbar. If BackOffice server is on-site, check the server is running.
+2. KITCHEN DISPLAY (TouchKitchen) NOT SHOWING ORDERS: Check the network connection between the POS terminal and the kitchen display unit. In TouchPoint > Setup > Kitchen, verify the KDS IP address is correct. Restart both the POS terminal and the KDS screen. Check that menu items are assigned to the correct kitchen printer/display group.
+3. STOCK DEDUCTING INCORRECTLY: Go to BackOffice > Stock > Stock Management and check item recipe/component links. Verify the stock unit of measure matches the selling unit. Run a stock audit report to identify discrepancies. Check that "negative stock" alerts are enabled in BackOffice > Preferences.
+4. END OF DAY Z-REPORT NOT RUNNING: Ensure all open tables/tabs are settled before running Z-report. In TouchPoint > Management > End of Period > Z-Report. If the report shows incorrect totals, check for any "training mode" transactions that may have been accidentally processed. Contact your ICRTouch reseller for Z-report discrepancies.
+5. PRINTER OFFLINE IN TOUCHPOINT: Go to Setup > Devices > Printers and check the printer status. Verify the IP address. Assign a static IP to your printers to prevent IP changes after router restarts. ICRTouch uses IP printing - ensure no firewall is blocking communication.
+6. STAFF PERMISSIONS NOT APPLYING: In BackOffice > Staff > Staff Members, check the employee's security level. Changes to permissions apply at next login. Ensure the employee is not currently logged into a terminal - log them out first.
+Error codes: ICR_CONN_ERR = cannot reach BackOffice server. PRINTER_TIMEOUT = printer not responding on network. AUTH_FAIL = incorrect staff PIN or security level.
+Pro tips: ICRTouch resellers handle most support - always contact your reseller first. Use TouchOffice Web for remote Back Office access. Enable receipt reprint from the management menu for lost receipt requests.`,
+
+  'tevalis': `TEVALIS
+Support: 01923 294446 | tevalis.com/support | support@tevalis.com
+Common issues and fixes:
+1. SYSTEM WON'T LOAD / BLACK SCREEN: Check the Tevalis service is running on the server (Windows Services > Tevalis). Restart the Tevalis POS application on the terminal. Check network connectivity between terminals and the central server. If cloud-hosted, check internet connection and Tevalis status page.
+2. TABLE PLAN NOT SHOWING CORRECTLY: In Tevalis Back Office > Table Plan, check tables are assigned to the correct floor plan. Refresh the table plan on the POS by logging out and back in. If tables are showing as occupied but empty, a manager can force-close open tables in Back Office > Table Management.
+3. CARD INTEGRATION ERRORS (Dojo/Worldpay): Check the payment terminal is paired and showing as connected in Tevalis > Integrations > Payment. Re-pair if needed by going through the payment integration setup. If error code shows on the terminal, note the code and call the payment provider.
+4. END OF DAY RECONCILIATION: Run Z-report from Tevalis Management > Reports > End of Day. Ensure all floats are declared and all payment types balanced. If figures don't reconcile, check for any offline transactions stored in the system (Tevalis > Offline Transactions).
+5. RECEIPT PRINTER OFFLINE: Tevalis uses IP-based printing. Check the printer IP in Back Office > Devices > Printers. Assign static IPs to all printers. Restart the printer and check it's on the same VLAN as the POS terminals.
+6. MENU ITEM NOT APPEARING: In Back Office > Menu > Items, check the item is "active" and assigned to the correct menu level and trade period. Sync the menu by closing and reopening the Tevalis POS or using Back Office > Sync.
+Error codes: SRV_UNAVAILABLE = cannot reach Tevalis server. PAY_COMM_ERR = payment terminal not responding. SYNC_ERR = menu sync failed.
+Pro tips: Tevalis requires a stable LAN connection between all terminals. Use their Table Ordering App for tableside ordering. Regular database backups are managed via Tevalis Back Office > System > Backup.`,
+
+  'zonal': `ZONAL (Aztec POS)
+Support: 0131 554 6200 | zonal.co.uk | support@zonal.co.uk
+Common issues and fixes:
+1. AZTEC POS OFFLINE / NOT RESPONDING: Check network connectivity on the affected terminal. Zonal Aztec connects to a central server - ensure the server (often in the back office) is running. Restart the Aztec application (not the server). Check Windows Event Viewer on the server for error logs.
+2. KITCHEN PRINTER NOT FIRING: In Aztec Back Office > Printing > Kitchen Printers, verify the printer is enabled and the IP address is correct. Check the "print rules" to ensure the menu item category is routed to the kitchen printer. Test with a manual print from Back Office.
+3. CARD PAYMENT INTEGRATION (Paymentsense/Dojo): Check the EFT terminal is paired with the till. In Aztec > Tenders > Card, verify the integration is "active". For Paymentsense issues, call 0800 048 4422. For Dojo, call 0800 060 8085.
+4. REPORTING DISCREPANCIES: Run the "Detailed Sales Report" in Aztec Back Office to check for voided transactions. Ensure all staff have properly closed their sessions. Check for any "training mode" flag being left on - this creates dummy transactions.
+5. STAFF SIGN-IN FAILING: Check the employee profile in Back Office > Staff > Employees. Ensure their PIN is set and account is active. Zonal uses magnetic stripe or PIN login - check the swipe reader is working if staff use cards.
+6. PROMOTIONS NOT APPLYING: In Back Office > Promotions, check the promotion is active, date range is correct, and qualifying items are included. Promotions can be triggered automatically or manually - verify the trigger type.
+Error codes: DB_CONNECT_FAIL = cannot reach Aztec database. EFT_TIMEOUT = card terminal not responding. PRINT_ERROR = printer unreachable.
+Pro tips: Zonal's support is enterprise-level - have your site ID ready when calling. Use Zonal's Aztec Web Analytics for remote reporting. Major changes to menus or pricing should be done outside of trading hours.`,
+
+  'dojo': `DOJO PAYMENTS
+Support: 0800 060 8085 | help.dojo.tech | Available 24/7
+Common issues and fixes:
+1. TERMINAL OFFLINE / NOT CONNECTING: Check the terminal's connectivity status (Wi-Fi icon on screen). If Wi-Fi, go to Settings > Wi-Fi and ensure correct network is selected. If SIM-based, check for signal (go to Settings > Mobile Data). Restart the terminal by holding the power button. If still offline after restart, check your router and try a different network.
+2. TRANSACTION DECLINED: Ask the customer to try again with PIN rather than contactless. Check the terminal is showing the correct amount. If card is repeatedly declined, the issue is with the customer's bank - advise them to contact their card provider. For Dojo-specific declines (ERR_40x), restart terminal.
+3. SETTLEMENT NOT RUNNING: Dojo auto-settles at midnight by default. To manually settle, go to Dojo Hub > Transactions > End of Day. If settlement is late, funds typically arrive next business day. For missing settlements, call Dojo support with your merchant ID.
+4. TERMINAL LOST PAIRING WITH EPOS: In your EPOS system, go to the payment integration settings and select "re-pair". On the Dojo terminal, go to Settings > Integrations > [your EPOS name] and pair. Both devices must be on the same Wi-Fi network for IP-based pairing.
+5. SOFTPOS (PHONE AS TERMINAL) NOT WORKING: Ensure NFC is enabled on the phone (Settings > NFC). Update the Dojo SoftPOS app. The phone must be unlocked and the app open to accept payments. If contactless won't read, clean the NFC area and ask customer to hold card flat.
+6. REFUND PROCESSING: On the terminal, press the menu button > Transactions > Find Transaction > Refund. Refunds typically take 3-5 business days to reach the customer. Partial refunds are supported. If you can't find the original transaction, call Dojo support.
+Error codes: ERR_001 = no connection. ERR_400 = invalid transaction. ERR_500 = internal error, restart terminal. DECLINE_05 = do not honour (customer's bank).
+Pro tips: Use Dojo Go (app + reader) for mobile payments. Enable digital receipts to reduce paper. Dojo Hub (hub.dojo.tech) gives full transaction history and reporting.`,
+
+  'worldpay': `WORLDPAY
+Support: 0330 333 3967 | worldpay.com/en-gb/support | Available 24/7
+Common issues and fixes:
+1. TERMINAL OFFLINE: Check broadband connection - Worldpay terminals typically use a fixed broadband line rather than Wi-Fi for reliability. Check the terminal's connectivity indicator. If using Wi-Fi, ensure the terminal is within range and on the correct network. Restart the terminal using the restart option in the terminal menu (not just power off).
+2. BATCH SETTLEMENT FAILURE: Worldpay terminals auto-batch overnight. If a batch fails, you'll see an error on the terminal. Go to Worldpay Business Manager > Transactions to check status. Call 0330 333 3967 with your merchant number to investigate missed settlements.
+3. CARD DECLINED UNEXPECTEDLY: Run a test transaction on a known good card. If other cards work, the issue is with that specific card/bank. If all cards are declining, check your terminal is not in "test mode" (check with Worldpay support). Verify your merchant account is not suspended.
+4. TERMINAL WON'T PRINT RECEIPT: Check paper roll is loaded correctly - thermal paper shiny side facing the print head. Check there's no paper jam. Go to terminal menu > Admin > Print Test to verify printer is working. If no print, the terminal may need a service call.
+5. CONTACTLESS NOT WORKING: Ensure contactless is enabled (Worldpay Back Office > Terminal Settings). The customer's card may have exceeded contactless limits - ask them to insert and use PIN. Clean the contactless reader area if foreign object may be blocking it.
+6. WRONG AMOUNT CHARGED: Void the transaction immediately if same day (terminal menu > Void). If not same day, process a refund from Worldpay Business Manager or via the terminal. Call 0330 333 3967 for assistance with disputed amounts.
+Error codes: LINK DOWN = no network. HOST UNAVAIL = cannot reach Worldpay servers. DECLINED = card issuer declined. VOID OK = void successful.
+Pro tips: Keep your merchant ID and terminal serial number accessible for support calls. Use Worldpay Business Manager for online reporting. Enable email receipts via Business Manager to reduce paper consumption.`,
+
+  'sumup': `SUMUP
+Support: 020 3510 0160 | help.sumup.com/en-GB | In-app support chat
+Common issues and fixes:
+1. CARD READER NOT CHARGING: Use the provided USB-C cable and a 5V/1A charger. Avoid fast chargers. Charge for at least 2 hours before first use. The LED indicator: solid red = charging, solid green = full. If reader doesn't charge at all, try a different cable. Readers have a 1-year warranty - contact SumUp for replacement if faulty.
+2. BLUETOOTH CONNECTION PROBLEMS: On your phone, go to Bluetooth settings and "Forget" the SumUp reader. In the SumUp app, go to Card Reader and follow the pairing steps again. Keep the phone within 1 metre of the reader during pairing. If using iOS, ensure Bluetooth permissions are granted to the SumUp app.
+3. APP CRASHES OR FREEZES: Force close the SumUp app and reopen. Ensure the app is up to date (check App Store or Google Play). Check your phone has enough free storage (at least 1GB free). If persistent, uninstall and reinstall the app - your account data is stored in the cloud.
+4. PROCESSING A REFUND: In the SumUp app, go to Sales > find the transaction > select "Refund". Refunds must be within 30 days of the original transaction. The refund goes back to the original payment method. SumUp fees are not refunded when you issue a refund.
+5. DAILY / MONTHLY LIMITS: SumUp accounts start with limits that increase as you process more. If you hit your limit, transactions will be declined. Go to SumUp account settings to request a limit increase, or call support. Limits are based on your account verification level.
+6. PAYOUT NOT RECEIVED: Go to SumUp app > Payouts to check payout status. Standard payouts take 1-3 business days. Ensure your bank account details are correct in account settings. New accounts may have a 7-day initial hold.
+Error codes: ERR_01 = communication error (retry). ERR_05 = declined by bank. ERR_14 = invalid card number. READER_NOT_FOUND = Bluetooth issue.
+Pro tips: SumUp Air reader works with phones and tablets. Enable the SumUp POS app for more advanced till features. Use SumUp Invoices for B2B payments.`,
+
+  'zettle': `ZETTLE BY PAYPAL
+Support: 020 3455 0690 | zettle.com/gb/help | help.zettle.com
+Common issues and fixes:
+1. CARD READER NOT RESPONDING: Check the reader has battery (LED indicator - tap the power button once to check). Charge via USB-C. Restart the reader by holding the power button for 5 seconds. In the Zettle app, go to Settings > Card Readers and try reconnecting. If reader not showing, enable Bluetooth on phone and re-pair.
+2. NO INTERNET ERROR DURING PAYMENT: Zettle requires internet to process payments. Switch from Wi-Fi to mobile data or vice versa. Check your phone's data connection. If in a venue with poor signal, move to an area with better connectivity. Zettle does not have an offline payment mode.
+3. INCORRECT AMOUNT PROCESSED: If already processed, go to Zettle app > History > find transaction > Refund. If not yet processed, cancel the transaction before completion. Always double-check amount on reader screen before customer taps/inserts card.
+4. REFUND PROCESS: Go to Zettle app > Transactions > select the transaction > Issue refund. Enter the refund amount. The customer does not need to be present if refunding to original card. Refunds take 5-10 business days to appear in customer's account.
+5. ZETTLE POS LIBRARY NOT SYNCING: If using Zettle POS for restaurants/retail, go to Library > sync. If items are missing, check they are active in the Zettle Back Office (my.zettle.com). Add items in Back Office and they will sync to the app.
+6. PAYOUT DELAYS: Go to my.zettle.com > Finance > Payouts to check status. Standard payout is next business day for verified accounts. For new accounts, first payout may take up to 5 business days. Ensure bank details are verified in account settings.
+Error codes: NET_ERR = no internet. AUTH_FAIL = session expired, log out and back in. DECLINED = card issuer declined. AMOUNT_MISMATCH = card amount doesn't match requested amount.
+Pro tips: Use Zettle Go for simple payments, Zettle POS for full EPOS. Connect a receipt printer via Bluetooth for printed receipts. Use multiple readers with staff management for teams.`,
+
+  'deputy': `DEPUTY (WORKFORCE MANAGEMENT)
+Support: help.deputy.com | In-app support chat | deputy.com
+Common issues and fixes:
+1. SCHEDULE NOT PUBLISHING TO STAFF: After creating/editing the schedule, click the "Publish" button (top right in schedule view). Staff receive the notification via email and Deputy app. Check staff have the Deputy app installed and notifications enabled. If staff say they haven't received it, check their email in People > Employees > verify email address is correct.
+2. TIMESHEET ERRORS / CLOCKED-IN TIME WRONG: Go to Timesheets > select the employee > click the timesheet to edit. Managers can manually adjust clock in/out times before approval. If employee forgot to clock out, their timesheet will show as "still clocked in" - manually add the clock out time.
+3. EMPLOYEE NOT APPEARING IN SCHEDULE: Check the employee is "active" in People > Employees. Ensure they are assigned to the correct location/area. Check their start date is not in the future. If using custom roles, verify the role is available at the location.
+4. PAYROLL EXPORT FAILING: Go to Pay > Payroll > Export. Check the payroll period is set correctly and all timesheets in the period are approved. If export fails, check you have the correct payroll integration configured (Xero, QuickBooks, MYOB etc). For integration issues, check the integration settings in Deputy > Settings > Integrations.
+5. LEAVE / ABSENCE NOT REFLECTING IN SCHEDULE: Go to Leave > check the leave request is approved. Approved leave should automatically block the employee in the schedule. If not reflecting, check Leave Settings > Blackout rules are not overriding the leave.
+6. AWARD INTERPRETATION ERRORS (AU/NZ): Deputy's award interpretation is complex. Go to Settings > Award Rules and verify the correct award is selected for each employee type. Test with a timesheet to see the calculated pay. If interpretation seems wrong, check employee contract type matches the award rule.
+Error codes: AUTH_ERROR = session expired, log back in. SYNC_FAILED = integration connection issue. EXPORT_ERR = payroll export failed, check period status.
+Pro tips: Use Deputy Kiosk mode on a tablet for clocking in/out. Enable geofencing to restrict clock-ins to venue location. Use Deputy's open shift feature for flexible staffing.`,
+
+  'fourth': `FOURTH (HOTSCHEDULES / WORKFORCE)
+Support: 020 3763 5000 | fourth.com/support | support@fourth.com
+Common issues and fixes:
+1. ROTA NOT VISIBLE TO STAFF: After building the schedule in Fourth, ensure you have "Published" it (not just saved). In HotSchedules, go to Scheduling > Publish Schedule. Staff are notified by email/push notification. If staff say they can't see their schedule, check their app is updated and they are logging into the correct location.
+2. MOBILE APP LOGIN ISSUES: Staff should download "HotSchedules" app (not Fourth app). Login uses their HotSchedules credentials. If forgotten, use "Forgot Password" on the login screen. If account is locked, a manager must reset in Fourth > Team > Employees > Reset Password. New employees need to be sent an activation email first.
+3. PAYROLL INTEGRATION ERRORS: Go to Fourth > Settings > Payroll Integration. Check the integration is connected and credentials are valid. If exporting to Sage, Xero, or another system, ensure the export period matches the payroll period. For persistent integration errors, call 020 3763 5000.
+4. ABSENCE REQUESTS NOT APPEARING: Employees submit absence in the HotSchedules app > My Schedule > Request Time Off. Managers approve in Fourth > Time Off. Check the approval notifications are enabled for managers. Approved absence should automatically update the schedule.
+5. REPORTING / LABOUR COST ISSUES: Go to Fourth > Reports > Labour Analysis. Ensure the date range is correct. If labour costs seem wrong, check employee hourly rates are correctly entered in People > Employees. Fourth uses scheduled vs actual hours - ensure timesheets are being approved for accurate actuals.
+6. NEW EMPLOYEE ONBOARDING: Add employee in Fourth > People > Add Employee. Complete all mandatory fields. An activation email is sent to the employee's email address. They must activate before they can use the app. If email not received, check spam or resend from employee profile.
+Error codes: SSO_FAIL = single sign-on error, try direct login. EXPORT_TIMEOUT = large export taking too long, try smaller date range. SYNC_ERR = integration sync failed.
+Pro tips: Use Fourth's demand forecasting to build rotas based on historical covers. Enable push notifications for all staff. Use the Fourth Forecasting module if you have it enabled.`,
+
+  'rotaready': `ROTAREADY
+Support: rotaready.com/support | support@rotaready.com | In-app chat
+Common issues and fixes:
+1. ROTA NOT PUBLISHING: In Rotaready, after building your rota, click "Publish" and select the week(s) to publish. Staff are notified via email and the Rotaready app. If staff can't see the rota, check they have the app installed and have verified their email. In People > Staff, check their notification preferences.
+2. PAYROLL EXPORT ISSUES: Go to Payroll > Export. Select the correct pay period and ensure all hours are approved. Rotaready integrates with Sage, Xero, and other payroll systems. If export shows wrong figures, check for unapproved overtime or unpaid breaks not being deducted. Contact support with specific payroll discrepancies.
+3. ABSENCE MANAGEMENT: Staff request absence via the Rotaready app > My Requests. Managers approve/decline in Rotaready > Absence > Requests. Approved absence blocks the employee in the rota. Configure absence types and accrual rules in Settings > Absence.
+4. NEW STARTERS NOT IN SYSTEM: Add in People > Add Person. Enter name, email, role, and cost centre. Send the welcome email from their profile. They must activate their account before they can clock in or view rotas. If they don't receive the welcome email, check the email address and resend.
+5. TIME AND ATTENDANCE DISCREPANCIES: Rotaready clocking uses the app (GPS-based) or a PIN terminal. Go to Attendance > Time Cards to review clock in/out times. Managers can edit time cards before approval. Ensure employees are clocking in via the correct location to avoid GPS mismatch.
+6. COST CENTRE / DEPARTMENT ERRORS: Go to Settings > Cost Centres and verify the structure. Each shift can be tagged to a cost centre. If labour costs are appearing in the wrong department, check shift assignments and default cost centres for each employee role.
+Error codes: AUTH_ERR = login issue, reset password. SYNC_FAIL = payroll integration issue. GPS_FAIL = cannot verify location for clocking.
+Pro tips: Use Rotaready's labour cost percentage tool to monitor spend vs revenue. Enable demand-based scheduling if you have till data integrated. Use the "notes" feature on shifts for specific instructions.`,
+
+  's4labour': `S4LABOUR
+Support: s4labour.com/support | support@s4labour.com | 01635 897 298
+Common issues and fixes:
+1. FORECASTING NOT ACCURATE: S4Labour uses historical sales data for forecasting. If forecasts are off, check the data feed from your EPOS is connected (Settings > Integrations). Ensure sufficient historical data exists (at least 4-8 weeks). Manually adjust forecasts in the Forecast tab by percentage or covers where needed.
+2. ROTA ERRORS / SHIFTS NOT SAVING: Check you are working in the correct week and location. After making changes, always save before navigating away. If a shift shows a wage percentage warning, this is advisory - it can still be saved. For recurring issues with saves, clear browser cache.
+3. WAGE PERCENTAGE CALCULATIONS WRONG: Go to Settings > Pay Rates and check all employee pay rates are correctly entered. Salaried employees should have their equivalent hourly rate entered. Check the correct trading period / session is being selected for the forecast comparison. Overtime rules may be affecting calculations.
+4. CLOCK IN / OUT ISSUES: S4Labour uses a tablet-based clock-in system or integration with your EPOS. If staff can't clock in, check the S4Labour Clock app on the tablet has internet access. Verify the employee is rostered for that location. Managers can manually add clock records in Timesheets > Edit.
+5. HR MODULE / EMPLOYEE DOCUMENTS: Go to HR > Documents to upload staff contracts, right to work documents etc. Set expiry reminders for time-limited documents (visas, food hygiene certs). If a document alert is showing, navigate to the employee's HR profile and update the document.
+6. PAYROLL EXPORT: Go to Payroll > Export. Choose the pay period and format (Sage, Xero, CSV etc). Ensure all timesheets for the period are approved. If figures don't match expectations, check for manual pay adjustments in Timesheets > Adjustments.
+Error codes: INTEG_ERR = EPOS data feed issue. AUTH_FAIL = session expired. EXPORT_LOCK = payroll period already exported, contact admin.
+Pro tips: S4Labour is designed for multi-site hospitality. Use the Dashboard for real-time wage % across all sites. Configure the automatic shift-pattern feature to speed up rota building.`,
+
+  'sevenrooms': `SEVENROOMS
+Support: support.sevenrooms.com | support@sevenrooms.com | In-platform chat
+Common issues and fixes:
+1. RESERVATION NOT SHOWING IN SYSTEM: Check the booking was confirmed - the guest should have received a confirmation email. In SevenRooms > Reservations, search by guest name, email, or date. If booked via the widget, check the widget integration is active. If booked through a third party (Google, TripAdvisor), check the channel integration is enabled.
+2. BOOKING WIDGET NOT LOADING: Check your website's embed code - it should be the most recent version from SevenRooms > Settings > Widget. Test the widget in an incognito browser window. If widget shows "no availability" incorrectly, check your shift settings and covers availability in SevenRooms > Settings > Shifts.
+3. POS INTEGRATION NOT SYNCING SPEND DATA: Go to SevenRooms > Settings > Integrations > POS. Check the integration is active and the API credentials are correct. POS spend data syncs throughout the day - if spend is not appearing on guest profiles, check the POS is sending transaction data (may need POS-side configuration).
+4. REPORTING ISSUES: Go to SevenRooms > Analytics for dashboards. For custom reports, use Reports > Custom Reports. If data seems missing, check the date range and location filters. Data refreshes throughout the day - real-time data may have a 15-minute delay.
+5. WAITLIST NOT WORKING: Ensure Waitlist is enabled in Settings > Waitlist. Guests can be added manually (New > Waitlist) or self-serve via the widget. If guests are not being notified when a table becomes available, check their phone number is in the system and SMS notifications are enabled.
+6. TAGS AND SEGMENTS NOT WORKING: Tags must be applied to guest profiles first. Go to a guest profile and add tags manually, or use bulk tagging via Guest > All Guests > Bulk Actions. For automated tagging, set up Automation rules in Settings > Automation.
+Error codes: API_AUTH_FAIL = POS integration credentials expired. WIDGET_CONFIG_ERR = widget settings misconfigured. SYNC_TIMEOUT = POS sync taking too long.
+Pro tips: Use SevenRooms Automated Emails to send pre-arrival and post-visit messages. Configure shift pacing to prevent over-seating at peak times. Use the SevenRooms CRM for follow-up marketing campaigns.`,
+
+  'opentable': `OPENTABLE
+Support: 020 3826 8100 | help.opentable.com | restaurants@opentable.com
+Common issues and fixes:
+1. RESERVATIONS NOT SYNCING / MISSING BOOKINGS: In OpenTable > Reservations, pull-to-refresh or press the sync button. If reservations from the widget or app are not appearing, check your OpenTable plan includes real-time syncing. For missing third-party bookings, check the channel is connected in Settings > Channels. If a guest can't see their booking, search by email in the reservation system.
+2. GUEST-FACING BOOKING ERRORS / WIDGET DOWN: Check status.opentable.com for any platform issues. In OpenTable Restaurant Centre, go to Settings > Booking Profile and ensure your availability settings are correct. If the widget on your website is broken, re-copy the embed code from Restaurant Centre > Marketing > Booking Widget.
+3. POS INTEGRATION NOT UPDATING: OpenTable integrates with Lightspeed, Square, and others. Go to Settings > Integrations > POS and check the integration status. If the POS is not receiving guest count or booking data, reconnect the integration. Some integrations are read-only (OpenTable to POS) and some are two-way.
+4. REVIEWS / GUEST FEEDBACK: Guests receive automatic review requests after their visit. To view reviews, go to Guest Centre > Reviews. If negative reviews are concerning, respond via the platform. You cannot remove reviews, but OpenTable may remove ones that violate their guidelines.
+5. NO-SHOW HANDLING: Mark no-shows in the reservation system by 11:59pm on the date of the reservation. In OpenTable > Reservations, change the status to "No Show". This automatically sends the guest a no-show notification and may affect their Dining Points. Configure no-show fees in Settings > Reservation Fees if you use prepayment.
+6. AVAILABILITY / TABLE MANAGEMENT: Manage available times and covers in Restaurant Centre > Schedule. If you're showing more availability than you want, reduce cover limits in Schedule > Shift settings. Use "Stop Accepting" for today if you need to close availability immediately.
+Error codes: SYNC_ERR = reservations not syncing, check internet. API_LIMIT = too many requests, wait and retry. POS_CONN_FAIL = POS integration disconnected.
+Pro tips: Use OpenTable's Network to gain exposure to new guests. Enable Experiences for special event bookings. Use the OpenTable Connect programme for commission-free bookings.`,
+
+  'resdiary': `RESDIARY
+Support: 0141 271 0770 | resdiary.com | support@resdiary.com
+Common issues and fixes:
+1. BOOKING WIDGET DOWN OR NOT SHOWING AVAILABILITY: Log in to ResDiary back office and check Settings > Online Booking. Ensure online booking is enabled for the correct services. Check the date/time restrictions. If the widget is on your website, verify the embed code is still the active version. Test in incognito mode.
+2. RESERVATIONS NOT CONFIRMED / GUESTS NOT GETTING EMAILS: Go to ResDiary > Communications > Email Settings. Verify confirmation emails are enabled. Check the "From" email address is not blocked by spam filters. For specific bookings, go to Reservations > find booking > check "confirmation sent" tick. Resend from the booking if needed.
+3. TABLE PLAN SYNC ISSUES: If tables on the table plan don't match physical layout, go to Settings > Table Plan and edit. Ensure each table has a correct cover count. If tables are showing as occupied when free, check for ghost reservations (bookings that were not properly cancelled) - search in Reservations > All > check that date.
+4. REPORTS NOT GENERATING CORRECTLY: ResDiary reports run on confirmed reservations only by default. Go to Reports and check the filter settings - include cancelled, no-shows, or partial-seated as needed. If covers count seems wrong, check for the "walk-in" count which is tracked separately.
+5. INTEGRATION ERRORS WITH EPOS OR THIRD PARTIES: Go to Settings > Integrations. Each integration (Lightspeed, Zonal etc) will show its connection status. If disconnected, re-authenticate using the vendor's API credentials. Google Reserve and TripAdvisor integrations are common - check each channel separately.
+6. PREPAYMENT / DEPOSITS NOT PROCESSING: ResDiary uses Stripe for deposit processing. Go to Settings > Payments > Stripe and verify your Stripe account is connected. If deposits are failing, check Stripe's dashboard for declined charges. Ensure the deposit amount and trigger conditions (party size, time to booking) are correctly configured.
+Error codes: AUTH_FAIL = login session expired. STRIPE_ERR = payment processing issue. WIDGET_UNAVAIL = online booking service error.
+Pro tips: Use ResDiary's Yield Management to dynamically adjust availability based on demand. Set up automated waitlist emails. Use custom guest notes fields to capture dietary requirements at booking stage.`,
+
+  'collins': `COLLINS BY DESIGNMYNIGHT
+Support: support.designmynight.com | support@designmynight.com
+Common issues and fixes:
+1. BOOKING NOT CONFIRMED / MISSING CONFIRMATION EMAIL: In Collins > Bookings, search for the booking by name or email. Check the booking status - if "Unconfirmed", it needs manual confirmation. Click the booking and select "Confirm". The guest will then receive their confirmation email. Check your Collins email settings ensure the "From" address is correctly configured.
+2. PAYMENT LINKS NOT WORKING: Collins uses Stripe for payment links. Go to Settings > Payments and verify Stripe is connected. Check the payment link hasn't expired (links expire after 24 hours by default). If a payment fails, check Stripe Dashboard for the specific failure reason. Resend a new payment link from the booking.
+3. PRE-ORDERS NOT APPEARING: If you have a pre-order menu set up, guests select items during booking. Go to Bookings > select booking > Pre-orders tab to view selections. If pre-orders are missing, check the menu was active when the booking was made. Ensure pre-order prompts are enabled for the booking type in Settings > Booking Types.
+4. CRM / GUEST DATA SYNC ISSUES: Collins integrates with Airship, Mailchimp, and others. Go to Settings > Integrations > CRM. If guest data is not syncing, disconnect and reconnect the integration. Check that marketing consent is being captured at booking stage (required for GDPR compliance).
+5. REPORTING: Go to Collins > Reports. Standard reports include enquiries, bookings, revenue, and capacity. For custom date ranges, adjust the filters. If revenue is not matching expectations, check for any bookings where payment was not taken or was refunded.
+6. WIDGET CUSTOMISATION: Go to Settings > Widget to adjust colours, fields, and booking types shown on your website widget. After changes, the widget updates immediately - no new embed code needed. Test on your live website in incognito mode to confirm changes appear.
+Error codes: STRIPE_DECLINED = payment failed, check Stripe dashboard. EMAIL_BOUNCE = guest email invalid or bounced. SLOT_UNAVAIL = requested time fully booked.
+Pro tips: Use Collins Enquiries for large group bookings that need a bespoke quote. Enable deposit requirements for bookings over a certain party size to reduce no-shows. Use the cancellation policy feature to enforce notice periods.`,
+
+  'deliverect': `DELIVERECT
+Support: support.deliverect.com | support@deliverect.com | In-platform chat
+Common issues and fixes:
+1. ORDERS NOT COMING THROUGH TO EPOS: Check Deliverect > Order Flow > Live Orders. If orders show in Deliverect but not reaching the EPOS, check the EPOS integration status in Deliverect > Settings > Integrations. Restart the Deliverect service on the EPOS if applicable (e.g. for EPOS Now or ICRTouch). Check the EPOS printer is online as many systems alert via kitchen printers.
+2. MENU NOT SYNCED ACROSS CHANNELS: If you've updated your menu in the EPOS or in Deliverect but the delivery channel (Deliveroo, Uber Eats, Just Eat) still shows old items, go to Deliverect > Menus > select menu > Publish to Channels. It can take 15-30 minutes for channels to update. Check the channel directly to confirm.
+3. CHANNEL SHOWING AS OFFLINE: Go to Deliverect > Channels and check the status. If a channel is offline, try reconnecting by going to the channel settings and clicking "Reconnect". If Deliveroo or Uber Eats is offline, check their respective restaurant portals to ensure your store is marked as open. Some channels require manual re-authentication.
+4. TABLET ISSUES (DELIVERECT TABLET): If using a Deliverect-branded tablet, ensure it has a strong internet connection. Restart the tablet. The Deliverect app auto-updates - check the app version in Settings. If the tablet is stuck, factory reset and reinstall the Deliverect app using your credentials.
+5. POS INJECTION FAILING (ORDERS NOT GOING INTO EPOS): Check Deliverect > Diagnostics > POS Connection. If the POS connection is shown as "Error", the EPOS API may need reconfiguring. Common fix: in your EPOS back office, regenerate the API key and update it in Deliverect Settings > Integrations > your EPOS. Contact Deliverect support for EPOS-specific injection issues.
+6. MENU ITEM MAPPING ERRORS: Go to Deliverect > Menus > Menu Items. Each item should have the correct PLU code matching your EPOS. If items are "unmapped" or "unlinked", orders for those items won't inject into the EPOS. Map each item by searching for the corresponding EPOS product.
+Error codes: POS_INJECT_FAIL = order failed to reach EPOS. CHANNEL_OFFLINE = delivery platform not connected. MENU_SYNC_ERR = menu publish failed.
+Pro tips: Use Deliverect's Smart Pricing to adjust prices on delivery channels vs in-house. Enable auto-accept for orders to save time during busy periods. Use Deliverect Analytics to compare channel performance.`,
+
+  'flipdish': `FLIPDISH
+Support: flipdish.com/support | support@flipdish.com | In-platform chat
+Common issues and fixes:
+1. APP ORDERS NOT REACHING EPOS: Check Flipdish > Orders > Live. If orders show in Flipdish but not in the EPOS, check the POS integration in Flipdish > Settings > Integrations. The EPOS must be online and the integration active. For ICRTouch, EPOS Now, and Lightspeed integrations, a middleware service may need restarting.
+2. MENU UPDATE DELAYS: After updating menu in Flipdish > Menu Manager, changes go live within 5-10 minutes. If still not updated after 15 minutes, go to Menu Manager > Publish. App users may need to close and reopen the app. For website ordering, hard refresh (Ctrl+Shift+R) to see changes.
+3. PAYMENT FAILURES: Flipdish uses Stripe for payment processing. If customers report payment failures, check Stripe Dashboard via Flipdish > Settings > Payments > Stripe Account. Common causes: declined by bank, incorrect card details, 3D Secure authentication failing. Flipdish does not store card details - all payments are handled by Stripe.
+4. DRIVER TRACKING NOT WORKING: Driver tracking requires the driver to have the Flipdish Driver app installed and location permissions enabled. Customers see tracking via the order confirmation page. If tracking is not updating, the driver may have location permissions off. Drivers must be assigned to the order in the Flipdish driver portal.
+5. PROMOTIONS NOT APPLYING: Go to Flipdish > Marketing > Promotions. Check the promo code is active, not expired, and the qualifying conditions are met (minimum order, eligible items). Promo codes are case-sensitive on some setups. Test with a test order before promoting to customers.
+6. STORE SHOWING AS CLOSED WHEN OPEN: Go to Flipdish > Settings > Opening Hours and verify correct hours are set. Check for any "forced closure" that may have been set (Settings > Store Status). If integrating with EPOS, the store status may be pulled from the EPOS - check the EPOS is showing as open.
+Error codes: POS_CONN_ERR = EPOS integration issue. STRIPE_DECLINE = payment failed. MENU_PUBLISH_FAIL = menu changes not published.
+Pro tips: Use Flipdish's marketing automation for abandoned cart emails. Enable pre-orders for events or collection slots. Use the Flipdish Kiosk for self-service ordering in-venue.`,
+
+  'airship': `AIRSHIP (LOYALTY & CRM)
+Support: airship.co.uk | support@airship.co.uk
+Common issues and fixes:
+1. EMAILS NOT SENDING / DELIVERY ISSUES: Go to Airship > Campaigns and check the campaign status. If "Scheduled" or "Sending", it may still be in progress. Check Airship > Reports > Email Deliverability for bounce rates. High bounce rates indicate bad email addresses in your list. Use Airship > Contacts to clean invalid emails. Check domain authentication (DKIM/SPF) is set up correctly in your DNS.
+2. CUSTOMER DATA SYNC NOT WORKING: Airship syncs with EPOS and reservation systems via APIs. Go to Settings > Integrations and check each integration's status. If data is not flowing, re-authenticate the connection. New customers added in the EPOS may take up to 24 hours to appear in Airship.
+3. LOYALTY POINTS NOT ACCRUING: Check the loyalty rules in Airship > Loyalty > Rules. Ensure the rule trigger is correct (e.g. "on purchase" via POS). Verify the EPOS integration is sending transaction data. For manual point adjustments, go to a customer profile > Loyalty > Adjust Points.
+4. INTEGRATION WITH EPOS FAILING: Go to Settings > Integrations > your EPOS. Check API credentials are correct and not expired. Re-generate API keys in the EPOS if needed and update in Airship. Contact Airship support with specific error messages from the integration log.
+5. CUSTOMER SEGMENTS NOT UPDATING: Airship segments are dynamic and rebuild on a schedule (typically overnight). If a segment appears to have wrong counts, wait 24 hours and check again. For immediate refresh, contact Airship support. Verify the segment conditions are correctly defined.
+6. AUTOMATIONS NOT TRIGGERING: Go to Airship > Automations and check the automation is "Active". Verify the trigger event matches what's actually happening in your EPOS/booking system. Check that the customer profile has the required data for the trigger (e.g. birthday date for birthday automations).
+Error codes: AUTH_ERR = API credentials invalid. SYNC_FAIL = data integration issue. SEND_BLOCK = sending blocked, check compliance settings.
+Pro tips: Use Airship's segmentation for targeted win-back campaigns. Enable transactional emails for booking confirmations and receipts. Use A/B testing on subject lines to improve open rates.`,
+
+  'stampede': `STAMPEDE (WIFI & LOYALTY)
+Support: stampede.ai | support@stampede.ai | In-platform chat
+Common issues and fixes:
+1. PORTAL NOT LOADING / ADMIN DASHBOARD INACCESSIBLE: Clear browser cache and try again. Try a different browser. Check stampede.ai status page for any platform issues. If using a company firewall, ensure stampede.ai is whitelisted. Contact support if the dashboard remains inaccessible.
+2. GUEST WIFI DOWN / SPLASH PAGE NOT APPEARING: Check the Stampede hardware (router/access point) is powered on and connected. In Stampede portal, go to Locations > your location > Network Status. If the device shows as "offline", it has lost connection to Stampede servers - check the internet connection on the device's network. Restarting the Stampede hardware often resolves this.
+3. SPLASH PAGE ISSUES / BRANDING NOT UPDATING: After changing the splash page in Stampede > Locations > Splash Page Editor, changes may take up to 10 minutes to propagate. Force a reconnect by disconnecting from the guest WiFi and reconnecting. If the old splash page still appears, clear your device's WiFi settings for that network.
+4. DATA CAPTURE NOT WORKING / NO GUEST SIGN-UPS: Check the capture form fields in Splash Page Editor. Ensure at least one field (email or phone) is set to "required". Verify the correct form is linked to the network. Test by connecting to the guest WiFi yourself and completing the sign-up flow.
+5. MAILCHIMP / EMAIL INTEGRATION SYNC FAILING: Go to Settings > Integrations > Mailchimp. If disconnected, click "Reconnect" and re-authorise with your Mailchimp account. Verify the correct Mailchimp list/audience is selected. New contacts sync in near real-time but may take up to an hour.
+6. MARKETING CAMPAIGNS NOT SENDING: Go to Stampede > Marketing > Campaigns. Check the campaign is scheduled correctly and the audience segment is not empty. If using SMS, verify you have sufficient SMS credits in your account. Email campaigns require a verified "From" address.
+Error codes: DEVICE_OFFLINE = Stampede hardware not connected to internet. AUTH_FAIL = portal login expired. INTEG_ERR = third-party integration disconnected.
+Pro tips: Use Stampede's footfall analytics to understand peak times. Enable the loyalty stamp card feature for repeat visit rewards. A/B test different splash page designs to improve sign-up rates.`,
+
+  'nutritics': `NUTRITICS
+Support: nutritics.com/support | support@nutritics.com | In-platform chat
+Common issues and fixes:
+1. ALLERGEN INFORMATION NOT DISPLAYING: In Nutritics, go to Menu > select the item > Allergens tab. Ensure all 14 major allergens are reviewed and the "Contains" or "May Contain" status is set for each. If displaying on a menu or website, check the allergen display settings in Publishing > Allergen Display. If using a QR code menu, ensure the QR code points to the current published version.
+2. RECIPE COSTING ERRORS: Go to Recipes > select recipe > check ingredient costs. Costs pull from the Ingredient Library - verify each ingredient has an up-to-date cost per unit entered. Check portion sizes are correctly entered (grams vs kg). If costs seem wrong, run a Recipe Cost Report from Reports > Costing.
+3. MENU NOT PUBLISHING TO WEBSITE/TABLETS: After making changes, go to Menu > Publish. Select the channels to publish to (website, app, QR code). If a specific channel isn't updating, check that channel's configuration in Settings > Publishing Channels. For website integration, your web team may need to update the embed code if it was recently changed.
+4. DATA IMPORTS FAILING: Nutritics accepts CSV imports for ingredients and recipes. Go to Import > download the CSV template and ensure your data matches the format exactly. Common issues: incorrect column headers, special characters in names, missing required fields. Check the import error log for specific row failures.
+5. NUTRITIONAL CALCULATIONS SEEM WRONG: Go to the recipe and check each ingredient's nutritional data. Data comes from the Nutritics database or custom entries. If using a branded ingredient, ensure the nutritional values match the product packaging. Contact Nutritics if you believe a database entry is incorrect.
+6. MULTIPLE SITES / MENUS: Use Nutritics > Locations to manage multiple venue menus. Ensure the correct location is selected when editing. Shared recipes can be pushed to multiple locations simultaneously. Location-specific pricing can be set per menu item.
+Error codes: AUTH_ERR = session expired. PUBLISH_FAIL = publishing error, check internet. IMPORT_ERR = CSV format issue.
+Pro tips: Use Nutritics for PPDS (Natasha's Law) compliance by generating pre-packed food labels. Export PDF allergen matrices for staff training. Use the cost vs revenue tool for menu engineering.`,
+
+  'marketman': `MARKETMAN
+Support: marketman.com/support | support@marketman.com | In-platform chat
+Common issues and fixes:
+1. ORDERS NOT SENDING TO SUPPLIERS: In MarketMan > Purchasing > Orders, check the order status. If "Draft" it hasn't been sent - click "Send". If "Error", the supplier connection may be broken. Go to Settings > Suppliers and check the order method (email, integration, portal). Verify the supplier's email is correct. Check your junk folder - MarketMan sends orders by email for many suppliers.
+2. STOCK COUNT ERRORS / WRONG INVENTORY LEVELS: Go to Inventory > Stock Counts. Ensure you're using the latest count. If stock levels don't match physical counts, check for unconfirmed deliveries or unrecorded wastage. Go to Inventory > Deliveries and confirm any pending deliveries. Check Inventory > Wastage log too.
+3. RECIPE COSTING INACCURATE: Go to Recipes > select recipe. Check each ingredient's unit and quantity is correct. Ensure the ingredient in the recipe links to the correct supplier product with an up-to-date price. Run Reports > Recipe Costing to see all recipes with current costs.
+4. INVOICE SCANNING ISSUES: MarketMan has invoice scanning via app or email. In the app, go to Invoices > Scan. Ensure the invoice is well-lit and flat. If items aren't matching, manually match them to your product list. Email invoices go to your unique MarketMan email address (Settings > Invoices > Email Address).
+5. POS SYNC NOT WORKING: MarketMan integrates with many POS systems. Go to Settings > Integrations > POS. If the sync is failing, check API credentials are valid. Sales data syncs typically overnight. If sales-based depletion is not working, check the recipe is linked to the POS item via the PLU/barcode.
+6. SUPPLIER PRICE CHANGES NOT UPDATING: Suppliers can update prices in MarketMan. You'll receive a notification. Go to Settings > Price Approvals to review and approve or reject price changes. Once approved, all recipe costings automatically update.
+Error codes: SUPPLIER_CONN_ERR = cannot reach supplier portal. SYNC_FAIL = POS integration error. OCR_ERR = invoice scan recognition failed.
+Pro tips: Use MarketMan's Budget vs Actual reporting to track food cost percentage. Enable supplier direct ordering to save time. Use the mobile app for delivery receiving and stock counts from the kitchen.`,
+
+  'deliveroo': `DELIVEROO FOR RESTAURANTS
+Support: restaurants.deliveroo.co.uk | restaurants@deliveroo.co.uk | 020 3699 9977
+Common issues and fixes:
+1. TABLET OFFLINE / NOT RECEIVING ORDERS: Check the tablet is connected to the internet (Wi-Fi or mobile data). Restart the Deliveroo Tablet app. If the app is stuck, force close and reopen. Ensure the tablet is plugged in and not in low battery mode. Check Deliveroo Status (deliveroostatus.com) for platform outages. If offline, Deliveroo will alert your account manager.
+2. MENU NOT SHOWING CORRECTLY / ITEMS MISSING: Log in to Restaurant Hub (restaurant.deliveroo.co.uk). Go to Menu and check all items are "published" and "available". Unhide any items that should be showing. Menu changes can take 15-30 minutes to go live. If using a third-party menu manager (Deliverect, Otter), make the change there and allow time to sync.
+3. ORDER NOT CONFIRMED / CUSTOMER COMPLAINT: In Restaurant Hub > Orders, find the order by ID or date. Check if it was accepted or rejected. If there was a technical issue, contact restaurants@deliveroo.co.uk with the order ID. For customer-facing issues, Deliveroo customer support handles all customer refund requests directly.
+4. PAYOUTS / PAYMENT QUERIES: Go to Restaurant Hub > Finance > Payouts. Payouts are typically weekly. Check the payout schedule and ensure your bank details are correct in Hub > Account Settings > Payment Details. For missing payouts, raise a case via Restaurant Hub > Help.
+5. BUSY MODE / PAUSING THE STORE: On the Deliveroo tablet, tap the menu button and select "Busy Mode" to increase prep times. To pause orders entirely, go to tablet menu > Pause Orders. Set how long to pause for. To resume, tap the play button. You can also manage this from Restaurant Hub.
+6. ITEM UNAVAILABLE / OUT OF STOCK: On the tablet, find the item and mark it as "Unavailable". Or in Restaurant Hub > Menu > find item > toggle "Available". This hides the item from customers immediately. Remember to re-enable when back in stock.
+Error codes: ORDER_LATE = order taking too long, Deliveroo may reassign rider. MENU_ERROR = menu publishing issue. DEVICE_OFFLINE = tablet connectivity problem.
+Pro tips: Use Deliveroo's "Plus" visibility for better placement. Review your menu photos - high quality images increase conversion. Ensure your opening hours in Restaurant Hub match actual trading hours to avoid penalties.`,
+
+  'uber eats': `UBER EATS FOR RESTAURANTS
+Support: ubereats.com/restaurant | uber-restaurants@uber.com | In-app support in Uber Eats Manager
+Common issues and fixes:
+1. UBER EATS MANAGER NOT LOADING: Clear browser cache and try again. Try a different browser (Chrome recommended). Log out and back in. If the app won't load on mobile, uninstall and reinstall. Check status at uberatsstatus.com for any outages.
+2. MENU PAUSING / ITEMS UNAVAILABLE: In Uber Eats Manager > Menu, select the item > set as "Unavailable". To pause the entire store, go to Uber Eats Manager > Store > Pause Store. Set a return time. Scheduled menus can be managed under Uber Eats Manager > Hours.
+3. ORDER TABLET OFFLINE: Restart the Uber Eats tablet. Check internet connection. Ensure the Uber Eats Orders app is up to date. If orders are coming through the Manager app but not on the dedicated tablet, re-login on the tablet. Call 0808 134 9883 (UK restaurant support) for urgent tablet issues.
+4. PAYOUT QUESTIONS / MISSING PAYMENTS: In Uber Eats Manager > Payments, view the payout schedule and history. Payouts are weekly (typically Wednesday for the previous week). For missing payouts, open a case in Manager > Help. Ensure your bank details are correct in Manager > Payments > Bank Account.
+5. RATINGS / REPUTATION: View ratings in Uber Eats Manager > Feedback. Respond to reviews through the platform. Consistently poor ratings can result in reduced visibility or temporary suspension. Focus on accuracy and delivery time to improve ratings.
+6. MENU NOT UPDATING AFTER CHANGES: Changes in Uber Eats Manager should go live within 15 minutes. If using Deliverect or another aggregator, make changes there. Hard refresh the Manager app. If still not updating after 30 minutes, contact support.
+Error codes: STORE_CLOSED = store is set to closed, check hours. ITEM_UNAVAIL = item marked unavailable. PAYMENT_HOLD = payment held pending review.
+Pro tips: Use Uber Eats Manager > Analytics to see your top-selling and worst-rated items. Enable the "Last Minute Deals" feature during slow periods. Respond to customer feedback to show you care.`,
+
+  'just eat': `JUST EAT FOR RESTAURANTS
+Support: restaurants.just-eat.co.uk | 0345 600 1111 | In-app support
+Common issues and fixes:
+1. ORDERS NOT COMING THROUGH TO TABLET: Check the Just Eat tablet is powered on and connected to the internet. The Just Eat app should be running in the foreground. Check the volume is turned up - orders play a sound. If orders are not arriving, check Just Eat status. Log out and back in on the tablet app. If issue persists, call 0345 600 1111.
+2. MENU CHANGES NOT GOING LIVE: Log in to Just Eat Partner Centre (restaurants.just-eat.co.uk). Go to Menu and make your changes. Click "Save" then "Publish". Changes can take up to 60 minutes to go live. If using Flyt, Deliverect, or another aggregator, make changes through that platform.
+3. TABLET SETUP / REPLACEMENT: If setting up a new tablet, download the "Just Eat Partner" app. Log in with your restaurant credentials. If you need a replacement tablet, call 0345 600 1111 or request via Partner Centre. Just Eat provides tablets free of charge to active restaurant partners.
+4. FLYT POS INTEGRATION ISSUES: Flyt connects Just Eat orders directly to your EPOS. If orders are not going into the EPOS, check the Flyt integration in your EPOS settings. Common POS integrations: EPOS Now, ICRTouch. Restart the Flyt service if applicable. For Flyt support, contact Just Eat via 0345 600 1111.
+5. PAYOUT QUERIES: Log in to Partner Centre > Payments. Payouts are weekly (Wednesdays). Check your bank details are correct. For missing payouts, raise a query via Partner Centre > Help > Finance. Have your restaurant ID ready.
+6. STORE AVAILABILITY / HOURS: In Partner Centre > Opening Hours, ensure your hours are correct. To temporarily close, go to Partner Centre > Manage Availability > Close for Today. For planned closures, update in advance.
+Error codes: TABLET_OFFLINE = no internet connection. MENU_PUBLISH_ERR = menu not published. INTEGRATION_ERR = Flyt connection issue.
+Pro tips: Respond to customer reviews in Partner Centre to improve reputation. Use Just Eat promotions to attract new customers during quiet periods. Ensure your menu photos are up to date - they significantly impact orders.`,
+
+  'mews': `MEWS (HOTEL PMS)
+Support: support.mews.com | mews.com/support | In-platform chat
+Common issues and fixes:
+1. RESERVATION NOT FOUND: In Mews > Reservations, search by guest name, email, or confirmation number. Check the correct property and date range are selected. Reservations from OTAs (Booking.com, Expedia) take a few minutes to sync via the channel manager. If a reservation is missing, check the channel manager connection in Mews > Connectivity > Channels.
+2. PAYMENT FAILURES AT CHECK-IN: Check the payment terminal is paired (Mews > Settings > Integrations > Payment Terminals). If using Adyen, the terminal must be connected to the same network. For card-on-file payments, the guest's card may have expired or been cancelled. Always have an alternative payment method ready.
+3. CHECK-IN / KEY ENCODING ISSUES: If the key card encoder is not working, check it's connected to the Mews workstation via USB. In Mews > Settings > Integrations > Key Encoders, check the status. For encoder errors, check the physical connection and restart the Mews Command Client software on the workstation.
+4. CHANNEL MANAGER SYNC FAILING: Go to Mews > Connectivity > Channels > select channel. Check the "Health" indicator. If red, reconnect by following the channel's re-authentication steps. For SiteMinder or D-EDGE specifically, re-enter API credentials. Allow 15 minutes for sync after reconnecting.
+5. REPORTING: Go to Mews > Commander > Reports. Key reports: Occupancy, Revenue, Check-in/Check-out, and Manager Report. If figures seem wrong, check for any "Test" reservations that may have been left in the system. The Night Audit report should be run daily to close the accounting period.
+6. ONLINE CHECK-IN NOT WORKING: Mews digital check-in emails go out automatically before arrival. Check Settings > Online Check-in for the timing configuration. If guests aren't receiving emails, verify the guest's email address in the reservation. Check the email template is active in Settings > Email Templates.
+Error codes: CHANNEL_SYNC_ERR = OTA/channel manager issue. PAYMENT_DECLINED = terminal or card issue. KEY_ENCODE_ERR = key encoder not responding.
+Pro tips: Use Mews' Revenue Management integration for dynamic pricing. Enable the Mews Guest Portal for self-service check-in and requests. Use Mews Spaces for managing meeting rooms and event spaces alongside bedrooms.`,
+
+  'oracle micros': `ORACLE MICROS / OPERA PMS
+Support: oracle.com/hospitality | Oracle Customer Support Portal (support.oracle.com) | 0800 054 9498
+Common issues and fixes:
+1. MICROS WORKSTATION OFFLINE / GREY SCREEN: Check network connectivity between the workstation and the MICROS server. Restart the MICROS POS application (not the OS). On RES systems, use the MICROS Control Panel to restart services. If the server is on-site, check it is running and not applying updates. Contact your MICROS reseller for urgent server issues.
+2. CHECK NOT PRINTING TO KITCHEN: In MICROS EMC (Enterprise Management Console), go to Devices > Printers and check the kitchen printer configuration. Verify the IP address is correct and the printer is reachable on the network. Check the "Menu Item Class" routing - items must be assigned to a printer class that routes to the kitchen. Restart the printer.
+3. OPERA PMS INTERFACE ERRORS: If MICROS EPOS is integrated with Opera PMS, check the IFC8 or OHIP interface status. In Opera > Interfaces, check the interface shows as "Running". If down, restart the interface from the Opera back end. For OHIP (cloud) integrations, check the OHIP dashboard in Oracle Cloud.
+4. MENU ENGINEERING / PRICE CHANGES: In MICROS EMC > Menu Items, find the item and update the price. Prices update on the next POS sync (typically a few seconds). For large menu changes, use the MICROS Import/Export function. Always test after changes by looking up the item in the POS.
+5. END OF DAY / BUSINESS DATE: MICROS uses a "Business Date" concept. Run End of Day (EOD) from EMC > Reporting > End of Day. Ensure all checks are closed before running EOD. If EOD fails, look at the MICROS log files for specific errors. For Oracle Cloud, EOD runs automatically.
+6. STAFF PERMISSIONS / EMPLOYEE SETUP: In MICROS EMC > Personnel > Employees, check the employee record. Ensure the correct "Employee Class" is assigned - this controls what the employee can do. If an employee can't do something they should be able to do, check the Employee Class permissions.
+Error codes: SEE_LOG = check MICROS log files. TIMEOUT = server communication issue. DB_ERR = database connectivity problem. LICENSE_ERR = license server issue.
+Pro tips: Oracle MICROS requires certified resellers for major changes - contact your reseller for system modifications. Regular database maintenance is important. Use MICROS Reporting and Analytics (mymicros.net) for cloud-based reporting.`,
+
+  'winnow': `WINNOW (FOOD WASTE)
+Support: winnowsolutions.com/support | support@winnow.com | In-platform chat
+Common issues and fixes:
+1. SCALES NOT CONNECTING TO TABLET: Check the scales are powered on (green LED). Ensure the Bluetooth or USB connection is established - go to the Winnow app > Settings > Scales and tap "Connect". If using Bluetooth, ensure no other devices are paired to the same scales. Restart the Winnow app and the scales. If USB, check the cable is securely connected.
+2. ITEMS NOT BEING RECOGNISED / WRONG CATEGORY: The Winnow Vision system uses AI to identify food items. If an item is frequently misidentified, go to the Winnow portal > Menu and check the item is listed with correct photos/names. You can flag incorrect identifications in the app. The system learns over time - consistent correction improves accuracy.
+3. REPORTS NOT GENERATING: Log in to Winnow Portal > Analytics. Check the date range and location filters. If data is missing, check whether the Winnow device was online during that period (Portal > Devices > Connection History). Reports require data to be synced from the device - devices must have internet connectivity.
+4. TABLET ISSUES / APP CRASHING: Force close the Winnow app and reopen. Ensure the tablet is charged (keep it plugged in during service). Check for app updates in the Play Store or App Store. If the tablet is very slow, check available storage - clear the app cache if needed. If the tablet is unresponsive, a factory reset may be needed.
+5. WASTE ITEM NOT ON THE LIST: During service, staff can add a waste item not in the list by selecting "Other" and typing the item name. These get reviewed and added to the main list by a Winnow admin. In the Winnow Portal > Menu, you can pre-add items to ensure they're available.
+6. SETTING TARGETS / BENCHMARKS: Go to Winnow Portal > Targets. Set waste reduction targets by cost or weight. View performance against targets in the Analytics dashboard. Share reports with kitchen teams to drive engagement. Winnow recommends weekly team reviews of waste data.
+Error codes: DEVICE_OFFLINE = tablet not connected to internet. SCALE_ERR = scales connectivity issue. SYNC_FAIL = data not syncing to portal.
+Pro tips: Hold weekly kitchen waste reviews using Winnow data. Use Winnow's benchmarking data to compare against similar operations. Enable automatic daily email reports for kitchen managers.`
+};
+
 // ─── VENDOR SUPPORT URL LOOKUP ────────────────────────────────────────────
 const VENDOR_SUPPORT_URLS = {
   // POS
@@ -1919,6 +2282,28 @@ tbody tr:hover td{background:var(--surface2)}
 
   <div class="tab-panel" id="tab-documents">
     <div class="page-header"><div><div class="page-title">Knowledge Base</div><div class="page-sub">Documents indexed for AI responses</div></div></div>
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title">&#x1F310; Scrape vendor help centres</span><span class="card-meta">Fetch and index docs directly from vendor support sites</span></div>
+      <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <input id="scrapeUrl" type="url" placeholder="https://help.lightspeedhq.com/hc/en-gb/articles/..." style="flex:2;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        <input id="scrapeVendor" type="text" placeholder="Vendor name (e.g. Lightspeed)" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+        <button class="btn btn-primary" onclick="doScrapeUrl()" id="scrapeBtn">&#x1F4E5; Scrape</button>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Quick scrape &mdash; known vendor help centres</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px" id="quickScrapeList">
+        <button class="filter-btn" onclick="quickScrape('https://support.lightspeedhq.com/hc/en-gb','Lightspeed Restaurant',this)">Lightspeed</button>
+        <button class="filter-btn" onclick="quickScrape('https://squareup.com/help/gb/en/article/5148-getting-started-with-square-for-restaurants','Square',this)">Square</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.eposnow.com/hc/en-gb','EPOS Now',this)">EPOS Now</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.deputy.com/hc/en-us','Deputy',this)">Deputy</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.sevenrooms.com/hc/en-us','SevenRooms',this)">SevenRooms</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.opentable.com/hc/en-us','OpenTable',this)">OpenTable</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.deliverect.com/hc/en-us','Deliverect',this)">Deliverect</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.mews.com/hc/en-us','Mews',this)">Mews</button>
+        <button class="filter-btn" onclick="quickScrape('https://support.marketman.com/hc/en-us','Marketman',this)">Marketman</button>
+        <button class="filter-btn" onclick="quickScrape('https://help.resdiary.com/hc/en-gb','ResDiary',this)">ResDiary</button>
+      </div>
+      <div id="scrapeStatus" style="margin-top:10px;font-size:12px;color:var(--text3)"></div>
+    </div>
     <div class="card">
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFiles(event)">
         <div style="font-size:28px">&#x1F4C4;</div>
@@ -2061,6 +2446,50 @@ function showTab(id) {
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 let actChart, donutChart;
+
+async function doScrapeUrl() {
+  const url = document.getElementById('scrapeUrl').value.trim();
+  const vendor = document.getElementById('scrapeVendor').value.trim();
+  if (!url) { notify('Enter a URL to scrape', 'red'); return; }
+  const btn = document.getElementById('scrapeBtn');
+  btn.disabled = true; btn.textContent = 'Scraping...';
+  document.getElementById('scrapeStatus').textContent = 'Fetching ' + url + '...';
+  try {
+    const r = await fetch('/scrape', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url, vendor }) });
+    const data = await r.json();
+    if (data.ok) {
+      notify('Scraped ' + data.chunks + ' chunks from ' + (vendor || url), 'green');
+      document.getElementById('scrapeStatus').textContent = 'Indexed ' + data.chunks + ' chunks (' + Math.round(data.chars/1000) + 'k chars) as "' + data.filename + '"';
+      document.getElementById('scrapeUrl').value = '';
+      document.getElementById('scrapeVendor').value = '';
+      setTimeout(loadAnalytics, 1000);
+    } else {
+      notify('Scrape failed: ' + (data.error || 'unknown'), 'red');
+      document.getElementById('scrapeStatus').textContent = 'Failed: ' + (data.error || 'Unknown error');
+    }
+  } catch(e) { notify('Error: ' + e.message, 'red'); }
+  btn.disabled = false; btn.textContent = 'Scrape';
+}
+
+async function quickScrape(url, vendor, btn) {
+  btn.disabled = true; btn.textContent = vendor + '...';
+  document.getElementById('scrapeStatus').textContent = 'Scraping ' + vendor + '...';
+  try {
+    const r = await fetch('/scrape', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url, vendor }) });
+    const data = await r.json();
+    if (data.ok) {
+      notify(vendor + ': ' + data.chunks + ' chunks indexed', 'green');
+      document.getElementById('scrapeStatus').textContent = vendor + ': indexed ' + data.chunks + ' chunks';
+      btn.textContent = vendor + ' done';
+      btn.style.background = 'var(--green)'; btn.style.color = '#fff'; btn.style.border = 'none';
+      setTimeout(loadAnalytics, 1000);
+    } else {
+      notify(vendor + ' scrape failed: ' + (data.error||''), 'red');
+      document.getElementById('scrapeStatus').textContent = vendor + ': ' + (data.error || 'Failed');
+      btn.disabled = false; btn.textContent = vendor;
+    }
+  } catch(e) { notify('Error: ' + e.message, 'red'); btn.disabled = false; btn.textContent = vendor; }
+}
 
 async function loadAnalytics() {
   try {
@@ -2704,20 +3133,47 @@ const server = http.createServer(async (req, res) => {
 
         let docContext = '';
         try {
-          const docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=200');
+          const docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
           if (Array.isArray(docsR.data) && docsR.data.length > 0) {
-            const msgLower = message.toLowerCase();
-            const msgWords = msgLower.split(/[\s,?!.]+/).filter(w => w.length > 1);
-            const relevant = docsR.data.filter(d => {
-              const docLower = (d.filename + ' ' + d.content).toLowerCase();
-              return msgWords.some(w => w.length > 2 && docLower.includes(w));
-            }).slice(0, 6);
+            const searchText = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
+            const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
+
+            // Score each doc chunk by relevance
+            const scored = docsR.data.map(d => {
+              const docText = (d.filename + ' ' + d.content).toLowerCase();
+              const hits = searchWords.filter(w => docText.includes(w)).length;
+              // Find the most relevant section of this doc
+              let bestSection = d.content.substring(0, 800);
+              if (hits > 0) {
+                const lines = d.content.split('\n');
+                let bestScore = 0, bestStart = 0;
+                for (let i = 0; i < lines.length; i++) {
+                  const window = lines.slice(i, i+8).join('\n').toLowerCase();
+                  const score = searchWords.filter(w => window.includes(w)).length;
+                  if (score > bestScore) { bestScore = score; bestStart = i; }
+                }
+                bestSection = lines.slice(bestStart, bestStart+12).join('\n');
+              }
+              return { filename: d.filename, section: bestSection, hits };
+            });
+
+            const relevant = scored.filter(d => d.hits >= 1).sort((a,b) => b.hits-a.hits).slice(0, 5);
             if (relevant.length > 0) {
               docContext = '\n\n=== FROM KNOWLEDGE BASE ===\n' +
-                relevant.map(d => `[${d.filename}]\n${d.content.substring(0, 600)}`).join('\n\n');
+                relevant.map(d => '[' + d.filename + ']\n' + d.section).join('\n\n');
             }
           }
         } catch(e) { /* no docs */ }
+
+        // Also inject vendor profiles if vendor mentioned
+        let vendorContext = '';
+        try {
+          const msgLower = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
+          const matchedProfiles = Object.entries(VENDOR_PROFILES).filter(([key]) => msgLower.includes(key)).slice(0, 2);
+          if (matchedProfiles.length > 0) {
+            vendorContext = '\n\n=== VENDOR KNOWLEDGE ===\n' + matchedProfiles.map(([,v]) => v).join('\n\n---\n\n');
+          }
+        } catch(e) {}
 
         const systemPrompt = `You are the Stacked Chat assistant — a friendly, direct AI support bot for hospitality operators in the UK. You specialise in hospitality technology troubleshooting.
 
@@ -2842,7 +3298,7 @@ Support URLs:
 - End with "If this hasn't resolved it, hit 'Raise a ticket' below" if the issue seems complex
 
 KNOWLEDGE BASE:
-${KNOWLEDGE_BASE}${docContext}${venueContext}`;
+${KNOWLEDGE_BASE}${vendorContext}${docContext}${venueContext}`;
 
         const messages = history.slice(-8).map(m => ({role:m.role,content:m.content}));
         if (!messages.length || messages[messages.length-1].content !== message) {
@@ -3227,6 +3683,61 @@ ${KNOWLEDGE_BASE}${docContext}${venueContext}`;
       res.end(JSON.stringify([]));
     }
     return;
+  }
+
+  // ─── WEB SCRAPER ───────────────────────────────────────────────────────────
+  if (method === 'POST' && url === '/scrape') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { url: scrapeUrl, vendor } = JSON.parse(body);
+        if (!scrapeUrl) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'No URL'})); return; }
+
+        // Fetch the page
+        const fetchRes = await fetch(scrapeUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; StackedChat/1.0; support-bot)' },
+          signal: AbortSignal.timeout(15000)
+        });
+        if (!fetchRes.ok) throw new Error('Fetch failed: ' + fetchRes.status);
+        const html = await fetchRes.text();
+
+        // Strip HTML - keep meaningful text
+        let text = html
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+          .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, ' ')
+          .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, ' ')
+          .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, ' ')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#\d+;/g, ' ')
+          .replace(/\s{3,}/g, '\n\n')
+          .trim();
+
+        if (text.length < 100) throw new Error('Page returned too little content - may require JavaScript rendering');
+
+        // Chunk and store
+        const filename = (vendor || new URL(scrapeUrl).hostname) + ' - scraped ' + new Date().toISOString().substring(0,10);
+        const chunkSize = 1200;
+        const chunks = [];
+        for (let i = 0; i < Math.min(text.length, 24000); i += chunkSize) {
+          chunks.push({ filename, content: text.substring(i, i + chunkSize), chunk_index: chunks.length });
+        }
+
+        // Delete old chunks for this vendor first
+        await sbFetch('/rest/v1/documents?filename=ilike.' + encodeURIComponent('%' + (vendor || new URL(scrapeUrl).hostname) + '%scraped%'), { method: 'DELETE' }).catch(() => {});
+
+        // Save new chunks
+        for (const chunk of chunks) {
+          await sbFetch('/rest/v1/documents', { method: 'POST', headers: { 'Prefer': 'return=minimal' }, body: chunk });
+        }
+
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: true, chunks: chunks.length, chars: text.length, filename }));
+      } catch(e) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    }); return;
   }
 
   // ─── BRANDED CHAT PAGE (/chat/:slug) ──────────────────────────────────
