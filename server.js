@@ -3537,15 +3537,23 @@ const server = http.createServer(async (req, res) => {
           if (profilesForContext.length > 0) {
             vendorContext = '\n\n=== VENDOR KNOWLEDGE ===\n' + profilesForContext.map(([,v]) => v).join('\n\n---\n\n');
           }
-          // NPS vendor = what the USER asked about, not what the bot mentioned
+          // NPS vendor: prefer what the USER mentioned, fall back to bot's last reply
           if (matchedProfiles.length > 0) {
             detectedVendor = matchedProfiles[0][0];
           }
-          // Broader NPS vendor detection — dynamically from documents table (user messages only)
+          // Broader NPS: check documents table against user messages
           if (!detectedVendor) {
             const vendorNames = await getVendorNames();
             const found = vendorNames.find(v => userMsgsLower.includes(v));
             if (found) detectedVendor = found;
+          }
+          // Last resort: check the bot's most recent reply for a single clear vendor
+          // (only if user didn't name one — avoids the multi-vendor suggestion problem)
+          if (!detectedVendor && history.length > 0) {
+            const lastBotReply = (history.filter(m=>m.role==='assistant').slice(-1)[0]?.content || '').toLowerCase();
+            const botVendors = Object.entries(VENDOR_PROFILES).filter(([key]) => lastBotReply.includes(key));
+            // Only use bot reply if exactly 1 vendor is strongly referenced (not a list of suggestions)
+            if (botVendors.length === 1) detectedVendor = botVendors[0][0];
           }
         } catch(e) {}
 
