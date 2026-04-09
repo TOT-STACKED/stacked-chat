@@ -3384,6 +3384,26 @@ const server = http.createServer(async (req, res) => {
             detectedVendor = matchedProfiles[0][0];
             vendorContext = '\n\n=== VENDOR KNOWLEDGE ===\n' + matchedProfiles.map(([,v]) => v).join('\n\n---\n\n');
           }
+          // Broader NPS vendor detection — covers vendors without full profiles
+          if (!detectedVendor) {
+            const NPS_VENDORS = [
+              'workforce.com','deputy','rotaready','fourth','sona','planday','bizimply','s4labour','harri','hotschedules','humanforce','homebase','nory','tanda',
+              'sevenrooms','opentable','resdiary','collins','quandoo','resy','tock','eat app','eveve','carbonara',
+              'deliveroo','uber eats','just eat','stuart','flipdish','hungrrr','bopple','orderswift','deliverect','otter',
+              'tevalis','zonal','icrtouch','comtrex','storekit','pepper','zettle','sumup','paypoint','tabology','revel','par brink',
+              'stripe','worldpay','adyen','dojo','barclaycard','elavon','paymentsense','square','lightspeed','epos now',
+              'vita mojo','yoello','qikserve','orderpay','tissl','preoday',
+              'marketman','apicbase','nutritics','foodics','crunchtime','winnow','too good to go','karma',
+              'mews','opera','apaleo','cloudbeds','guestline','rezlynx','siteminder','beds24',
+              'airship','stampede','acteol','como','punchh','paytronix','eagle eye','klaviyo','yumpingo',
+              'tenzo','avero','juyo','tableau','power bi','snowflake',
+              'hibob','breathe hr','bamboohr','rippling','personio','charlie hr',
+              'typsy','axonify','beekeeper','flow learning',
+              'revinate','trustyou','guestrevu','medallia','tripadvisor',
+            ];
+            const found = NPS_VENDORS.find(v => msgLower.includes(v));
+            if (found) detectedVendor = found;
+          }
         } catch(e) {}
 
         // ── Pre-fetch videos so the AI knows they exist ───────────────────
