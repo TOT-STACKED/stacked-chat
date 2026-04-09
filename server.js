@@ -916,7 +916,28 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .welcome-wordmark { height: 36px; margin-bottom: 16px; max-width: 200px; object-fit: contain; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.1s forwards; }
   .welcome h2 { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -0.4px; color: var(--brown); margin-bottom: 6px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
   .welcome p { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
-  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-bottom: 12px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.5s forwards; }
+  /* ─── ROTATING CARDS CAROUSEL ─── */
+  .carousel-wrap { width: 100%; max-width: 380px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 12px; }
+  .carousel-track { position: relative; height: 130px; overflow: hidden; border-radius: 18px; }
+  .carousel-card { position: absolute; inset: 0; border-radius: 18px; padding: 20px 22px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; opacity: 0; transform: translateX(30px); transition: opacity 0.5s var(--ease), transform 0.5s var(--ease); }
+  .carousel-card.active { opacity: 1; transform: translateX(0); }
+  .carousel-card.exit { opacity: 0; transform: translateX(-30px); }
+  .carousel-card.orange { background: var(--orange); color: #fff; }
+  .carousel-card.purple { background: var(--purple); color: #1E1E1E; }
+  .carousel-card.green { background: var(--green-brand); color: #1E1E1E; }
+  .carousel-card .cc-emoji { font-size: 22px; margin-bottom: 4px; }
+  .carousel-card .cc-label { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700; line-height: 1.3; }
+  .carousel-card .cc-sub { font-size: 12px; opacity: 0.75; font-weight: 500; margin-top: 2px; }
+  .carousel-card .cc-tap { font-size: 11px; font-weight: 600; opacity: 0.65; margin-top: auto; letter-spacing: 0.03em; }
+  .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+  .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-dark); border: none; padding: 0; cursor: pointer; transition: all 0.3s var(--ease); }
+  .carousel-dot.active { width: 20px; border-radius: 3px; }
+  .carousel-dot.orange.active { background: var(--orange); }
+  .carousel-dot.purple.active { background: var(--purple); }
+  .carousel-dot.green.active { background: var(--green-brand); }
+
+  /* Keep quick-grid as fallback / below carousel */
+  .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-bottom: 12px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.6s forwards; }
   .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: all 0.3s var(--ease); line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
   .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(230,84,58,0.12); transform: translateY(-2px); }
   .quick-btn:active { transform: translateY(0); }
@@ -1222,7 +1243,10 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
         <img class="welcome-wordmark" id="welcomeWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
         <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Hospitality tech support, powered by AI</span></div>
         <h2>{{WELCOME_HEADING}}</h2>
-        <p id="welcomeVenue">Ask anything about your hospitality tech.</p>
+        <div class="carousel-wrap" id="carouselWrap">
+          <div class="carousel-track" id="carouselTrack"></div>
+          <div class="carousel-dots" id="carouselDots"></div>
+        </div>
         <div class="quick-grid" id="quickGrid"></div>
         <button class="shift-check-btn" onclick="openShiftCheck()" id="shiftCheckBtn">
           <span class="sc-icon">&#x2705;</span> Start of shift check
@@ -1230,7 +1254,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
         <div class="predict-section" id="predictSection" style="display:none">
           <div class="predict-grid" id="predictGrid"></div>
         </div>
-        <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none">
+        <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none;margin-top:0">
           <div class="tip-header"><span class="tip-badge">Tip of the day</span><span class="tip-product" id="tipProduct"></span></div>
           <div class="tip-text" id="tipText"></div>
           <div class="tip-cta">Tap to explore &rarr;</div>
@@ -1338,6 +1362,7 @@ let dropdownBlurTimeout = null;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
+  renderCarousel();
   renderQuickBtns();
   loadSocialProof();
   loadPredictiveFixes();
@@ -1613,6 +1638,63 @@ function renderQuickBtns() {
     '<span class="emoji">' + b.emoji + '</span>' + b.label + '</button>'
   ).join('');
 }
+
+// ─── CAROUSEL ─────────────────────────────────────────────────────────────
+const CAROUSEL_CARDS = [
+  { color: 'orange', emoji: '💻', label: 'EPOS crashed mid-service?', sub: 'We\\'ll walk you through a fix in seconds', msg: 'My EPOS has crashed mid-service', tap: 'Tap to get help →' },
+  { color: 'purple', emoji: '💳', label: 'Payment terminal offline?', sub: 'Step-by-step troubleshooting, right now', msg: 'My payment terminal is offline', tap: 'Tap to fix it →' },
+  { color: 'green', emoji: '📶', label: 'WiFi down in your venue?', sub: 'Get your systems back online fast', msg: 'WiFi is down in my venue', tap: 'Tap to diagnose →' },
+  { color: 'orange', emoji: '🖨️', label: 'Kitchen printer not working?', sub: 'Orders not reaching the kitchen? Let\\'s fix it', msg: 'Kitchen printer not receiving orders', tap: 'Tap to troubleshoot →' },
+  { color: 'purple', emoji: '📅', label: 'Reservation system issues?', sub: 'Bookings not syncing? We can help', msg: 'My reservation system is not working', tap: 'Tap to get help →' },
+  { color: 'green', emoji: '🔒', label: 'Staff can\\'t log in?', sub: 'Access issues sorted in minutes', msg: 'Staff cannot log in to the system', tap: 'Tap to fix it →' },
+];
+
+let _carouselIdx = 0;
+let _carouselTimer = null;
+
+function renderCarousel() {
+  const track = document.getElementById('carouselTrack');
+  const dots = document.getElementById('carouselDots');
+  if (!track || !dots) return;
+  // Shuffle and pick 4
+  const cards = [...CAROUSEL_CARDS].sort(() => Math.random() - 0.5).slice(0, 4);
+  track.innerHTML = cards.map((c, i) =>
+    '<div class="carousel-card ' + c.color + (i === 0 ? ' active' : '') + '" data-action="quickSend" data-msg="' + c.msg.replace(/"/g,'&quot;') + '">' +
+    '<div><span class="cc-emoji">' + c.emoji + '</span><div class="cc-label">' + c.label + '</div><div class="cc-sub">' + c.sub + '</div></div>' +
+    '<div class="cc-tap">' + c.tap + '</div></div>'
+  ).join('');
+  dots.innerHTML = cards.map((c, i) =>
+    '<button class="carousel-dot ' + c.color + (i === 0 ? ' active' : '') + '" data-idx="' + i + '"></button>'
+  ).join('');
+  // Dot clicks
+  dots.querySelectorAll('.carousel-dot').forEach(d => {
+    d.addEventListener('click', function() { goToCard(parseInt(this.dataset.idx), cards); });
+  });
+  _carouselIdx = 0;
+  clearInterval(_carouselTimer);
+  _carouselTimer = setInterval(() => {
+    const next = (_carouselIdx + 1) % cards.length;
+    goToCard(next, cards);
+  }, 4000);
+}
+
+function goToCard(idx, cards) {
+  const track = document.getElementById('carouselTrack');
+  const dots = document.getElementById('carouselDots');
+  if (!track) return;
+  const allCards = track.querySelectorAll('.carousel-card');
+  const allDots = dots ? dots.querySelectorAll('.carousel-dot') : [];
+  allCards.forEach((c, i) => {
+    c.classList.remove('active', 'exit');
+    if (i === _carouselIdx) c.classList.add('exit');
+    if (i === idx) setTimeout(() => c.classList.add('active'), 50);
+  });
+  allDots.forEach((d, i) => { d.classList.toggle('active', i === idx); });
+  _carouselIdx = idx;
+}
+
+// Stop carousel when chat starts
+function stopCarousel() { clearInterval(_carouselTimer); }
 
 // ─── TIPS OF THE DAY ──────────────────────────────────────────────────────
 const ALL_TIPS = [
@@ -1964,7 +2046,7 @@ async function sendMessage() {
   input.focus();
 }
 
-function hideWelcome() { const w = document.getElementById('welcome'); if (w) w.remove(); }
+function hideWelcome() { stopCarousel(); const w = document.getElementById('welcome'); if (w) w.remove(); }
 
 function addMessage(role, content, showTicket, video, supportUrl) {
   const msgs = document.getElementById('messages');
