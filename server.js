@@ -1682,6 +1682,7 @@ const CAROUSEL_CARDS = [
   { color: 'orange', emoji: '🖨️', label: 'Kitchen printer not working?', sub: 'Orders not reaching the kitchen? Let\\'s fix it', msg: 'Kitchen printer not receiving orders', tap: 'Tap to troubleshoot →' },
   { color: 'purple', emoji: '📅', label: 'Reservation system issues?', sub: 'Bookings not syncing? We can help', msg: 'My reservation system is not working', tap: 'Tap to get help →' },
   { color: 'green', emoji: '🔒', label: 'Staff can\\'t log in?', sub: 'Access issues sorted in minutes', msg: 'Staff cannot log in to the system', tap: 'Tap to fix it →' },
+  { color: 'purple', emoji: '⭐', label: 'Rate your tech stack', sub: 'Share your NPS score to help other operators build theirs', msg: 'I\\'d like to rate my tech vendors', tap: 'Tap to rate →' },
 ];
 
 let _carouselIdx = 0;
