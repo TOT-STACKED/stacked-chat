@@ -1171,7 +1171,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <!-- ─── APP ─── -->
 <div id="app">
   <header>
-    <a href="https://wearestacked.io" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:flex-start;text-decoration:none;gap:2px;">
+    <a href="https://stackedchat.io" style="display:flex;flex-direction:column;align-items:flex-start;text-decoration:none;gap:2px;">
       <img class="header-logo" id="headerIcon" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
       <span style="font-family:'Righteous',sans-serif;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--orange);padding-left:1px;margin-top:2px;">CHAT</span>
     </a>
