@@ -916,19 +916,19 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .welcome-wordmark { height: 36px; margin-bottom: 16px; max-width: 200px; object-fit: contain; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.1s forwards; }
   .welcome h2 { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -0.4px; color: var(--brown); margin-bottom: 6px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
   .welcome p { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
-  /* ─── ROTATING CARDS CAROUSEL ─── */
-  .carousel-wrap { width: 100%; max-width: 420px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 12px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
-  .carousel-track { position: relative; height: 180px; overflow: hidden; border-radius: 22px; }
-  .carousel-card { position: absolute; inset: 0; border-radius: 22px; padding: 26px 28px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; opacity: 0; transform: translateX(40px); transition: opacity 0.45s var(--ease), transform 0.45s var(--ease); }
-  .carousel-card.active { opacity: 1; transform: translateX(0); }
-  .carousel-card.exit { opacity: 0; transform: translateX(-40px); }
-  .carousel-card.orange { background: var(--orange); color: #fff; }
-  .carousel-card.purple { background: var(--purple); color: #1E1E1E; }
-  .carousel-card.green { background: var(--green-brand); color: #1E1E1E; }
-  .carousel-card .cc-emoji { font-size: 28px; margin-bottom: 8px; }
-  .carousel-card .cc-label { font-family: 'Inter', sans-serif; font-size: 19px; font-weight: 700; line-height: 1.25; letter-spacing: -0.3px; }
-  .carousel-card .cc-sub { font-size: 14px; opacity: 0.75; font-weight: 500; margin-top: 4px; line-height: 1.4; }
-  .carousel-card .cc-tap { font-size: 12px; font-weight: 600; opacity: 0.6; margin-top: auto; letter-spacing: 0.03em; }
+  /* ─── ROTATING CARDS CAROUSEL (Tinder-style portrait) ─── */
+  .carousel-wrap { width: 100%; max-width: 300px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 16px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+  .carousel-track { position: relative; height: 320px; overflow: hidden; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+  .carousel-card { position: absolute; inset: 0; border-radius: 24px; padding: 32px 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; opacity: 0; transform: translateX(50px) rotate(3deg); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); }
+  .carousel-card.active { opacity: 1; transform: translateX(0) rotate(0deg); }
+  .carousel-card.exit { opacity: 0; transform: translateX(-50px) rotate(-3deg); }
+  .carousel-card.orange { background: linear-gradient(160deg, #F07A63 0%, var(--orange) 100%); color: #fff; }
+  .carousel-card.purple { background: linear-gradient(160deg, #B3A6D6 0%, var(--purple) 100%); color: #1E1E1E; }
+  .carousel-card.green { background: linear-gradient(160deg, #D1E58F 0%, var(--green-brand) 100%); color: #1E1E1E; }
+  .carousel-card .cc-emoji { font-size: 48px; margin-bottom: 20px; }
+  .carousel-card .cc-label { font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 700; line-height: 1.25; letter-spacing: -0.3px; }
+  .carousel-card .cc-sub { font-size: 14px; opacity: 0.7; font-weight: 500; margin-top: 8px; line-height: 1.5; max-width: 220px; }
+  .carousel-card .cc-tap { font-size: 12px; font-weight: 600; opacity: 0.5; margin-top: 24px; letter-spacing: 0.04em; }
   .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
   .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-dark); border: none; padding: 0; cursor: pointer; transition: all 0.3s var(--ease); }
   .carousel-dot.active { width: 20px; border-radius: 3px; }
@@ -1246,6 +1246,11 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
         <div class="carousel-wrap" id="carouselWrap">
           <div class="carousel-track" id="carouselTrack"></div>
           <div class="carousel-dots" id="carouselDots"></div>
+        </div>
+        <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none">
+          <div class="tip-header"><span class="tip-badge">Tip of the day</span><span class="tip-product" id="tipProduct"></span></div>
+          <div class="tip-text" id="tipText"></div>
+          <div class="tip-cta">Tap to explore &rarr;</div>
         </div>
       </div>
     </div>
