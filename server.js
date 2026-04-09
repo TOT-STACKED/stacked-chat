@@ -1628,16 +1628,19 @@ function showNPS(vendor) {
   const msgs = document.getElementById('messages');
   const wrap = document.createElement('div'); wrap.className = 'nps-wrap';
   const label = vendor.charAt(0).toUpperCase() + vendor.slice(1);
-  wrap.innerHTML = `<div class="nps-card">
-    <div class="nps-q">How likely are you to recommend <strong>${label}</strong> to another hospitality operator?</div>
-    <div class="nps-labels"><span class="nps-label">Not at all</span><span class="nps-label">Extremely likely</span></div>
-    <div class="nps-row" id="npsRow">${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="nps-btn" onclick="npsSelect(${n},'${vendor}')">${n}</button>`).join('')}</div>
-    <div class="nps-comment" id="npsComment">
-      <input class="nps-input" id="npsInput" placeholder="What's the main reason? (optional)">
-      <button class="nps-send" onclick="npsSubmit('${vendor}')">Send</button>
-    </div>
-    <div class="nps-done" id="npsDone">✓ Thanks — your rating has been saved</div>
-  </div>`;
+  const btns = [0,1,2,3,4,5,6,7,8,9,10].map(function(n) {
+    return '<button class="nps-btn" onclick="npsSelect(' + n + ',\'' + vendor + '\')">' + n + '</button>';
+  }).join('');
+  wrap.innerHTML = '<div class="nps-card">' +
+    '<div class="nps-q">How likely are you to recommend <strong>' + label + '</strong> to another hospitality operator?</div>' +
+    '<div class="nps-labels"><span class="nps-label">Not at all</span><span class="nps-label">Extremely likely</span></div>' +
+    '<div class="nps-row" id="npsRow">' + btns + '</div>' +
+    '<div class="nps-comment" id="npsComment">' +
+    '<input class="nps-input" id="npsInput" placeholder="What\'s the main reason? (optional)">' +
+    '<button class="nps-send" onclick="npsSubmit(\'' + vendor + '\')">Send</button>' +
+    '</div>' +
+    '<div class="nps-done" id="npsDone">&#10003; Thanks \u2014 your rating has been saved</div>' +
+    '</div>';
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 }
@@ -2689,24 +2692,26 @@ async function loadAnalytics() {
         '<th style="text-align:center;padding:8px 4px;font-weight:600;color:var(--text2)">Responses</th>' +
         '<th style="padding:8px 4px;font-weight:600;color:var(--text2)">Distribution</th>' +
         '</tr></thead><tbody>' +
-        a.npsData.map(d => {
-          const npsColor = d.nps >= 50 ? 'var(--green)' : d.nps >= 0 ? '#ca8a04' : 'var(--red)';
-          const promoterPct = Math.round(d.promoters / d.count * 100);
-          const detractorPct = Math.round(d.detractors / d.count * 100);
-          const passivePct = 100 - promoterPct - detractorPct;
-          return `<tr style="border-bottom:1px solid var(--border2)">
-            <td style="padding:10px 4px;font-weight:600;color:var(--text)">${esc(d.vendor.charAt(0).toUpperCase()+d.vendor.slice(1))}</td>
-            <td style="padding:10px 4px;text-align:center;font-weight:700;color:${npsColor}">${d.nps > 0 ? '+' : ''}${d.nps}</td>
-            <td style="padding:10px 4px;text-align:center;color:var(--text2)">${d.avg}/10</td>
-            <td style="padding:10px 4px;text-align:center;color:var(--text2)">${d.count}</td>
-            <td style="padding:10px 4px;min-width:120px">
-              <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:1px">
-                <div style="width:${promoterPct}%;background:var(--green)" title="Promoters ${promoterPct}%"></div>
-                <div style="width:${passivePct}%;background:#fbbf24" title="Passives ${passivePct}%"></div>
-                <div style="width:${detractorPct}%;background:var(--red)" title="Detractors ${detractorPct}%"></div>
-              </div>
-            </td>
-          </tr>`;
+        a.npsData.map(function(d) {
+          var npsColor = d.nps >= 50 ? 'var(--green)' : d.nps >= 0 ? '#ca8a04' : 'var(--red)';
+          var promoterPct = Math.round(d.promoters / d.count * 100);
+          var detractorPct = Math.round(d.detractors / d.count * 100);
+          var passivePct = 100 - promoterPct - detractorPct;
+          var vendorLabel = esc(d.vendor.charAt(0).toUpperCase()+d.vendor.slice(1));
+          var npsLabel = (d.nps > 0 ? '+' : '') + d.nps;
+          return '<tr style="border-bottom:1px solid var(--border2)">' +
+            '<td style="padding:10px 4px;font-weight:600;color:var(--text)">' + vendorLabel + '</td>' +
+            '<td style="padding:10px 4px;text-align:center;font-weight:700;color:' + npsColor + '">' + npsLabel + '</td>' +
+            '<td style="padding:10px 4px;text-align:center;color:var(--text2)">' + d.avg + '/10</td>' +
+            '<td style="padding:10px 4px;text-align:center;color:var(--text2)">' + d.count + '</td>' +
+            '<td style="padding:10px 4px;min-width:120px">' +
+              '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:1px">' +
+                '<div style="width:' + promoterPct + '%;background:var(--green)" title="Promoters ' + promoterPct + '%"></div>' +
+                '<div style="width:' + passivePct + '%;background:#fbbf24" title="Passives ' + passivePct + '%"></div>' +
+                '<div style="width:' + detractorPct + '%;background:var(--red)" title="Detractors ' + detractorPct + '%"></div>' +
+              '</div>' +
+            '</td>' +
+          '</tr>';
         }).join('') +
         '</tbody></table>' +
         '<div style="display:flex;gap:16px;padding:10px 4px 0;font-size:11px;color:var(--text3)">' +
