@@ -690,6 +690,26 @@ async function getAnalytics() {
     });
     const venueStats = Object.values(venueMap).sort((a, b) => b.convs - a.convs);
 
+    // Fetch NPS scores per vendor
+    let npsData = [];
+    try {
+      const npsRows = await sbFetch('/rest/v1/nps_scores?select=vendor,score&limit=2000');
+      if (Array.isArray(npsRows) && npsRows.length) {
+        const byVendor = {};
+        npsRows.forEach(({ vendor, score }) => {
+          if (!byVendor[vendor]) byVendor[vendor] = [];
+          byVendor[vendor].push(score);
+        });
+        npsData = Object.entries(byVendor).map(([vendor, scores]) => {
+          const promoters = scores.filter(s => s >= 9).length;
+          const detractors = scores.filter(s => s <= 6).length;
+          const nps = Math.round((promoters / scores.length - detractors / scores.length) * 100);
+          const avg = (scores.reduce((a,b) => a+b, 0) / scores.length).toFixed(1);
+          return { vendor, nps, avg, count: scores.length, promoters, detractors };
+        }).sort((a, b) => b.nps - a.nps);
+      }
+    } catch(e) { /* nps_scores table may not exist yet */ }
+
     return {
       totalConvs: convs.length, totalMessages: allMessages.length,
       openTickets: tickets.filter(t => t.status === 'open').length,
@@ -697,7 +717,7 @@ async function getAnalytics() {
       totalDocs: uniqueDocs.length,
       topTopics, topVendors, recentConvs: convs.slice(0, 10), tickets, docs: uniqueDocs,
       healthChecks: healthChecks.slice(0, 50), venueHealth, systemIssueCounts,
-      totalChecks: healthChecks.length, venueStats
+      totalChecks: healthChecks.length, venueStats, npsData
     };
   } catch(e) { console.error('Analytics error:', e); return { error: e.message }; }
 }
@@ -1035,6 +1055,25 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .tip-product { font-size: 11px; color: var(--brown-mid); font-weight: 500; }
   .tip-text { font-size: 13px; font-weight: 600; color: var(--brown); line-height: 1.45; }
   .tip-cta { font-size: 12px; color: var(--orange); font-weight: 600; margin-top: 6px; }
+
+  /* ─── NPS WIDGET ─── */
+  .nps-wrap { padding-left: 42px; margin-top: -4px; }
+  .nps-card { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 16px; padding: 14px 16px; max-width: 340px; box-shadow: var(--shadow); }
+  .nps-q { font-size: 13px; font-weight: 600; color: var(--brown); margin-bottom: 12px; line-height: 1.4; }
+  .nps-q strong { color: var(--orange); }
+  .nps-labels { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .nps-label { font-size: 10px; color: var(--brown-mid); font-weight: 500; }
+  .nps-row { display: flex; gap: 4px; margin-bottom: 10px; }
+  .nps-btn { flex: 1; height: 32px; border-radius: 8px; border: 1.5px solid var(--cream-dark); background: var(--white); font-size: 12px; font-weight: 600; color: var(--brown); cursor: pointer; transition: all 0.15s; padding: 0; min-width: 0; }
+  .nps-btn:hover { border-color: var(--orange); color: var(--orange); background: rgba(232,87,60,0.06); }
+  .nps-btn.selected { background: var(--orange); border-color: var(--orange); color: #fff; }
+  .nps-comment { display: none; margin-top: 6px; }
+  .nps-comment.show { display: flex; gap: 6px; }
+  .nps-input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--brown); outline: none; background: var(--cream); transition: border-color 0.15s; }
+  .nps-input:focus { border-color: var(--orange); background: #fff; }
+  .nps-send { padding: 8px 14px; background: var(--orange); border: none; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .nps-done { font-size: 13px; color: var(--green); font-weight: 600; display: none; align-items: center; gap: 6px; padding-top: 4px; }
+  .nps-done.show { display: flex; }
 </style>
 </head>
 <body>
@@ -1246,6 +1285,7 @@ let user = null;
 let messages = [];
 let conversationId = null;
 let lastBotMsg = '';
+let npsShown = false;
 
 // Venue autocomplete state
 let selectedVenueId = PRESET_VENUE_ID || null;
@@ -1583,6 +1623,47 @@ function renderTipOfTheDay() {
   card.style.display = 'block';
 }
 
+// ─── NPS ──────────────────────────────────────────────────────────────────
+function showNPS(vendor) {
+  const msgs = document.getElementById('messages');
+  const wrap = document.createElement('div'); wrap.className = 'nps-wrap';
+  const label = vendor.charAt(0).toUpperCase() + vendor.slice(1);
+  wrap.innerHTML = `<div class="nps-card">
+    <div class="nps-q">How likely are you to recommend <strong>${label}</strong> to another hospitality operator?</div>
+    <div class="nps-labels"><span class="nps-label">Not at all</span><span class="nps-label">Extremely likely</span></div>
+    <div class="nps-row" id="npsRow">${[0,1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="nps-btn" onclick="npsSelect(${n},'${vendor}')">${n}</button>`).join('')}</div>
+    <div class="nps-comment" id="npsComment">
+      <input class="nps-input" id="npsInput" placeholder="What's the main reason? (optional)">
+      <button class="nps-send" onclick="npsSubmit('${vendor}')">Send</button>
+    </div>
+    <div class="nps-done" id="npsDone">✓ Thanks — your rating has been saved</div>
+  </div>`;
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+let _npsScore = null;
+function npsSelect(score, vendor) {
+  _npsScore = score;
+  document.querySelectorAll('.nps-btn').forEach((b,i) => b.classList.toggle('selected', i === score));
+  const comment = document.getElementById('npsComment');
+  if (comment) comment.classList.add('show');
+  setTimeout(() => { const inp = document.getElementById('npsInput'); if (inp) inp.focus(); }, 50);
+}
+
+async function npsSubmit(vendor) {
+  if (_npsScore === null) return;
+  const comment = (document.getElementById('npsInput')?.value || '').trim();
+  try {
+    await fetch(SERVER_URL + '/save-nps', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ vendor, score: _npsScore, comment: comment || null, venue_id: user?.venue_id || null, venue: user?.venue || null, respondent: user?.name || null })
+    });
+  } catch(e) {}
+  const comment_el = document.getElementById('npsComment'); if (comment_el) comment_el.style.display = 'none';
+  const done = document.getElementById('npsDone'); if (done) done.classList.add('show');
+}
+
 function fireTip() {
   if (!window._currentTip) return;
   hideWelcome();
@@ -1812,6 +1893,10 @@ async function sendMessage() {
       if (vtagEnd > vtagStart) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
     }
     addMessage('assistant', displayReply, true, videoData, supportUrl);
+    if (data.detectedVendor && !npsShown && messages.filter(m=>m.role==='user').length >= 2) {
+      npsShown = true;
+      setTimeout(() => showNPS(data.detectedVendor), 1200);
+    }
     if (shouldEscalate) {
       const msgs = document.getElementById('messages');
       const banner = document.createElement('div'); banner.className = 'escalation-banner';
@@ -2219,6 +2304,7 @@ tbody tr:hover td{background:var(--surface2)}
       <div class="card"><div class="card-header"><span class="card-title">Hot topics</span><span class="card-meta">Most frequent</span></div><div id="hotTopics"><div class="empty">No data yet</div></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Top products mentioned</span><span class="card-meta">Top 10</span></div><div id="topProducts"><div class="empty">No data yet</div></div></div>
     </div>
+    <div class="card"><div class="card-header"><span class="card-title">Product NPS scores</span><span class="card-meta">Operator ratings</span></div><div id="npsTable"><div class="empty">No ratings yet — NPS prompts appear after vendor conversations</div></div></div>
     <div class="grid-2">
       <div class="card"><div class="card-header"><span class="card-title">Messages by day</span></div><div class="chart-wrap"><canvas id="actChart"></canvas></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Issue categories</span></div><div class="chart-wrap"><canvas id="donutChart"></canvas></div></div>
@@ -2590,6 +2676,45 @@ async function loadAnalytics() {
     const ct=document.getElementById('convsTable');
     if(!a.recentConvs.length){ct.innerHTML='<div class="empty">No conversations yet</div>';}
     else{ct.innerHTML='<div>'+a.recentConvs.map(c=>{const first=(c.messages||[]).find(m=>m.role==='user');const count=(c.messages||[]).filter(m=>m.role==='user').length;const d=new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'});const thread=(c.messages||[]).map(m=>'<div class="thread-msg"><div class="thread-role '+(m.role==='user'?'user':'')+'">'+esc(m.role==='user'?'You':'Bot')+'</div><div class="thread-content">'+esc((m.content||'').substring(0,300))+'</div></div>').join('');return '<div class="conv-item" onclick="toggleConv(this)" title="Click to expand thread"><div class="conv-top"><span class="conv-name">'+esc(c.name||'Unknown')+'</span>'+(c.venue?'<span class="conv-venue">'+esc(c.venue)+'</span>':'')+'<span class="conv-date">'+d+' &middot; '+count+' msg'+(count!==1?'s':'')+'</span></div><div class="conv-preview">'+esc((first?.content||'Chat session').substring(0,100))+'</div><div class="conv-thread">'+thread+'</div></div>';}).join('')+'</div>';}
+    // NPS table
+    const npsEl = document.getElementById('npsTable');
+    if (!a.npsData || !a.npsData.length) {
+      npsEl.innerHTML = '<div class="empty">No ratings yet — NPS prompts appear after vendor conversations</div>';
+    } else {
+      npsEl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+        '<thead><tr style="border-bottom:1px solid var(--border)">' +
+        '<th style="text-align:left;padding:8px 4px;font-weight:600;color:var(--text2)">Vendor</th>' +
+        '<th style="text-align:center;padding:8px 4px;font-weight:600;color:var(--text2)">NPS</th>' +
+        '<th style="text-align:center;padding:8px 4px;font-weight:600;color:var(--text2)">Avg score</th>' +
+        '<th style="text-align:center;padding:8px 4px;font-weight:600;color:var(--text2)">Responses</th>' +
+        '<th style="padding:8px 4px;font-weight:600;color:var(--text2)">Distribution</th>' +
+        '</tr></thead><tbody>' +
+        a.npsData.map(d => {
+          const npsColor = d.nps >= 50 ? 'var(--green)' : d.nps >= 0 ? '#ca8a04' : 'var(--red)';
+          const promoterPct = Math.round(d.promoters / d.count * 100);
+          const detractorPct = Math.round(d.detractors / d.count * 100);
+          const passivePct = 100 - promoterPct - detractorPct;
+          return `<tr style="border-bottom:1px solid var(--border2)">
+            <td style="padding:10px 4px;font-weight:600;color:var(--text)">${esc(d.vendor.charAt(0).toUpperCase()+d.vendor.slice(1))}</td>
+            <td style="padding:10px 4px;text-align:center;font-weight:700;color:${npsColor}">${d.nps > 0 ? '+' : ''}${d.nps}</td>
+            <td style="padding:10px 4px;text-align:center;color:var(--text2)">${d.avg}/10</td>
+            <td style="padding:10px 4px;text-align:center;color:var(--text2)">${d.count}</td>
+            <td style="padding:10px 4px;min-width:120px">
+              <div style="display:flex;height:8px;border-radius:4px;overflow:hidden;gap:1px">
+                <div style="width:${promoterPct}%;background:var(--green)" title="Promoters ${promoterPct}%"></div>
+                <div style="width:${passivePct}%;background:#fbbf24" title="Passives ${passivePct}%"></div>
+                <div style="width:${detractorPct}%;background:var(--red)" title="Detractors ${detractorPct}%"></div>
+              </div>
+            </td>
+          </tr>`;
+        }).join('') +
+        '</tbody></table>' +
+        '<div style="display:flex;gap:16px;padding:10px 4px 0;font-size:11px;color:var(--text3)">' +
+        '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--green);margin-right:4px"></span>Promoters (9-10)</span>' +
+        '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:#fbbf24;margin-right:4px"></span>Passives (7-8)</span>' +
+        '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--red);margin-right:4px"></span>Detractors (0-6)</span>' +
+        '</div>';
+    }
     renderVenues(a.venueStats || []);
     renderDocs(a.docs);
     renderHealthData(a);
@@ -3153,6 +3278,21 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
+  // ─── SAVE NPS ──────────────────────────────────────────────────────────
+  if (method === 'POST' && url === '/save-nps') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const payload = JSON.parse(body);
+        await sbFetch('/rest/v1/nps_scores', { method: 'POST', body: payload });
+        res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true}));
+      } catch(e) {
+        res.writeHead(500); res.end(JSON.stringify({error:e.message}));
+      }
+    }); return;
+  }
+
   // ─── SAVE LEAD ─────────────────────────────────────────────────────────
   if (method === 'POST' && url === '/save-lead') {
     let body = '';
@@ -3228,10 +3368,12 @@ const server = http.createServer(async (req, res) => {
 
         // Also inject vendor profiles if vendor mentioned
         let vendorContext = '';
+        let detectedVendor = null;
         try {
           const msgLower = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
           const matchedProfiles = Object.entries(VENDOR_PROFILES).filter(([key]) => msgLower.includes(key)).slice(0, 2);
           if (matchedProfiles.length > 0) {
+            detectedVendor = matchedProfiles[0][0];
             vendorContext = '\n\n=== VENDOR KNOWLEDGE ===\n' + matchedProfiles.map(([,v]) => v).join('\n\n---\n\n');
           }
         } catch(e) {}
@@ -3495,7 +3637,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         }
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
