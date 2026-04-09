@@ -3417,19 +3417,34 @@ const server = http.createServer(async (req, res) => {
         } catch(e) { /* no docs */ }
 
         // Also inject vendor profiles if vendor mentioned
+        // NPS detection: only use USER messages (not bot replies which mention many vendors)
         let vendorContext = '';
         let detectedVendor = null;
         try {
-          const msgLower = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
-          const matchedProfiles = Object.entries(VENDOR_PROFILES).filter(([key]) => msgLower.includes(key)).slice(0, 2);
+          const userMsgsLower = (message + ' ' + (history.slice(-4).filter(m=>m.role==='user').map(m=>m.content).join(' '))).toLowerCase();
+          // Also build a broader context including bot replies for knowledge injection (not NPS)
+          const allContextLower = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
+          // First: check current message alone for strongest signal
+          const currentMsgLower = message.toLowerCase();
+          const currentMatch = Object.entries(VENDOR_PROFILES).filter(([key]) => currentMsgLower.includes(key));
+          // Then: check recent user messages
+          const userMatch = Object.entries(VENDOR_PROFILES).filter(([key]) => userMsgsLower.includes(key));
+          // Use current message match first (strongest signal), then user history
+          const matchedProfiles = currentMatch.length > 0 ? currentMatch.slice(0, 2) : userMatch.slice(0, 2);
+          // For knowledge injection, also check bot replies
+          const allMatched = Object.entries(VENDOR_PROFILES).filter(([key]) => allContextLower.includes(key)).slice(0, 2);
+          const profilesForContext = matchedProfiles.length > 0 ? matchedProfiles : allMatched;
+          if (profilesForContext.length > 0) {
+            vendorContext = '\n\n=== VENDOR KNOWLEDGE ===\n' + profilesForContext.map(([,v]) => v).join('\n\n---\n\n');
+          }
+          // NPS vendor = what the USER asked about, not what the bot mentioned
           if (matchedProfiles.length > 0) {
             detectedVendor = matchedProfiles[0][0];
-            vendorContext = '\n\n=== VENDOR KNOWLEDGE ===\n' + matchedProfiles.map(([,v]) => v).join('\n\n---\n\n');
           }
-          // Broader NPS vendor detection — dynamically from documents table
+          // Broader NPS vendor detection — dynamically from documents table (user messages only)
           if (!detectedVendor) {
             const vendorNames = await getVendorNames();
-            const found = vendorNames.find(v => msgLower.includes(v));
+            const found = vendorNames.find(v => userMsgsLower.includes(v));
             if (found) detectedVendor = found;
           }
         } catch(e) {}
