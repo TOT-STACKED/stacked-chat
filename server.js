@@ -919,9 +919,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   /* ─── ROTATING CARDS CAROUSEL (Tinder-style portrait) ─── */
   .carousel-wrap { width: 100%; max-width: 300px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 16px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
   .carousel-track { position: relative; height: 320px; overflow: hidden; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
-  .carousel-card { position: absolute; inset: 0; border-radius: 24px; padding: 32px 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; opacity: 0; transform: translateX(50px) rotate(3deg); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); }
-  .carousel-card.active { opacity: 1; transform: translateX(0) rotate(0deg); }
-  .carousel-card.exit { opacity: 0; transform: translateX(-50px) rotate(-3deg); }
+  .carousel-card { position: absolute; inset: 0; border-radius: 24px; padding: 32px 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; opacity: 0; transform: translateX(50px) rotate(3deg); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); pointer-events: none; }
+  .carousel-card.active { opacity: 1; transform: translateX(0) rotate(0deg); pointer-events: auto; }
+  .carousel-card.exit { opacity: 0; transform: translateX(-50px) rotate(-3deg); pointer-events: none; }
   .carousel-card.orange { background: linear-gradient(160deg, #F07A63 0%, var(--orange) 100%); color: #fff; }
   .carousel-card.purple { background: linear-gradient(160deg, #B3A6D6 0%, var(--purple) 100%); color: #1E1E1E; }
   .carousel-card.green { background: linear-gradient(160deg, #D1E58F 0%, var(--green-brand) 100%); color: #1E1E1E; }
