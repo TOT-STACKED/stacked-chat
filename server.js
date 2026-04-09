@@ -1624,47 +1624,50 @@ function renderTipOfTheDay() {
 }
 
 // ─── NPS ──────────────────────────────────────────────────────────────────
+var _npsScore = null;
+var _npsVendor = null;
+
 function showNPS(vendor) {
-  const msgs = document.getElementById('messages');
-  const wrap = document.createElement('div'); wrap.className = 'nps-wrap';
-  const label = vendor.charAt(0).toUpperCase() + vendor.slice(1);
-  const btns = [0,1,2,3,4,5,6,7,8,9,10].map(function(n) {
-    return '<button class="nps-btn" onclick="npsSelect(' + n + ',\'' + vendor + '\')">' + n + '</button>';
+  _npsVendor = vendor;
+  var msgs = document.getElementById('messages');
+  var wrap = document.createElement('div'); wrap.className = 'nps-wrap';
+  var label = vendor.charAt(0).toUpperCase() + vendor.slice(1);
+  var btns = [0,1,2,3,4,5,6,7,8,9,10].map(function(n) {
+    return '<button class="nps-btn" onclick="npsSelect(' + n + ')">' + n + '</button>';
   }).join('');
   wrap.innerHTML = '<div class="nps-card">' +
     '<div class="nps-q">How likely are you to recommend <strong>' + label + '</strong> to another hospitality operator?</div>' +
     '<div class="nps-labels"><span class="nps-label">Not at all</span><span class="nps-label">Extremely likely</span></div>' +
     '<div class="nps-row" id="npsRow">' + btns + '</div>' +
     '<div class="nps-comment" id="npsComment">' +
-    '<input class="nps-input" id="npsInput" placeholder="What\'s the main reason? (optional)">' +
-    '<button class="nps-send" onclick="npsSubmit(\'' + vendor + '\')">Send</button>' +
+    '<input class="nps-input" id="npsInput" placeholder="What is the main reason? (optional)">' +
+    '<button class="nps-send" onclick="npsSubmit()">Send</button>' +
     '</div>' +
-    '<div class="nps-done" id="npsDone">&#10003; Thanks \u2014 your rating has been saved</div>' +
+    '<div class="nps-done" id="npsDone">&#10003; Thanks &#8212; your rating has been saved</div>' +
     '</div>';
   msgs.appendChild(wrap);
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-let _npsScore = null;
-function npsSelect(score, vendor) {
+function npsSelect(score) {
   _npsScore = score;
-  document.querySelectorAll('.nps-btn').forEach((b,i) => b.classList.toggle('selected', i === score));
-  const comment = document.getElementById('npsComment');
+  document.querySelectorAll('.nps-btn').forEach(function(b, i) { b.classList.toggle('selected', i === score); });
+  var comment = document.getElementById('npsComment');
   if (comment) comment.classList.add('show');
-  setTimeout(() => { const inp = document.getElementById('npsInput'); if (inp) inp.focus(); }, 50);
+  var inp = document.getElementById('npsInput'); if (inp) setTimeout(function(){ inp.focus(); }, 50);
 }
 
-async function npsSubmit(vendor) {
+async function npsSubmit() {
   if (_npsScore === null) return;
-  const comment = (document.getElementById('npsInput')?.value || '').trim();
+  var comment = (document.getElementById('npsInput') ? document.getElementById('npsInput').value : '').trim();
   try {
     await fetch(SERVER_URL + '/save-nps', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ vendor, score: _npsScore, comment: comment || null, venue_id: user?.venue_id || null, venue: user?.venue || null, respondent: user?.name || null })
+      body: JSON.stringify({ vendor: _npsVendor, score: _npsScore, comment: comment || null, venue_id: user ? user.venue_id : null, venue: user ? user.venue : null, respondent: user ? user.name : null })
     });
   } catch(e) {}
-  const comment_el = document.getElementById('npsComment'); if (comment_el) comment_el.style.display = 'none';
-  const done = document.getElementById('npsDone'); if (done) done.classList.add('show');
+  var cel = document.getElementById('npsComment'); if (cel) cel.style.display = 'none';
+  var done = document.getElementById('npsDone'); if (done) done.classList.add('show');
 }
 
 function fireTip() {
