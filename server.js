@@ -917,18 +917,18 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .welcome h2 { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -0.4px; color: var(--brown); margin-bottom: 6px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
   .welcome p { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
   /* ─── ROTATING CARDS CAROUSEL ─── */
-  .carousel-wrap { width: 100%; max-width: 380px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 12px; }
-  .carousel-track { position: relative; height: 130px; overflow: hidden; border-radius: 18px; }
-  .carousel-card { position: absolute; inset: 0; border-radius: 18px; padding: 20px 22px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; opacity: 0; transform: translateX(30px); transition: opacity 0.5s var(--ease), transform 0.5s var(--ease); }
+  .carousel-wrap { width: 100%; max-width: 420px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 12px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+  .carousel-track { position: relative; height: 180px; overflow: hidden; border-radius: 22px; }
+  .carousel-card { position: absolute; inset: 0; border-radius: 22px; padding: 26px 28px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; opacity: 0; transform: translateX(40px); transition: opacity 0.45s var(--ease), transform 0.45s var(--ease); }
   .carousel-card.active { opacity: 1; transform: translateX(0); }
-  .carousel-card.exit { opacity: 0; transform: translateX(-30px); }
+  .carousel-card.exit { opacity: 0; transform: translateX(-40px); }
   .carousel-card.orange { background: var(--orange); color: #fff; }
   .carousel-card.purple { background: var(--purple); color: #1E1E1E; }
   .carousel-card.green { background: var(--green-brand); color: #1E1E1E; }
-  .carousel-card .cc-emoji { font-size: 22px; margin-bottom: 4px; }
-  .carousel-card .cc-label { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700; line-height: 1.3; }
-  .carousel-card .cc-sub { font-size: 12px; opacity: 0.75; font-weight: 500; margin-top: 2px; }
-  .carousel-card .cc-tap { font-size: 11px; font-weight: 600; opacity: 0.65; margin-top: auto; letter-spacing: 0.03em; }
+  .carousel-card .cc-emoji { font-size: 28px; margin-bottom: 8px; }
+  .carousel-card .cc-label { font-family: 'Inter', sans-serif; font-size: 19px; font-weight: 700; line-height: 1.25; letter-spacing: -0.3px; }
+  .carousel-card .cc-sub { font-size: 14px; opacity: 0.75; font-weight: 500; margin-top: 4px; line-height: 1.4; }
+  .carousel-card .cc-tap { font-size: 12px; font-weight: 600; opacity: 0.6; margin-top: auto; letter-spacing: 0.03em; }
   .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
   .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-dark); border: none; padding: 0; cursor: pointer; transition: all 0.3s var(--ease); }
   .carousel-dot.active { width: 20px; border-radius: 3px; }
@@ -1246,18 +1246,6 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
         <div class="carousel-wrap" id="carouselWrap">
           <div class="carousel-track" id="carouselTrack"></div>
           <div class="carousel-dots" id="carouselDots"></div>
-        </div>
-        <div class="quick-grid" id="quickGrid"></div>
-        <button class="shift-check-btn" onclick="openShiftCheck()" id="shiftCheckBtn">
-          <span class="sc-icon">&#x2705;</span> Start of shift check
-        </button>
-        <div class="predict-section" id="predictSection" style="display:none">
-          <div class="predict-grid" id="predictGrid"></div>
-        </div>
-        <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none;margin-top:0">
-          <div class="tip-header"><span class="tip-badge">Tip of the day</span><span class="tip-product" id="tipProduct"></span></div>
-          <div class="tip-text" id="tipText"></div>
-          <div class="tip-cta">Tap to explore &rarr;</div>
         </div>
       </div>
     </div>
@@ -1676,6 +1664,7 @@ function renderCarousel() {
     const next = (_carouselIdx + 1) % cards.length;
     goToCard(next, cards);
   }, 4000);
+  initCarouselSwipe(cards);
 }
 
 function goToCard(idx, cards) {
@@ -1691,6 +1680,30 @@ function goToCard(idx, cards) {
   });
   allDots.forEach((d, i) => { d.classList.toggle('active', i === idx); });
   _carouselIdx = idx;
+}
+
+// Swipe support
+function initCarouselSwipe(cards) {
+  const track = document.getElementById('carouselTrack');
+  if (!track) return;
+  let startX = 0, startY = 0, swiping = false;
+  track.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    swiping = true;
+    clearInterval(_carouselTimer);
+  }, { passive: true });
+  track.addEventListener('touchend', function(e) {
+    if (!swiping) return;
+    swiping = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) goToCard((_carouselIdx + 1) % cards.length, cards);
+      else goToCard((_carouselIdx - 1 + cards.length) % cards.length, cards);
+    }
+    _carouselTimer = setInterval(function() { goToCard((_carouselIdx + 1) % cards.length, cards); }, 4000);
+  }, { passive: true });
 }
 
 // Stop carousel when chat starts
