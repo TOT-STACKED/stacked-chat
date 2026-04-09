@@ -556,6 +556,35 @@ const VENDOR_SUPPORT_URLS = {
   'flow learning': 'https://support.flowlearning.co',
 };
 
+// ─── VENDOR NAME CACHE (for NPS detection) ────────────────────────────────
+// Derived dynamically from Supabase documents table — adding a doc makes
+// that vendor automatically eligible for NPS prompts, no code change needed.
+let _vendorNameCache = [];
+let _vendorCacheAt = 0;
+
+async function getVendorNames() {
+  if (Date.now() - _vendorCacheAt < 3600000 && _vendorNameCache.length) return _vendorNameCache;
+  try {
+    const docs = await sbFetch('/rest/v1/documents?select=filename&limit=1000');
+    if (Array.isArray(docs) && docs.length) {
+      const names = [...new Set(docs.map(d => {
+        // Strip extension and normalise: "Lightspeed_Restaurant_Guide.pdf" → "lightspeed restaurant guide"
+        return d.filename.toLowerCase()
+          .replace(/\.(txt|pdf|md|docx?|csv)$/i, '')
+          .replace(/[_\-]+/g, ' ')
+          .trim();
+      }))].filter(n => n.length > 2);
+      // Also include VENDOR_PROFILES keys and known short-names
+      const profileKeys = Object.keys(VENDOR_PROFILES);
+      _vendorNameCache = [...new Set([...profileKeys, ...names])];
+      _vendorCacheAt = Date.now();
+    }
+  } catch(e) { /* fall through to stale cache */ }
+  // Fallback: at minimum expose profile keys
+  if (!_vendorNameCache.length) _vendorNameCache = Object.keys(VENDOR_PROFILES);
+  return _vendorNameCache;
+}
+
 // ─── SLACK ALERT ──────────────────────────────────────────────────────────
 async function sendSlackAlert({ venue, userName, email, issue, turns }) {
   if (!SLACK_WEBHOOK_URL) return;
@@ -3384,24 +3413,10 @@ const server = http.createServer(async (req, res) => {
             detectedVendor = matchedProfiles[0][0];
             vendorContext = '\n\n=== VENDOR KNOWLEDGE ===\n' + matchedProfiles.map(([,v]) => v).join('\n\n---\n\n');
           }
-          // Broader NPS vendor detection — covers vendors without full profiles
+          // Broader NPS vendor detection — dynamically from documents table
           if (!detectedVendor) {
-            const NPS_VENDORS = [
-              'workforce.com','deputy','rotaready','fourth','sona','planday','bizimply','s4labour','harri','hotschedules','humanforce','homebase','nory','tanda',
-              'sevenrooms','opentable','resdiary','collins','quandoo','resy','tock','eat app','eveve','carbonara',
-              'deliveroo','uber eats','just eat','stuart','flipdish','hungrrr','bopple','orderswift','deliverect','otter',
-              'tevalis','zonal','icrtouch','comtrex','storekit','pepper','zettle','sumup','paypoint','tabology','revel','par brink',
-              'stripe','worldpay','adyen','dojo','barclaycard','elavon','paymentsense','square','lightspeed','epos now',
-              'vita mojo','yoello','qikserve','orderpay','tissl','preoday',
-              'marketman','apicbase','nutritics','foodics','crunchtime','winnow','too good to go','karma',
-              'mews','opera','apaleo','cloudbeds','guestline','rezlynx','siteminder','beds24',
-              'airship','stampede','acteol','como','punchh','paytronix','eagle eye','klaviyo','yumpingo',
-              'tenzo','avero','juyo','tableau','power bi','snowflake',
-              'hibob','breathe hr','bamboohr','rippling','personio','charlie hr',
-              'typsy','axonify','beekeeper','flow learning',
-              'revinate','trustyou','guestrevu','medallia','tripadvisor',
-            ];
-            const found = NPS_VENDORS.find(v => msgLower.includes(v));
+            const vendorNames = await getVendorNames();
+            const found = vendorNames.find(v => msgLower.includes(v));
             if (found) detectedVendor = found;
           }
         } catch(e) {}
