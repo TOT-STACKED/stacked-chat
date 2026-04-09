@@ -2084,7 +2084,7 @@ async function sendMessage() {
       if (vtagEnd > vtagStart) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
     }
     addMessage('assistant', displayReply, true, videoData, supportUrl);
-    if (data.detectedVendor && !npsShown && messages.filter(m=>m.role==='user').length >= 2) {
+    if (data.detectedVendor && !npsShown && (data.forceNPS || messages.filter(m=>m.role==='user').length >= 2)) {
       npsShown = true;
       setTimeout(() => showNPS(data.detectedVendor), 1200);
     }
@@ -3662,6 +3662,12 @@ Once you know the product, respond with:
 - A mid-service workaround if relevant
 - The vendor support URL inline
 
+NPS / VENDOR RATING REQUESTS:
+When a user says they want to rate their tech vendors, rate a product, give feedback, or provide an NPS score:
+1. Ask them which specific vendor/product they would like to rate. Be friendly and concise, e.g. "Sure! Which vendor would you like to rate? For example Lightspeed, Square, Tevalis, Dojo, OpenTable, Deputy, or any other product you use."
+2. Once they name the vendor, reply with a short confirmation like "Great — rating [vendor name] now." and add [NPS:vendorname] on its own line at the very end of your response (e.g. [NPS:lightspeed] or [NPS:resdiary]). Use the lowercase vendor key. The system will display the NPS rating widget automatically.
+3. Do NOT ask them to rate on a scale yourself — the system handles the rating UI.
+
 Support URLs:
   --- POINT OF SALE ---
   Square: https://squareup.com/help/gb
@@ -3844,6 +3850,14 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         reply = reply.replace(/\[ESCALATE\]/g, '').trim();
         finalReply = finalReply.replace(/\[ESCALATE\]/g, '').trim();
 
+        // Handle [NPS:vendorname] tag — AI-triggered NPS rating
+        const npsMatch = reply.match(/\[NPS:([a-z0-9 ]+)\]/i);
+        if (npsMatch) {
+          detectedVendor = npsMatch[1].toLowerCase().trim();
+          reply = reply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
+          finalReply = finalReply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
+        }
+
         if (shouldEscalate) {
           try {
             const issue = history.length > 0
@@ -3859,7 +3873,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         }
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
