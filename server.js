@@ -566,8 +566,8 @@ async function getVendorNames() {
   if (Date.now() - _vendorCacheAt < 3600000 && _vendorNameCache.length) return _vendorNameCache;
   try {
     const docs = await sbFetch('/rest/v1/documents?select=filename&limit=1000');
-    if (Array.isArray(docs) && docs.length) {
-      const names = [...new Set(docs.map(d => {
+    if (Array.isArray(docs.data) && docs.data.length) {
+      const names = [...new Set(docs.data.map(d => {
         // Strip extension and normalise: "Lightspeed_Restaurant_Guide.pdf" → "lightspeed restaurant guide"
         return d.filename.toLowerCase()
           .replace(/\.(txt|pdf|md|docx?|csv)$/i, '')
@@ -723,9 +723,9 @@ async function getAnalytics() {
     let npsData = [];
     try {
       const npsRows = await sbFetch('/rest/v1/nps_scores?select=vendor,score&limit=2000');
-      if (Array.isArray(npsRows) && npsRows.length) {
+      if (Array.isArray(npsRows.data) && npsRows.data.length) {
         const byVendor = {};
-        npsRows.forEach(({ vendor, score }) => {
+        npsRows.data.forEach(({ vendor, score }) => {
           if (!byVendor[vendor]) byVendor[vendor] = [];
           byVendor[vendor].push(score);
         });
