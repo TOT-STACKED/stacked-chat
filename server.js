@@ -1041,7 +1041,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .logo-strip::before, .logo-strip::after { content: ''; position: absolute; top: 0; bottom: 0; width: 48px; z-index: 2; pointer-events: none; }
   .logo-strip::before { left: 0; background: linear-gradient(to right, var(--white), transparent); }
   .logo-strip::after { right: 0; background: linear-gradient(to left, var(--white), transparent); }
-  .logo-track { display: flex; align-items: center; gap: 44px; width: max-content; animation: logoScroll 30s linear infinite; }
+  .logo-track { display: flex; align-items: center; gap: 44px; width: max-content; animation: logoScroll 60s linear infinite; }
   .logo-track:hover { animation-play-state: paused; }
   .logo-text { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brown); opacity: 0.3; white-space: nowrap; flex-shrink: 0; user-select: none; }
   .logo-dot { width: 4px; height: 4px; background: var(--brown); border-radius: 50%; opacity: 0.15; flex-shrink: 0; }
@@ -1190,42 +1190,84 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     <div class="logo-track">
       <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
       <span class="logo-text">Square</span><span class="logo-dot"></span>
-      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
-      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
-      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
-      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
-      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
       <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
-      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
+      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
+      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
+      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
+      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
+      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
+      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
+      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
+      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
+      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
+      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
+      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
+      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
+      <span class="logo-text">Collins</span><span class="logo-dot"></span>
+      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
+      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
+      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
       <span class="logo-text">Airship</span><span class="logo-dot"></span>
-      <span class="logo-text">Planday</span><span class="logo-dot"></span>
-      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
-      <span class="logo-text">Nory</span><span class="logo-dot"></span>
-      <span class="logo-text">Sona</span><span class="logo-dot"></span>
       <span class="logo-text">Stampede</span><span class="logo-dot"></span>
+      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
+      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
       <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
+      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
+      <span class="logo-text">Mews</span><span class="logo-dot"></span>
+      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
+      <span class="logo-text">Planday</span><span class="logo-dot"></span>
+      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
+      <span class="logo-text">Sona</span><span class="logo-dot"></span>
+      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
+      <span class="logo-text">Nory</span><span class="logo-dot"></span>
       <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
-      <span class="strip-label">+ 80 more partners</span><span class="logo-dot"></span>
+      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
+      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
+      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
+      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
+      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
+      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
+      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
       <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
       <span class="logo-text">Square</span><span class="logo-dot"></span>
-      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
-      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
-      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
-      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
-      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
       <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
-      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
+      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
+      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
+      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
+      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
+      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
+      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
+      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
+      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
+      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
+      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
+      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
+      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
+      <span class="logo-text">Collins</span><span class="logo-dot"></span>
+      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
+      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
+      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
       <span class="logo-text">Airship</span><span class="logo-dot"></span>
-      <span class="logo-text">Planday</span><span class="logo-dot"></span>
-      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
-      <span class="logo-text">Nory</span><span class="logo-dot"></span>
-      <span class="logo-text">Sona</span><span class="logo-dot"></span>
       <span class="logo-text">Stampede</span><span class="logo-dot"></span>
+      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
+      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
       <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
+      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
+      <span class="logo-text">Mews</span><span class="logo-dot"></span>
+      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
+      <span class="logo-text">Planday</span><span class="logo-dot"></span>
+      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
+      <span class="logo-text">Sona</span><span class="logo-dot"></span>
+      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
+      <span class="logo-text">Nory</span><span class="logo-dot"></span>
       <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
-      <span class="strip-label">+ 80 more partners</span><span class="logo-dot"></span>
+      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
+      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
+      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
+      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
+      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
+      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
+      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
     </div>
   </div>
 
