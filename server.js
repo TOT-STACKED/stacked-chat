@@ -2542,8 +2542,9 @@ tbody tr:hover td{background:var(--surface2)}
           </select>
         </div>
         <div>
-          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Logo URL</label>
-          <input id="bLogoUrl" type="url" placeholder="https://yoursite.com/logo.png" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Logo URL <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3);font-size:11px">— must be a direct image link (.png, .svg, .jpg)</span></label>
+          <input id="bLogoUrl" type="url" placeholder="https://logo.clearbit.com/yourdomain.com" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+          <div id="bLogoUrlError" style="display:none;margin-top:6px;padding:8px 10px;border-radius:6px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:12px;line-height:1.4"></div>
           <div style="font-size:11px;color:var(--text3);margin-top:4px">Link to a PNG or SVG — ideally on a transparent background</div>
         </div>
         <div>
@@ -3221,6 +3222,16 @@ document.addEventListener('DOMContentLoaded', function() {
   ['bLogoUrl','bBotName','bWelcomeMsg'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.oninput = updatePreview;
   });
+  var logoInput = document.getElementById('bLogoUrl');
+  if (logoInput) {
+    logoInput.addEventListener('blur', async function() {
+      var url = this.value.trim();
+      if (!url) { showLogoUrlError(null); return; }
+      var result = await validateLogoUrl(url);
+      showLogoUrlError(result.ok ? null : result.msg);
+    });
+    logoInput.addEventListener('input', function() { showLogoUrlError(null); });
+  }
 });
 function updatePreview() {
   var logo = document.getElementById('bLogoUrl').value.trim();
@@ -3235,9 +3246,50 @@ function updatePreview() {
   document.getElementById('bPreviewSwatch').style.background = color;
   document.getElementById('bPreviewUrl').textContent = slug ? 'stackedchat.io/chat/' + slug : '';
 }
+
+// Validate logo URL: check extension + attempt to load as image
+function validateLogoUrl(url) {
+  return new Promise(function(resolve) {
+    if (!url) { resolve({ ok: true }); return; }
+    // Clearbit logos and data URIs are OK without extension check
+    var isClearbit = /logo\\.clearbit\\.com/i.test(url);
+    var isDataUri = /^data:image\\//i.test(url);
+    var hasImageExt = /\\.(png|jpg|jpeg|svg|webp|gif)(\\?|$|#)/i.test(url);
+    if (!isClearbit && !isDataUri && !hasImageExt) {
+      resolve({ ok: false, msg: 'URL doesn\\'t look like an image. Use a direct link ending in .png, .svg, .jpg, or a Clearbit URL like logo.clearbit.com/domain.com' });
+      return;
+    }
+    // Try to load the image
+    var img = new Image();
+    var done = false;
+    var timer = setTimeout(function() { if (!done) { done = true; resolve({ ok: false, msg: 'Image took too long to load. Check the URL is correct and publicly accessible.' }); } }, 6000);
+    img.onload = function() { if (!done) { done = true; clearTimeout(timer); resolve({ ok: true }); } };
+    img.onerror = function() { if (!done) { done = true; clearTimeout(timer); resolve({ ok: false, msg: 'Image failed to load. Make sure the URL points to an actual image file, not a webpage.' }); } };
+    img.src = url;
+  });
+}
+
+function showLogoUrlError(msg) {
+  var el = document.getElementById('bLogoUrlError');
+  var input = document.getElementById('bLogoUrl');
+  if (msg) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    if (input) input.style.borderColor = '#dc2626';
+  } else {
+    el.style.display = 'none';
+    el.textContent = '';
+    if (input) input.style.borderColor = '';
+  }
+}
 async function saveBranding() {
   var venueId = document.getElementById('bVenueSelect').value;
   if (!venueId) { notify('Select a venue first', 'red'); return; }
+  var logoUrl = document.getElementById('bLogoUrl').value.trim();
+  if (logoUrl) {
+    var logoCheck = await validateLogoUrl(logoUrl);
+    if (!logoCheck.ok) { showLogoUrlError(logoCheck.msg); notify('Fix the logo URL before saving', 'red'); return; }
+  }
   var btn = document.getElementById('bSaveBtn'); btn.disabled = true; btn.textContent = 'Saving...';
   var payload = {
     logo_url: document.getElementById('bLogoUrl').value.trim() || null,
