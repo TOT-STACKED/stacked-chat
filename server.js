@@ -610,6 +610,32 @@ async function sendSlackAlert({ venue, userName, email, issue, turns }) {
   });
 }
 
+async function sendSlackTicketAlert(ticket) {
+  if (!SLACK_WEBHOOK_URL) return;
+  const https = require('https');
+  const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const issue = (ticket.issue || '').substring(0, 300);
+  const convoLen = Array.isArray(ticket.conversation) ? ticket.conversation.length : 0;
+  const text = [
+    '🎫 *New Support Ticket — Stacked Chat*',
+    `*Venue:* ${ticket.venue || 'Unknown'}`,
+    `*User:* ${ticket.name || 'Unknown'} (${ticket.email || 'no email'})`,
+    `*Issue:* ${issue}`,
+    `*Conversation length:* ${convoLen} message${convoLen !== 1 ? 's' : ''}`,
+    `*Time:* ${now}`,
+  ].join('\n');
+  const body = JSON.stringify({ text });
+  const url = new URL(SLACK_WEBHOOK_URL);
+  return new Promise((res) => {
+    const req = https.request({
+      hostname: url.hostname, path: url.pathname + url.search,
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, (r) => { r.resume(); r.on('end', res); });
+    req.on('error', () => {});
+    req.write(body); req.end();
+  });
+}
+
 // ─── SUPABASE HELPERS ──────────────────────────────────────────────────────
 async function sbFetch(path, opts = {}) {
   const https = require('https');
@@ -3516,6 +3542,8 @@ const server = http.createServer(async (req, res) => {
       try {
         const payload = JSON.parse(body);
         await sbFetch('/rest/v1/tickets', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: payload });
+        // Slack notification for user-raised tickets
+        sendSlackTicketAlert(payload).catch(e => console.error('Slack ticket alert error:', e));
         res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true}));
       } catch(e) {
         res.writeHead(500); res.end(JSON.stringify({error:e.message}));
