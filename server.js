@@ -5,10 +5,11 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yuzlfocqovwhqdpitvxj.s
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
 // Approved-reporting portal (stackcollect) — NPS from every touchpoint is
 // mirrored here so it lands in the central dashboard at approvedreporting.netlify.app.
-// If either env var is unset, the portal sync is silently skipped and local
-// NPS persistence still works. Set both on Railway to enable the mirror.
-const STACKCOLLECT_SUPABASE_URL = process.env.STACKCOLLECT_SUPABASE_URL || '';
-const STACKCOLLECT_SUPABASE_KEY = process.env.STACKCOLLECT_SUPABASE_KEY || '';
+// Anon key is public-facing, rate-limited, and restricted by RLS to INSERT only
+// on nps_scores — same security model as the bot's own SUPABASE_KEY above.
+// If either is unset, the portal mirror silently no-ops.
+const STACKCOLLECT_SUPABASE_URL = process.env.STACKCOLLECT_SUPABASE_URL || 'https://gfbswivkhfsegpvfocox.supabase.co';
+const STACKCOLLECT_SUPABASE_KEY = process.env.STACKCOLLECT_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmYnN3aXZraGZzZWdwdmZvY294Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzc4ODQsImV4cCI6MjA3NDgxMzg4NH0.YBuuMRXtMu2sUXBG7nJ6ue5LFgkHD8Dj1OP5Zu_J9_U';
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 const CRON_SECRET = process.env.CRON_SECRET || 'stacked-cron-secret';
 
