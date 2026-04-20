@@ -3,6 +3,12 @@ const http = require('http');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yuzlfocqovwhqdpitvxj.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
+// Approved-reporting portal (stackcollect) — NPS from every touchpoint is
+// mirrored here so it lands in the central dashboard at approvedreporting.netlify.app.
+// If either env var is unset, the portal sync is silently skipped and local
+// NPS persistence still works. Set both on Railway to enable the mirror.
+const STACKCOLLECT_SUPABASE_URL = process.env.STACKCOLLECT_SUPABASE_URL || '';
+const STACKCOLLECT_SUPABASE_KEY = process.env.STACKCOLLECT_SUPABASE_KEY || '';
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 const CRON_SECRET = process.env.CRON_SECRET || 'stacked-cron-secret';
 
@@ -637,6 +643,48 @@ async function sendSlackTicketAlert(ticket) {
 }
 
 // ─── SUPABASE HELPERS ──────────────────────────────────────────────────────
+// Mirror a /save-nps payload into the approved-reporting portal's unified
+// nps_scores table. Silent no-op if STACKCOLLECT env vars aren't set.
+// Payload shape (from npsSubmit in the client): { vendor, score, comment,
+// venue_id, venue, respondent }.
+async function mirrorNpsToPortal(payload) {
+  if (!STACKCOLLECT_SUPABASE_URL || !STACKCOLLECT_SUPABASE_KEY) return;
+  if (!payload || typeof payload.score !== 'number') return;
+  const https = require('https');
+  const url = new URL(`${STACKCOLLECT_SUPABASE_URL}/rest/v1/nps_scores`);
+  const body = JSON.stringify({
+    source:           'toast-support-bot',
+    touchpoint:       'vendor-chat',
+    score:            payload.score,
+    comment:          payload.comment || null,
+    vendor:           payload.vendor || null,
+    respondent_name:  payload.respondent || null,
+    company:          payload.venue || null,
+    venue_id:         payload.venue_id || null,
+  });
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: url.hostname, path: url.pathname + url.search, method: 'POST',
+      headers: {
+        apikey: STACKCOLLECT_SUPABASE_KEY,
+        Authorization: `Bearer ${STACKCOLLECT_SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+    }, (r) => {
+      let d = '';
+      r.on('data', c => d += c);
+      r.on('end', () => {
+        if (r.statusCode >= 400) console.error('[portal] nps_scores insert failed', r.statusCode, d);
+        resolve();
+      });
+    });
+    req.on('error', (e) => { console.error('[portal] nps_scores request error', e.message); resolve(); });
+    req.write(body);
+    req.end();
+  });
+}
+
 async function sbFetch(path, opts = {}) {
   const https = require('https');
   const url = new URL(`${SUPABASE_URL}${path}`);
@@ -3559,6 +3607,9 @@ const server = http.createServer(async (req, res) => {
       try {
         const payload = JSON.parse(body);
         await sbFetch('/rest/v1/nps_scores', { method: 'POST', body: payload });
+        // Fan-out to the approved-reporting portal. Best-effort, non-blocking —
+        // a portal outage must not break the bot's own NPS capture.
+        mirrorNpsToPortal(payload).catch(e => console.error('[portal] nps mirror threw', e));
         res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true}));
       } catch(e) {
         res.writeHead(500); res.end(JSON.stringify({error:e.message}));
