@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Stacked Chat · App</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ink-900: #0A0A0A;
+    --ink-800: #131313;
+    --ink-700: #1D1D1D;
+    --fg: #F4EFE6;
+    --fg-muted: #928A7C;
+    --fg-dim: #555048;
+    --border: #262421;
+
+    --stacked-orange-500: #E87830;
+    --stacked-orange-700: #A34F15;
+    --stacked-green-500: #3BD36F;
+    --stacked-green-700: #1E8A44;
+    --stacked-amber-500: #F5A524;
+    --stacked-red-500: #E5484D;
+    --stacked-purple-500: #C7B3F2;
+    --stacked-purple-700: #1D1340;
+
+    --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Fraunces', 'Fraunces Placeholder', ui-serif, Georgia, serif;
+    --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body, #root { height: 100%; margin: 0; }
+  body { background: var(--ink-900); color: var(--fg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  button { font-family: inherit; }
+  @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--ink-900); }
+  ::-webkit-scrollbar-thumb { background: var(--ink-700); border-radius: 5px; }
+
+  /* Tweaks panel */
+  #tweaks { position: fixed; right: 18px; bottom: 18px; width: 280px; background: var(--ink-800); border: 1px solid var(--border); border-radius: 14px; padding: 16px; z-index: 50; display: none; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+  #tweaks.on { display: block; }
+  #tweaks h3 { margin: 0 0 10px; font-family: var(--font-display); font-size: 16px; letter-spacing: -0.01em; }
+  #tweaks label { display: block; font-size: 11px; color: var(--fg-muted); letter-spacing: 0.14px; text-transform: uppercase; font-weight: 800; margin: 12px 0 6px; }
+  #tweaks .row { display: flex; gap: 6px; }
+  #tweaks button.swatch { flex: 1; border: 1px solid var(--border); background: var(--ink-900); color: var(--fg); padding: 8px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+  #tweaks button.swatch.on { outline: 2px solid var(--stacked-orange-500); outline-offset: 1px; }
+  #tweaks .dot { display: inline-block; width: 10px; height: 10px; border-radius: 999px; margin-right: 6px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<div id="tweaks">
+  <h3>Tweaks</h3>
+  <label>Accent</label>
+  <div class="row">
+    <button class="swatch" data-accent="orange"><span class="dot" style="background:#E87830"></span>Orange</button>
+    <button class="swatch" data-accent="green"><span class="dot" style="background:#3BD36F"></span>Green</button>
+    <button class="swatch" data-accent="purple"><span class="dot" style="background:#C7B3F2"></span>Lilac</button>
+  </div>
+  <label>Density</label>
+  <div class="row">
+    <button class="swatch" data-density="comfy">Comfy</button>
+    <button class="swatch" data-density="compact">Compact</button>
+  </div>
+  <label>Greeting tone</label>
+  <div class="row">
+    <button class="swatch" data-tone="warm">Warm</button>
+    <button class="swatch" data-tone="dry">Dry</button>
+  </div>
+</div>
+
+<script>
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "accent": "green",
+    "density": "compact",
+    "tone": "warm"
+  }/*EDITMODE-END*/;
+  const state = { ...TWEAK_DEFAULTS, ...(JSON.parse(localStorage.getItem('sc:tweaks') || '{}')) };
+
+  function applyTweaks() {
+    const accents = { orange: ['#E87830','#A34F15'], green: ['#3BD36F','#1E8A44'], purple: ['#C7B3F2','#1D1340'] };
+    const [a, b] = accents[state.accent] || accents.orange;
+    document.documentElement.style.setProperty('--stacked-orange-500', a);
+    document.documentElement.style.setProperty('--stacked-orange-700', b);
+    document.body.dataset.density = state.density;
+    document.body.dataset.tone = state.tone;
+    document.querySelectorAll('#tweaks .swatch').forEach(b => {
+      const k = b.dataset.accent ? 'accent' : b.dataset.density ? 'density' : 'tone';
+      const v = b.dataset[k];
+      b.classList.toggle('on', state[k] === v);
+    });
+  }
+  document.querySelectorAll('#tweaks .swatch').forEach(b => b.addEventListener('click', () => {
+    const k = b.dataset.accent ? 'accent' : b.dataset.density ? 'density' : 'tone';
+    state[k] = b.dataset[k];
+    localStorage.setItem('sc:tweaks', JSON.stringify(state));
+    applyTweaks();
+    try { window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [k]: state[k] } }, '*'); } catch(e){}
+  }));
+  applyTweaks();
+
+  // Edit-mode protocol
+  window.addEventListener('message', (e) => {
+    if (!e.data) return;
+    if (e.data.type === '__activate_edit_mode') document.getElementById('tweaks').classList.add('on');
+    if (e.data.type === '__deactivate_edit_mode') document.getElementById('tweaks').classList.remove('on');
+  });
+  try { window.parent.postMessage({ type: '__edit_mode_available' }, '*'); } catch(e){}
+</script>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="app/shell.jsx"></script>
+<script type="text/babel" src="app/triage.jsx"></script>
+<script type="text/babel" src="app/issue.jsx"></script>
+<script type="text/babel" src="app/handoff.jsx"></script>
+<script type="text/babel" src="app/health.jsx"></script>
+<script type="text/babel" src="app/extras.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+  function App() {
+    const [route, setRoute] = useRoute();
+
+    const go = (r) => setRoute(r);
+    // "virtual" sub-routes stored in same var, e.g. 'issue' / 'handoff'
+    let screen = null;
+    if (route === 'triage')   screen = <TriageScreen goToIssue={() => go('issue')} />;
+    else if (route === 'issue')    screen = <IssueScreen goToHandoff={() => go('handoff')} goBack={() => go('triage')} />;
+    else if (route === 'handoff')  screen = <HandoffScreen goBack={() => go('issue')} />;
+    else if (route === 'issues')   screen = <IssueScreen goToHandoff={() => go('handoff')} goBack={() => go('triage')} />;
+    else if (route === 'health')   screen = <HealthScreen />;
+    else if (route === 'runbooks') screen = <RunbooksScreen />;
+    else if (route === 'sites')    screen = <SitesScreen />;
+    else if (route === 'widget')   screen = <WidgetScreen />;
+    else screen = <TriageScreen goToIssue={() => go('issue')} />;
+
+    // For nav, collapse inner routes back to a top-level id
+    const navRoute = ['issue','handoff','issues'].includes(route) ? 'issues' : route;
+    const setNav = (id) => setRoute(id);
+
+    return <AppShell route={navRoute} setRoute={setNav}>{screen}</AppShell>;
+  }
+
+  const root = ReactDOM.createRoot(document.getElementById('root'));
+  root.render(<App />);
+</script>
+</body>
+</html>
