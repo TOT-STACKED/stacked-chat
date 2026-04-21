@@ -861,10 +861,11 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <title>{{BOT_NAME}}</title>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Righteous&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Righteous&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
+    /* Legacy chat-widget tokens (light theme) */
     --cream: #EDEBE5; --cream-dark: #D6D2C8;
     --orange: {{PRIMARY_COLOR}}; --orange-light: {{PRIMARY_COLOR}}cc;
     --brown: #1A1A1A; --brown-mid: #6B6867;
@@ -874,6 +875,19 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     --shadow: 0 2px 16px rgba(0,0,0,0.08);
     --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    /* ─── Stacked design-system tokens (see colors_and_type.css) ─── */
+    --ink-900: #0A0A0A; --ink-800: #131313; --ink-700: #1D1D1D;
+    --fg: #F4EFE6; --fg-muted: #928A7C; --fg-dim: #555048;
+    --border: #262421;
+    --stacked-orange-500: #E87830; --stacked-orange-700: #A34F15;
+    --stacked-green-500:  #3BD36F; --stacked-green-700:  #1E8A44;
+    --stacked-amber-500:  #F5A524;
+    --stacked-red-500:    #E5484D;
+    --stacked-purple-500: #C7B3F2; --stacked-purple-700: #1D1340;
+    --font-sans:    'Geist', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Fraunces', 'Fraunces Placeholder', ui-serif, Georgia, serif;
+    --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', monospace;
   }
   ::selection { background: var(--orange); color: #fff; }
   html { height: 100%; height: 100dvh; overflow-x: hidden; overflow-y: hidden; }
@@ -2393,10 +2407,24 @@ const ADMIN_PAGE = `<!DOCTYPE html>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iODgiIHZpZXdCb3g9IjAgMCA1NiA4OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNTUuNDE1MiA2Mi45OTM1QzU1LjQzMzQgNjYuNzMxNyA1NC45MDYxIDcwLjA4MDkgNTMuODQwNyA3My4wMzM2QzUyLjc3MTYgNzUuOTkgNTEuMTA5NyA3OC41MjQ2IDQ4Ljg1NTIgODAuNjQxQzQ2LjU5NyA4Mi43NTc0IDQzLjczNTEgODQuMzc5MiA0MC4yNjIzIDg1LjQ5OTJDMzYuNzg5NiA4Ni42MTkyIDMyLjY1NSA4Ny4xOTAyIDI3Ljg2MjIgODcuMjEyQzIzLjA2OTQgODcuMjMwMiAxOC45MTY2IDg2LjY5NTYgMTUuNDExMSA4NS42MDQ3QzExLjkwMiA4NC41MTM4IDkuMDI1NjEgODIuOTE3NCA2Ljc3ODMxIDgwLjgxOTJDNC41MzEwMSA3OC43MjQ2IDIuODU4MjYgNzYuMjAwOSAxLjc2NzM0IDczLjI1NTRDMC42NzY0MjEgNzAuMzEgMC4xMjAwNTEgNjYuOTY4MSAwLjEwNTUwNiA2My4yMjk5TDQuOTgxNDVlLTA1IDQ5Ljk4NjFDLTAuMDA3MjIzIDQ4LjQwNDMgMC43ODE4NzcgNDcuNjExNSAyLjM2MDA4IDQ3LjYwNDJMMTEuOTA1NiA0Ny41NjQyQzEyLjUwOTMgNDguMTYwNiAxMy4xNzExIDQ4LjcwNjEgMTMuODgwMiA0OS4yMDQzQzE1Ljg2OTMgNTAuNTk3IDE4LjI5ODQgNTEuNTI3OSAyMS4xNjc2IDUxLjk5N0MyNC4wMzMxIDUyLjQ2MjUgMjcuMzQyMiA1Mi40MjYxIDMxLjA5MTMgNTEuODgwN0MzNC44NDQxIDUxLjMzNTIgMzguMDE1IDUwLjQzMzQgNDAuNjExNCA0OS4xNzE1QzQxLjY4NzggNDguNjQ3OSA0Mi42NzMzIDQ4LjA2NjEgNDMuNTY3OCA0Ny40Mjk3TDUyLjkzMTYgNDcuMzg5N0M1NC41MTM0IDQ3LjM4MjQgNTUuMzA2MSA0OC4xNjc5IDU1LjMxMzQgNDkuNzQ5N0w1NS40MTUyIDYyLjk5MzVaIiBmaWxsPSIjRTY1NDNBIi8+PHBhdGggZD0iTTQzLjU2OTQgNDcuNDMwN0M0Mi42NzQ4IDQ4LjA2NyA0MS42ODk0IDQ4LjY0ODkgNDAuNjEzIDQ5LjE3MjVDMzguMDE2NiA1MC40MzQzIDM0Ljg0NTcgNTEuMzM2MiAzMS4wOTI5IDUxLjg4MTZDMjcuMzQzOCA1Mi40MjcxIDI0LjAzNDYgNTIuNDYzNCAyMS4xNjkyIDUxLjk5OEMxOC4zIDUxLjUyODkgMTUuODcwOSA1MC41OTggMTMuODgxOCA0OS4yMDUyQzEzLjE3MjcgNDguNzA3IDEyLjUxMDkgNDguMTYxNiAxMS45MDcyIDQ3LjU2NTJMNDMuNTY5NCA0Ny40MzA3WiIgZmlsbD0iI0I3MzUxRiIvPjxwYXRoIGQ9Ik00OS44NjA5IDM3LjkxNjVDNDkuMzUxOCA0MC4zNDU3IDQ4LjMzIDQyLjUxMyA0Ni43OTkxIDQ0LjQyMjFDNDUuOTAwOSA0NS41MzQ4IDQ0LjgyNDUgNDYuNTM4NSA0My41NjYzIDQ3LjQyOTRMMTEuOTA0MSA0Ny41NjM5QzEwLjgwNTkgNDYuNDgzOSA5Ljg3ODYzIDQ1LjI0MDMgOS4xMjIyNiA0My44MzY2QzcuOTQwNDMgNDEuNjQ3NSA3LjEzNjc4IDM5LjA5NDcgNi43MTQ5NiAzNi4xNjc0TDUuMTY5NDkgMjUuODEwOUM0Ljk5MTMgMjQuNTc0NiA1LjUxODU4IDIzLjg2NTUgNi43NTQ5NiAyMy42ODczTDEyLjI2NDEgMjIuODg3M0MxMy4xMjIzIDIzLjUyMzYgMTQuMTAwNSAyNC4wODczIDE1LjE5MTQgMjQuNTc4MkMxNy4yODYgMjUuNTIgMTkuODIwNiAyNi4xNjM3IDIyLjc5ODggMjYuNTEyOEMyNS43NzM0IDI2Ljg1ODIgMjguMzgwNyAyNi44MTQ2IDMwLjYyMDcgMjYuMzgxOUMzMi44NjA3IDI1Ljk0NTUgMzQuNzU4OSAyNS4xNTY0IDM2LjMxODkgMjQuMDE0NkMzNy44NzUzIDIyLjg2OTEgMzkuMDk3MiAyMS40MjE4IDM5Ljk4NDQgMTkuNjY5MUM0MC4xMjYzIDE5LjM4NTQgNDAuMjYwOCAxOS4wOTgxIDQwLjM4MDggMTguOEw0Ni4zMjI3IDE3LjkzODFDNDcuNTU5MSAxNy43NTYzIDQ4LjI2NDUgMTguMjg3MiA0OC40NDY0IDE5LjUyMzZMNDkuOTg4MiAyOS44ODAxQzUwLjQxMzYgMzIuODAzNyA1MC4zNyAzNS40ODM4IDQ5Ljg2MDkgMzcuOTE2NVoiIGZpbGw9IiNFNjU0M0EiLz48cGF0aCBkPSJNNDAuMzgxMyAxOC44MDA4QzQwLjI2MTMgMTkuMDk5IDQwLjEyNjggMTkuMzg2MiAzOS45ODUgMTkuNjY5OUMzOS4wOTc3IDIxLjQyMjYgMzcuODc1OSAyMi44Njk5IDM2LjMxOTUgMjQuMDE1NEMzNC43NTk1IDI1LjE1NzIgMzIuODYxMyAyNS45NDYzIDMwLjYyMTIgMjYuMzgyN0MyOC4zODEyIDI2LjgxNTQgMjUuNzczOSAyNi44NTkxIDIyLjc5OTMgMjYuNTEzNkMxOS44MjExIDI2LjE2NDUgMTcuMjg2NSAyNS41MjA5IDE1LjE5MiAyNC41NzlDMTQuMTAxIDI0LjA4ODEgMTMuMTIyOCAyMy41MjQ1IDEyLjI2NDYgMjIuODg4MUw0MC4zODEzIDE4LjgwMDhaIiBmaWxsPSIjQjczNTFGIi8+PHBhdGggZD0iTTQyLjY1MDQgNS4zMzEyOEw0MS43MTk0IDEzLjU1NjhDNDEuNDkwNCAxNS41MDU5IDQxLjA0NjcgMTcuMjU1MSA0MC4zODEyIDE4LjgwMDVMMTIuMjY0NiAyMi44ODc5QzExLjQ3OTEgMjIuMzA2IDEwLjc4ODIgMjEuNjYyNCAxMC4xOTU0IDIwLjk2MDZDOC45NTkwNyAxOS40OTE0IDguMTExNzggMTcuODAwNSA3LjY1MzYgMTUuODkxNEM3LjE5OTA1IDEzLjk3ODcgNy4xMDgxMyAxMS44NjU5IDcuMzc3MjMgOS41NDIyNEw4LjMwODE1IDEuMzE2NjlDOC40MjQ1MSAwLjMzNDg2MiA4Ljk3MzYxIC0wLjA5Nzg2OTkgOS45NTE4IDAuMDE4NDk1MUw0MS4zNDg1IDMuNjg3NjNDNDIuMzMwNCAzLjgwMDM2IDQyLjc2MzEgNC4zNDk0NSA0Mi42NTA0IDUuMzMxMjhaIiBmaWxsPSIjRTY1NDNBIi8+PC9zdmc+Cg==">
 <title>Stacked Chat &mdash; Admin</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--blue:#E8573C;--bg:#EDEBE5;--surface:#ffffff;--surface2:#F5F3EF;--border:#D6D2C8;--border2:#C8C4BA;--text:#1A1A1A;--text2:#6B6867;--text3:#A8A49C;--green:#16a34a;--red:#dc2626;}
+:root{
+  /* Legacy admin tokens (light theme) */
+  --blue:#E8573C;--bg:#EDEBE5;--surface:#ffffff;--surface2:#F5F3EF;--border:#D6D2C8;--border2:#C8C4BA;--text:#1A1A1A;--text2:#6B6867;--text3:#A8A49C;--green:#16a34a;--red:#dc2626;
+  /* Stacked design-system tokens — see colors_and_type.css */
+  --ink-900:#0A0A0A;--ink-800:#131313;--ink-700:#1D1D1D;
+  --fg:#F4EFE6;--fg-muted:#928A7C;--fg-dim:#555048;
+  --stacked-orange-500:#E87830;--stacked-orange-700:#A34F15;
+  --stacked-green-500:#3BD36F;--stacked-green-700:#1E8A44;
+  --stacked-amber-500:#F5A524;--stacked-red-500:#E5484D;
+  --stacked-purple-500:#C7B3F2;--stacked-purple-700:#1D1340;
+  --font-sans:'Geist',ui-sans-serif,system-ui,sans-serif;
+  --font-display:'Fraunces','Fraunces Placeholder',ui-serif,Georgia,serif;
+  --font-mono:'Geist Mono',ui-monospace,'SF Mono',monospace;
+  --ease:cubic-bezier(0.2,0.8,0.2,1);
+}
 body{background:var(--bg);font-family:'Inter',system-ui,sans-serif;color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
 header{background:var(--surface);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
 .header-left{display:flex;align-items:center;gap:16px}

@@ -1,0 +1,56 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Stacked Chat · Design Tokens
+   Single source of truth for colors, typography, and motion used by the
+   operator-facing redesign. Ported from the hi-fi prototype in
+   `Stacked Chat.html`. Downstream surfaces (chat widget in
+   `server.js::STACKED_CHAT_TEMPLATE`, admin in `server.js::ADMIN_PAGE`,
+   and the React screens under `app/*.jsx`) read from these variables.
+
+   Notes
+   - Brand colors are namespaced `--stacked-*` so they won't collide with
+     legacy chat-widget tokens (`--orange`, `--cream`, etc).
+   - Dark surface scale (`--ink-*`) + foreground scale (`--fg`, `--fg-muted`,
+     `--fg-dim`) are the default for the redesign — the existing chat
+     remains light and continues to use its own scale.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ─── Surface / Ink (dark-first) ──────────────────────────────────── */
+  --ink-900: #0A0A0A;
+  --ink-800: #131313;
+  --ink-700: #1D1D1D;
+
+  /* ─── Foreground (on ink) ─────────────────────────────────────────── */
+  --fg:        #F4EFE6;
+  --fg-muted:  #928A7C;
+  --fg-dim:    #555048;
+  --border:    #262421;
+
+  /* ─── Brand palette ───────────────────────────────────────────────── */
+  --stacked-orange-500: #E87830;
+  --stacked-orange-700: #A34F15;
+  --stacked-green-500:  #3BD36F;
+  --stacked-green-700:  #1E8A44;
+  --stacked-amber-500:  #F5A524;
+  --stacked-red-500:    #E5484D;
+  --stacked-purple-500: #C7B3F2;
+  --stacked-purple-700: #1D1340;
+
+  /* ─── Typography ──────────────────────────────────────────────────── */
+  --font-sans:    'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', 'Fraunces Placeholder', ui-serif, Georgia, serif;
+  --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* ─── Motion ──────────────────────────────────────────────────────── */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  color-scheme: dark;
+}
+
+/* Reusable keyframe used by the constellation pulse (critical + watch) */
+@keyframes flash {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
