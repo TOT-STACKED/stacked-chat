@@ -2496,6 +2496,90 @@ button { font-family: inherit; cursor: pointer; }
 .content { flex: 1; overflow: auto; min-height: 0; padding: 28px 32px 48px; }
 .content-placeholder { display: grid; place-items: center; height: 100%; color: var(--fg-dim); font-family: var(--font-display); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
 .content-placeholder span { color: var(--fg-muted); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14px; text-transform: uppercase; font-weight: 800; display: block; margin-top: 6px; text-align: center; }
+
+/* ─── SHARED PRIMITIVES ──────────────────────────────────────────────── */
+@keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ─── TRIAGE SCREEN ──────────────────────────────────────────────────── */
+.triage { display: grid; gap: 28px; }
+.triage-top { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: start; }
+.eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.18px; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 8px; }
+.triage-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; line-height: 1; margin: 0; font-weight: 600; }
+.triage-h1 .accent { color: var(--stacked-orange-500); }
+.triage-subhead { font-size: 15px; color: var(--fg-muted); margin-top: 12px; max-width: 640px; }
+.kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.kpi { background: var(--ink-800); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 140px; }
+.kpi-label { font-size: 10px; color: var(--fg-muted); font-weight: 800; letter-spacing: 0.14px; text-transform: uppercase; }
+.kpi-big { font-family: var(--font-display); font-size: 38px; line-height: 1; margin-top: 6px; color: var(--fg); font-weight: 600; }
+.kpi-big.green { color: var(--stacked-green-500); }
+.kpi-big.orange { color: var(--stacked-orange-500); }
+.kpi-sub { font-size: 11px; color: var(--fg-muted); margin-top: 4px; }
+
+.active-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.active-card { background: var(--ink-800); border: 1.5px solid var(--stacked-red-500); border-radius: 14px; padding: 16px 18px; text-align: left; color: inherit; font-family: inherit; display: block; transition: transform 120ms var(--ease), border-color 120ms var(--ease); }
+.active-card.watch { border-color: var(--stacked-amber-500); }
+.active-card:hover { transform: translateY(-1px); }
+.active-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.crit-badge { font-size: 10px; font-weight: 900; font-family: var(--font-mono); letter-spacing: 0.14px; background: var(--stacked-red-500); color: #fff; padding: 3px 7px; border-radius: 3px; }
+.crit-badge.watch { background: var(--stacked-amber-500); color: #0F0F0F; }
+.active-site { font-size: 11px; color: var(--fg-muted); font-family: var(--font-mono); }
+.active-brand { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; margin-bottom: 4px; font-weight: 600; }
+.active-inc { font-size: 13px; color: var(--stacked-red-500); font-weight: 700; }
+.active-inc.watch { color: var(--stacked-amber-500); }
+.mini-prog { height: 3px; background: var(--ink-900); border-radius: 2px; margin-top: 14px; margin-bottom: 6px; overflow: hidden; }
+.mini-prog-bar { height: 100%; background: var(--stacked-orange-500); width: 66%; transition: width 800ms var(--ease); }
+.active-foot { font-size: 11px; color: var(--fg-muted); display: flex; justify-content: space-between; }
+.active-monitor { font-size: 11px; color: var(--fg-muted); margin-top: 14px; }
+
+.const-wrap { background: var(--ink-800); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+.const-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; }
+.triage-h2 { font-family: var(--font-display); font-size: 28px; letter-spacing: -0.015em; margin: 0; font-weight: 600; }
+.legend { display: flex; gap: 18px; font-size: 11px; color: var(--fg-muted); align-items: center; }
+.legend-dot { width: 8px; height: 8px; border-radius: 999px; margin-right: 6px; margin-left: 10px; display: inline-block; }
+.const-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.cell { background: var(--ink-900); border: 1px solid; border-radius: 12px; padding: 14px; text-align: left; color: inherit; font-family: inherit; display: grid; gap: 8px; transition: transform 120ms var(--ease); }
+.cell:hover { transform: translateY(-1px); }
+.cell.red   { border-color: var(--stacked-red-500);   background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(229,72,77,0.08) 100%); }
+.cell.amber { border-color: var(--stacked-amber-500); background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(245,165,36,0.08) 100%); }
+.cell.green { border-color: var(--stacked-green-500); background: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(59,211,111,0.08) 100%); }
+.cell-top { display: flex; align-items: center; gap: 6px; }
+.cell-dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
+.cell-dot.pulsing { animation: flash 1200ms infinite; }
+.cell-dot.red   { background: var(--stacked-red-500); }
+.cell-dot.amber { background: var(--stacked-amber-500); }
+.cell-dot.green { background: var(--stacked-green-500); }
+.cell-brand { font-size: 10px; font-family: var(--font-mono); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cell-name { font-size: 13px; font-weight: 800; }
+.cell-bar { display: flex; gap: 3px; }
+.cell-pip { height: 6px; flex: 1; border-radius: 2px; }
+.cell-pip.red   { background: var(--stacked-red-500); }
+.cell-pip.amber { background: var(--stacked-amber-500); }
+.cell-pip.green { background: var(--stacked-green-500); }
+.cell-score { display: flex; justify-content: space-between; align-items: flex-end; }
+.cell-score-num { font-family: var(--font-display); font-size: 22px; line-height: 1; font-weight: 600; }
+.cell-score-num.red   { color: var(--stacked-red-500); }
+.cell-score-num.amber { color: var(--stacked-amber-500); }
+.cell-score-num.green { color: var(--stacked-green-500); }
+.cell-score-label { font-size: 9px; font-family: var(--font-mono); color: var(--fg-muted); letter-spacing: 0.12px; font-weight: 700; }
+
+.feed-wrap { display: block; }
+.feed-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; }
+.ghost-btn { background: transparent; border: 1px solid var(--border); color: var(--fg); padding: 8px 14px; border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 700; transition: border-color 120ms var(--ease); }
+.ghost-btn:hover { border-color: var(--fg-dim); }
+.feed { background: var(--ink-800); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.feed-row { display: grid; grid-template-columns: 10px 60px 1.4fr 1.6fr 1.4fr 110px; gap: 18px; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 13px; font-family: var(--font-mono); }
+.feed-row:last-child { border-bottom: 0; }
+.feed-pip { width: 8px; height: 8px; border-radius: 999px; }
+.feed-pip.ok    { background: var(--stacked-green-500); }
+.feed-pip.human { background: var(--stacked-amber-500); }
+.feed-time { color: var(--fg-muted); }
+.feed-site { font-family: var(--font-sans); font-weight: 700; }
+.feed-issue { color: var(--fg-muted); font-family: var(--font-sans); }
+.feed-fix { font-weight: 700; }
+.feed-fix.ok    { color: var(--stacked-green-500); }
+.feed-fix.human { color: var(--stacked-amber-500); }
+.feed-open { background: var(--ink-900); border: 1px solid var(--border); color: var(--fg); padding: 6px 10px; border-radius: 6px; font-size: 11px; font-family: inherit; font-weight: 700; }
+.feed-open:hover { border-color: var(--fg-dim); }
 </style>
 </head>
 <body>
@@ -2586,10 +2670,9 @@ button { font-family: inherit; cursor: pointer; }
     </header>
 
     <div class="content" id="content">
-      <div class="content-placeholder" id="placeholder">
+      <div class="content-placeholder" id="placeholder" style="display:none">
         <div>
-          Shell ready.
-          <span id="placeholderRoute">Route: triage</span>
+          <span id="placeholderRoute">Coming soon</span>
         </div>
       </div>
     </div>
@@ -2630,8 +2713,216 @@ button { font-family: inherit; cursor: pointer; }
     }
     // Breadcrumb label
     document.getElementById('crumbCur').textContent = ROUTES[r];
-    // Placeholder (screens land here in steps 3–6)
-    document.getElementById('placeholderRoute').textContent = 'Route: ' + r;
+
+    // Tear down previous screen state (intervals etc)
+    if (window._screenTeardown) { try { window._screenTeardown(); } catch(_){} window._screenTeardown = null; }
+
+    var content = document.getElementById('content');
+    if (r === 'triage') {
+      content.innerHTML = renderTriage();
+      wireTriage();
+    } else {
+      content.innerHTML =
+        '<div class="content-placeholder"><div>' +
+        ROUTES[r] + ' screen' +
+        '<span>Lands in a later step</span>' +
+        '</div></div>';
+    }
+  }
+
+  // ─── TRIAGE SCREEN ────────────────────────────────────────────────────
+  // Mock data mirrors triage.jsx exactly — swapped for real data in step 7.
+  var SITES = [
+    { id: 's1',  name: 'Soho, W1',          brand: 'The Pelican',    state: 'ok',       inc: null,                      score: 96 },
+    { id: 's2',  name: 'Bristol, BS1',      brand: 'Pieminister',    state: 'critical', inc: 'Kitchen printer offline', score: 68 },
+    { id: 's3',  name: 'Spitalfields, E1',  brand: 'Ottolenghi',     state: 'watch',    inc: 'Card retries elevated',   score: 82 },
+    { id: 's4',  name: 'Camden, NW1',       brand: 'Honest Burgers', state: 'ok',       inc: null,                      score: 94 },
+    { id: 's5',  name: 'Canary Wharf, E14', brand: "Carluccio's",    state: 'ok',       inc: null,                      score: 91 },
+    { id: 's6',  name: 'Shoreditch, EC2',   brand: 'The Pelican',    state: 'critical', inc: "Dojo T2 won't connect",   score: 62 },
+    { id: 's7',  name: 'Fitzrovia, W1T',    brand: 'Ottolenghi',     state: 'ok',       inc: null,                      score: 98 },
+    { id: 's8',  name: 'Kings Cross, N1',   brand: 'Pieminister',    state: 'ok',       inc: null,                      score: 93 },
+    { id: 's9',  name: 'Borough, SE1',      brand: 'The Pelican',    state: 'watch',    inc: 'WiFi latency > 120ms',    score: 79 },
+    { id: 's10', name: 'Peckham, SE15',     brand: 'Honest Burgers', state: 'ok',       inc: null,                      score: 95 },
+    { id: 's11', name: 'Clerkenwell, EC1',  brand: "Carluccio's",    state: 'ok',       inc: null,                      score: 89 },
+    { id: 's12', name: 'Mayfair, W1S',      brand: 'Ottolenghi',     state: 'ok',       inc: null,                      score: 97 }
+  ];
+
+  var FEED = [
+    ['17.58', 'Mayfair · Ottolenghi',        'Square till froze',         'Force-restart · 28s',         'ok'],
+    ['17.24', 'Kings Cross · Pieminister',   'Planday clock-in error',    'Token refresh · 18s',         'ok'],
+    ['16.02', 'Peckham · Honest Burgers',    'Deliveroo not pushing',     'Handed to Jo at Deliveroo',   'human'],
+    ['14.41', "Clerkenwell · Carluccio's",   'SumUp reader unresponsive', 'Reset handshake · 52s',       'ok'],
+    ['12.18', 'Fitzrovia · Ottolenghi',      'Printer paper path',        'Guided fix · 1m 12s',         'ok']
+  ];
+
+  var PIP_LABELS = ['EPOS','Pay','Net','Print','Rota','Del'];
+
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function stateColor(state){ return state === 'critical' ? 'red' : state === 'watch' ? 'amber' : 'green'; }
+
+  function pipColor(site, j){
+    // Matches triage.jsx: critical sites flag Pay (j=1) and Print (j=3); watch flags Net (j=2).
+    if (site.state === 'critical' && (j === 1 || j === 3)) return 'red';
+    if (site.state === 'watch'    && j === 2)              return 'amber';
+    return 'green';
+  }
+
+  function renderKpi(label, big, sub, tone){
+    return '<div class="kpi">' +
+      '<div class="kpi-label">' + esc(label) + '</div>' +
+      '<div class="kpi-big' + (tone ? ' ' + tone : '') + '">' + esc(big) + '</div>' +
+      '<div class="kpi-sub">' + esc(sub) + '</div>' +
+    '</div>';
+  }
+
+  function renderActiveCrit(s, minutes){
+    return '<button class="active-card" data-site="' + esc(s.id) + '" type="button">' +
+      '<div class="active-head">' +
+        '<span class="crit-badge" data-crit-timer>CRITICAL · ' + minutes + 'm</span>' +
+        '<span class="active-site">' + esc(s.name) + '</span>' +
+      '</div>' +
+      '<div class="active-brand">' + esc(s.brand) + '</div>' +
+      '<div class="active-inc">' + esc(s.inc) + '</div>' +
+      '<div class="mini-prog"><div class="mini-prog-bar"></div></div>' +
+      '<div class="active-foot"><span>Diagnosing&hellip;</span><span>Open chat →</span></div>' +
+    '</button>';
+  }
+
+  function renderActiveWatch(s){
+    return '<button class="active-card watch" data-site="' + esc(s.id) + '" type="button">' +
+      '<div class="active-head">' +
+        '<span class="crit-badge watch">WATCH</span>' +
+        '<span class="active-site">' + esc(s.name) + '</span>' +
+      '</div>' +
+      '<div class="active-brand">' + esc(s.brand) + '</div>' +
+      '<div class="active-inc watch">' + esc(s.inc) + '</div>' +
+      '<div class="active-monitor">Monitoring · no action needed yet</div>' +
+    '</button>';
+  }
+
+  function renderCell(s){
+    var c = stateColor(s.state);
+    var pulsing = s.state !== 'ok';
+    var pips = '';
+    for (var j = 0; j < PIP_LABELS.length; j++) {
+      pips += '<span class="cell-pip ' + pipColor(s, j) + '" title="' + PIP_LABELS[j] + '"></span>';
+    }
+    return '<button class="cell ' + c + '" data-site="' + esc(s.id) + '" type="button">' +
+      '<div class="cell-top">' +
+        '<span class="cell-dot ' + c + (pulsing ? ' pulsing' : '') + '"></span>' +
+        '<span class="cell-brand">' + esc(s.brand) + '</span>' +
+      '</div>' +
+      '<div class="cell-name">' + esc(s.name) + '</div>' +
+      '<div class="cell-bar">' + pips + '</div>' +
+      '<div class="cell-score">' +
+        '<div class="cell-score-num ' + c + '">' + s.score + '</div>' +
+        '<div class="cell-score-label">SCORE</div>' +
+      '</div>' +
+    '</button>';
+  }
+
+  function renderFeedRow(r){
+    var tone = r[4]; // 'ok' | 'human'
+    return '<div class="feed-row">' +
+      '<span class="feed-pip ' + tone + '"></span>' +
+      '<span class="feed-time">' + esc(r[0]) + '</span>' +
+      '<span class="feed-site">' + esc(r[1]) + '</span>' +
+      '<span class="feed-issue">' + esc(r[2]) + '</span>' +
+      '<span class="feed-fix ' + tone + '">' + esc(r[3]) + '</span>' +
+      '<button class="feed-open" type="button">View chart</button>' +
+    '</div>';
+  }
+
+  function renderTriage(){
+    var crit = SITES.filter(function(s){ return s.state === 'critical'; });
+    var watch = SITES.filter(function(s){ return s.state === 'watch'; });
+    var openCount = crit.length + watch.length;
+
+    var activeHtml = '';
+    if (openCount > 0) {
+      var parts = [];
+      for (var i = 0; i < crit.length; i++) parts.push(renderActiveCrit(crit[i], 2));
+      for (var k = 0; k < watch.length; k++) parts.push(renderActiveWatch(watch[k]));
+      activeHtml = '<div class="active-row">' + parts.join('') + '</div>';
+    }
+
+    var cellsHtml = '';
+    for (var m = 0; m < SITES.length; m++) cellsHtml += renderCell(SITES[m]);
+
+    var feedHtml = '';
+    for (var n = 0; n < FEED.length; n++) feedHtml += renderFeedRow(FEED[n]);
+
+    return '<div class="triage">' +
+      // Header + KPI strip
+      '<section class="triage-top">' +
+        '<div>' +
+          '<div class="eyebrow">Thursday · 21 April · 18.42 BST</div>' +
+          '<h1 class="triage-h1">Evening Sam. <span class="accent">2 sites need a look.</span></h1>' +
+          '<div class="triage-subhead">Rest of your estate is trading normally. Here\\'s what we\\'ve sorted and what\\'s still open.</div>' +
+        '</div>' +
+        '<div class="kpi-strip">' +
+          renderKpi('Open', String(openCount), 'down 2 since 18.00') +
+          renderKpi('AI-resolved today', '27', '96% first-pass', 'green') +
+          renderKpi('Avg TTR', '41s', 'vs. 4m industry') +
+          renderKpi('Saved to human', '£840', 'est. this week', 'orange') +
+        '</div>' +
+      '</section>' +
+
+      // Active incidents row
+      activeHtml +
+
+      // Constellation grid (novel moment)
+      '<section class="const-wrap">' +
+        '<div class="const-head">' +
+          '<div>' +
+            '<div class="eyebrow">Your estate</div>' +
+            '<h2 class="triage-h2">The stack constellation</h2>' +
+          '</div>' +
+          '<div class="legend">' +
+            '<span><span class="legend-dot" style="background:var(--stacked-green-500)"></span>Healthy</span>' +
+            '<span><span class="legend-dot" style="background:var(--stacked-amber-500)"></span>Watch</span>' +
+            '<span><span class="legend-dot" style="background:var(--stacked-red-500)"></span>Critical</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="const-grid">' + cellsHtml + '</div>' +
+      '</section>' +
+
+      // Resolved feed
+      '<section class="feed-wrap">' +
+        '<div class="feed-head">' +
+          '<div>' +
+            '<div class="eyebrow">Today · resolved</div>' +
+            '<h2 class="triage-h2">Things we already sorted</h2>' +
+          '</div>' +
+          '<button class="ghost-btn" type="button">See all 27 →</button>' +
+        '</div>' +
+        '<div class="feed">' + feedHtml + '</div>' +
+      '</section>' +
+    '</div>';
+  }
+
+  function wireTriage(){
+    // Emulate the prototype's 1200ms tick that drives the CRITICAL badge minutes.
+    var tick = 0;
+    var timer = setInterval(function(){
+      tick++;
+      var badges = document.querySelectorAll('[data-crit-timer]');
+      for (var i = 0; i < badges.length; i++) {
+        badges[i].textContent = 'CRITICAL · ' + (2 + (tick % 3)) + 'm';
+      }
+    }, 1200);
+
+    // Click any site (active card or constellation cell) → will route to /issue
+    // once step 4 lands. For now just log the intent.
+    document.querySelectorAll('[data-site]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-site');
+        console.log('[triage] site click:', id, '(issue screen lands in step 4)');
+      });
+    });
+
+    window._screenTeardown = function(){ clearInterval(timer); };
   }
 
   // Wire nav clicks
