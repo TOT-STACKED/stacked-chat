@@ -2398,6 +2398,269 @@ function closeCvModal() {
 </body>
 </html>`;
 
+// ─── OPERATOR APP SHELL ────────────────────────────────────────────────────
+// Persistent shell (sidebar + topbar) for the Stacked Chat redesign.
+// Routes: triage | issues | health | runbooks | sites | widget
+// Hash-routed (#triage, #issues, ...) with localStorage['sc:route'] persistence
+// to match prototype behaviour (see shell.jsx). Content area is intentionally
+// empty — screens are built in subsequent steps.
+const APP_SHELL = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stacked Chat &mdash; App</title>
+<link rel="icon" type="image/svg+xml" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/bowls-orange.svg">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink-900: #0A0A0A; --ink-800: #131313; --ink-700: #1D1D1D;
+  --fg: #F4EFE6; --fg-muted: #928A7C; --fg-dim: #555048;
+  --border: #262421;
+  --stacked-orange-500: #E87830; --stacked-orange-700: #A34F15;
+  --stacked-green-500: #3BD36F; --stacked-green-700: #1E8A44;
+  --stacked-amber-500: #F5A524;
+  --stacked-red-500: #E5484D;
+  --stacked-purple-500: #C7B3F2; --stacked-purple-700: #1D1340;
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', 'Fraunces Placeholder', ui-serif, Georgia, serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color-scheme: dark;
+}
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--ink-900); color: var(--fg); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+button { font-family: inherit; cursor: pointer; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ink-900); }
+::-webkit-scrollbar-thumb { background: var(--ink-700); border-radius: 5px; }
+
+/* ─── LAYOUT ─────────────────────────────────────────────────────────── */
+.app { display: grid; grid-template-columns: 240px 1fr; height: 100%; }
+
+/* ─── LEFT NAV ───────────────────────────────────────────────────────── */
+.nav { background: var(--ink-800); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 16px 12px; }
+.nav-top { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 18px; }
+.nav-top img { height: 20px; }
+.nav-tag { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.24px; background: var(--stacked-orange-500); color: #fff; padding: 3px 7px; border-radius: 3px; font-weight: 800; }
+
+.org-picker { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--ink-900); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 16px; cursor: pointer; transition: border-color 120ms var(--ease); }
+.org-picker:hover { border-color: var(--fg-dim); }
+.org-av { width: 30px; height: 30px; border-radius: 8px; background: var(--stacked-orange-500); color: #fff; display: grid; place-items: center; font-family: var(--font-display); font-size: 12px; flex-shrink: 0; font-weight: 700; }
+.org-meta { min-width: 0; flex: 1; }
+.org-name { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.org-sub { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); }
+
+.new-issue { background: var(--stacked-orange-500); color: #fff; border: 0; padding: 11px 14px; border-radius: 999px; font-weight: 800; font-size: 13px; box-shadow: 0 4px 0 0 var(--stacked-orange-700); margin-bottom: 22px; transition: transform 120ms var(--ease), box-shadow 120ms var(--ease); }
+.new-issue:hover { transform: translateY(-1px); box-shadow: 0 5px 0 0 var(--stacked-orange-700); }
+.new-issue:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
+
+.nav-list { display: flex; flex-direction: column; gap: 2px; flex: 1; align-content: flex-start; }
+.nav-btn { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: transparent; border: 0; border-radius: 8px; color: var(--fg-muted); font-size: 13px; font-weight: 600; text-align: left; transition: background 120ms var(--ease), color 120ms var(--ease); width: 100%; }
+.nav-btn:hover { background: var(--ink-700); color: var(--fg); }
+.nav-btn.active { background: var(--ink-700); color: var(--fg); }
+.nav-badge { margin-left: auto; font-size: 10px; font-weight: 900; font-family: var(--font-mono); background: var(--stacked-red-500); color: #fff; padding: 2px 6px; border-radius: 3px; }
+.nav-btn.active .nav-badge { background: var(--stacked-orange-500); }
+
+.nav-foot { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; display: grid; gap: 10px; }
+.foot-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; }
+.livedot { width: 7px; height: 7px; border-radius: 999px; background: var(--stacked-green-500); box-shadow: 0 0 0 3px rgba(59,211,111,0.22); }
+.foot-status { font-size: 11px; color: var(--fg-muted); }
+.user-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px; }
+.user-av { width: 30px; height: 30px; border-radius: 999px; background: var(--stacked-purple-500); color: var(--stacked-purple-700); display: grid; place-items: center; font-family: var(--font-display); font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.user-meta { min-width: 0; flex: 1; }
+.user-name { font-size: 12px; font-weight: 700; }
+.user-role { font-size: 10px; color: var(--fg-muted); }
+.cog { color: var(--fg-muted); background: transparent; border: 0; padding: 4px; border-radius: 6px; display: grid; place-items: center; }
+.cog:hover { color: var(--fg); background: var(--ink-700); }
+
+/* ─── MAIN ───────────────────────────────────────────────────────────── */
+.main { display: flex; flex-direction: column; min-width: 0; }
+.topbar { display: flex; align-items: center; gap: 16px; padding: 14px 22px; border-bottom: 1px solid var(--border); background: var(--ink-900); }
+.breadcrumbs { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.breadcrumbs .crumb-org { color: var(--fg-muted); }
+.breadcrumbs .crumb-sep { color: var(--fg-dim); }
+.breadcrumbs .crumb-cur { font-weight: 700; text-transform: capitalize; }
+.search { flex: 1; max-width: 440px; display: flex; align-items: center; gap: 8px; background: var(--ink-800); border: 1px solid var(--border); border-radius: 10px; padding: 7px 12px; transition: border-color 120ms var(--ease); }
+.search:focus-within { border-color: var(--fg-dim); }
+.search input { flex: 1; background: transparent; border: 0; color: var(--fg); font-family: inherit; font-size: 13px; outline: none; }
+.search input::placeholder { color: var(--fg-muted); }
+.top-actions { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.icon-btn { width: 34px; height: 34px; background: var(--ink-800); border: 1px solid var(--border); border-radius: 8px; color: var(--fg); position: relative; display: grid; place-items: center; transition: border-color 120ms var(--ease); }
+.icon-btn:hover { border-color: var(--fg-dim); }
+.bell-dot { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 999px; background: var(--stacked-red-500); border: 2px solid var(--ink-800); }
+.invite-btn { background: var(--ink-800); border: 1px solid var(--border); color: var(--fg); padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 700; transition: border-color 120ms var(--ease); }
+.invite-btn:hover { border-color: var(--fg-dim); }
+
+.content { flex: 1; overflow: auto; min-height: 0; padding: 28px 32px 48px; }
+.content-placeholder { display: grid; place-items: center; height: 100%; color: var(--fg-dim); font-family: var(--font-display); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
+.content-placeholder span { color: var(--fg-muted); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14px; text-transform: uppercase; font-weight: 800; display: block; margin-top: 6px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Left nav -->
+  <aside class="nav">
+    <div class="nav-top">
+      <img src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/wordmark-orange.svg" alt="Stacked">
+      <span class="nav-tag">CHAT</span>
+    </div>
+
+    <button class="org-picker" type="button">
+      <div class="org-av">PM</div>
+      <div class="org-meta">
+        <div class="org-name">Pieminister Group</div>
+        <div class="org-sub">14 sites · PRO</div>
+      </div>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" style="color:var(--fg-muted)"><path d="M3 5l3 3 3-3M3 8l3-3 3 3"/></svg>
+    </button>
+
+    <button class="new-issue" type="button">＋ New issue</button>
+
+    <nav class="nav-list" id="navList">
+      <button class="nav-btn" data-route="triage" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 3 10 2-4h5"/></svg>
+        <span>Triage</span>
+        <span class="nav-badge">3</span>
+      </button>
+      <button class="nav-btn" data-route="issues" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4h9a2 2 0 012 2v12a2 2 0 01-2 2H8l-5-5V6a2 2 0 012-2h3"/></svg>
+        <span>Issues</span>
+      </button>
+      <button class="nav-btn" data-route="health" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1116 0 8 8 0 01-16 0zM8 12h2l1-3 2 6 1-3h2"/></svg>
+        <span>Stack health</span>
+      </button>
+      <button class="nav-btn" data-route="runbooks" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12a2 2 0 012 2v14H6a2 2 0 01-2-2V4zM7 8h8M7 12h8M7 16h5"/></svg>
+        <span>Runbooks</span>
+      </button>
+      <button class="nav-btn" data-route="sites" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6v10a1 1 0 01-1 1h-4v-6H8v6H4a1 1 0 01-1-1V10z"/></svg>
+        <span>Sites</span>
+      </button>
+      <button class="nav-btn" data-route="widget" type="button">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 01-4 4H8l-5 3V8a4 4 0 014-4h10a4 4 0 014 4v7z"/></svg>
+        <span>Widget preview</span>
+      </button>
+    </nav>
+
+    <div class="nav-foot">
+      <div class="foot-row">
+        <span class="livedot"></span>
+        <span class="foot-status">All systems · normal</span>
+      </div>
+      <div class="user-row">
+        <div class="user-av">SJ</div>
+        <div class="user-meta">
+          <div class="user-name">Sam Jennings</div>
+          <div class="user-role">Ops Director</div>
+        </div>
+        <button class="cog" type="button" aria-label="Settings">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main column -->
+  <main class="main">
+    <header class="topbar">
+      <div class="breadcrumbs">
+        <span class="crumb-org">Pieminister Group</span>
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" class="crumb-sep"><path d="M3 2l3 3-3 3"/></svg>
+        <span class="crumb-cur" id="crumbCur">Triage</span>
+      </div>
+      <div class="search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--fg-muted)"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input placeholder="Search issues, sites, vendors&hellip; (⌘K)" id="globalSearch">
+      </div>
+      <div class="top-actions">
+        <button class="icon-btn" type="button" aria-label="Notifications">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 106 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg>
+          <span class="bell-dot"></span>
+        </button>
+        <button class="invite-btn" type="button">Invite team</button>
+      </div>
+    </header>
+
+    <div class="content" id="content">
+      <div class="content-placeholder" id="placeholder">
+        <div>
+          Shell ready.
+          <span id="placeholderRoute">Route: triage</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  var ROUTES = {
+    triage:   'Triage',
+    issues:   'Issues',
+    health:   'Stack health',
+    runbooks: 'Runbooks',
+    sites:    'Sites',
+    widget:   'Widget preview'
+  };
+
+  function currentRoute(){
+    var h = (location.hash || '').replace(/^#\\/?/, '');
+    if (ROUTES[h]) return h;
+    var stored = localStorage.getItem('sc:route');
+    if (stored && ROUTES[stored]) return stored;
+    return 'triage';
+  }
+
+  function setRoute(r){
+    if (!ROUTES[r]) r = 'triage';
+    localStorage.setItem('sc:route', r);
+    if (location.hash !== '#' + r) location.hash = r;
+    render(r);
+  }
+
+  function render(r){
+    // Active state on nav buttons
+    var btns = document.querySelectorAll('.nav-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-route') === r);
+    }
+    // Breadcrumb label
+    document.getElementById('crumbCur').textContent = ROUTES[r];
+    // Placeholder (screens land here in steps 3–6)
+    document.getElementById('placeholderRoute').textContent = 'Route: ' + r;
+  }
+
+  // Wire nav clicks
+  document.getElementById('navList').addEventListener('click', function(e){
+    var btn = e.target.closest('.nav-btn');
+    if (!btn) return;
+    setRoute(btn.getAttribute('data-route'));
+  });
+
+  // Hash changes (back/forward)
+  window.addEventListener('hashchange', function(){ render(currentRoute()); });
+
+  // ⌘K / Ctrl-K focuses search
+  window.addEventListener('keydown', function(e){
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      document.getElementById('globalSearch').focus();
+    }
+  });
+
+  // Boot
+  var r = currentRoute();
+  if (!location.hash) location.hash = r;
+  render(r);
+})();
+</script>
+</body>
+</html>`;
+
 // ─── ADMIN PAGE ────────────────────────────────────────────────────────────
 const ADMIN_PAGE = `<!DOCTYPE html>
 <html lang="en">
@@ -3441,6 +3704,13 @@ const server = http.createServer(async (req, res) => {
   if (url === '/admin' || url === '/admin/') {
     res.writeHead(200, {'Content-Type':'text/html'});
     res.end(ADMIN_PAGE); return;
+  }
+
+  // Operator-facing redesign shell (sidebar + topbar, no screens yet).
+  // See CLAUDE.md step 2. Screens land at #triage / #issues / etc.
+  if (url === '/app' || url === '/app/' || url.startsWith('/app#')) {
+    res.writeHead(200, {'Content-Type':'text/html'});
+    res.end(APP_SHELL); return;
   }
 
   if (url === '/analytics') {
