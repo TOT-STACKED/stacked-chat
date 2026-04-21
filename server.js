@@ -2819,6 +2819,61 @@ button { font-family: inherit; cursor: pointer; }
 .rb-st-l { font-size: 9px; font-family: var(--font-mono); color: var(--fg-muted); letter-spacing: 0.14px; font-weight: 700; margin-top: 4px; }
 .rb-open { margin-left: auto; background: transparent; border: 0; color: var(--stacked-orange-500); font-family: inherit; font-size: 12px; font-weight: 700; }
 .rb-open:hover { text-decoration: underline; }
+
+/* ─── SITES SCREEN ───────────────────────────────────────────────────── */
+.st { display: grid; gap: 22px; }
+.st-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
+.st-table { background: var(--ink-800); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+.st-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 80px 80px; padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 13px; align-items: center; }
+.st-row:last-child { border-bottom: 0; }
+.st-head { font-size: 10px; font-weight: 800; letter-spacing: 0.18px; text-transform: uppercase; color: var(--fg-muted); }
+.st-body:hover { background: var(--ink-900); }
+.st-site   { font-weight: 700; }
+.st-brand  { color: var(--fg-muted); }
+.st-gm     { color: var(--fg-muted); }
+.st-stack  { color: var(--fg-muted); font-family: var(--font-mono); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-score  { font-family: var(--font-display); font-size: 18px; font-weight: 600; line-height: 1; }
+.st-score.green { color: var(--stacked-green-500); }
+.st-score.amber { color: var(--stacked-amber-500); }
+.st-score.red   { color: var(--stacked-red-500); }
+.st-iss    { font-family: var(--font-mono); font-size: 12px; font-weight: 700; }
+.st-iss.clean { color: var(--fg-muted); }
+.st-iss.open  { color: var(--stacked-red-500); }
+
+/* ─── WIDGET PREVIEW SCREEN ──────────────────────────────────────────── */
+.wg { display: grid; gap: 22px; align-items: start; }
+.wg-grid { display: grid; grid-template-columns: 1fr 420px; gap: 32px; align-items: start; }
+.wg-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
+.wg-sub { font-size: 14px; color: var(--fg-muted); margin-top: 10px; line-height: 1.6; max-width: 520px; }
+.wg-features { display: grid; gap: 10px; margin-top: 24px; }
+.wg-feat { display: flex; gap: 10px; align-items: center; font-size: 13px; color: var(--fg-muted); }
+.wg-feat-check { color: var(--stacked-green-500); font-family: var(--font-mono); font-weight: 800; }
+.wg-snippet { background: var(--ink-800); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 18px; }
+.wg-snippet-label { font-size: 10px; font-family: var(--font-mono); color: var(--fg-muted); letter-spacing: 0.14px; text-transform: uppercase; margin-bottom: 8px; font-weight: 700; }
+.wg-snippet-code { font-family: var(--font-mono); font-size: 12px; color: var(--stacked-orange-500); word-break: break-all; }
+
+/* Phone mockup */
+.wg-phone-wrap { justify-self: center; }
+.wg-phone { width: 300px; background: #0B0B0B; border: 8px solid #1a1a1a; border-radius: 36px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5); position: relative; }
+.wg-notch { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); width: 80px; height: 20px; background: #000; border-radius: 20px; z-index: 2; }
+.wg-sb { display: flex; justify-content: space-between; padding: 12px 22px 6px; font-family: var(--font-mono); font-size: 10px; color: var(--fg); background: #0B0B0B; }
+.wg-sb-right { display: flex; gap: 4px; align-items: center; font-size: 9px; }
+.wg-hdr { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--ink-800); border-bottom: 1px solid var(--border); }
+.wg-hdr-av { width: 26px; height: 26px; border-radius: 999px; background: var(--stacked-orange-500); display: grid; place-items: center; flex-shrink: 0; }
+.wg-hdr-av img { width: 14px; height: 14px; }
+.wg-hdr-name { font-size: 12px; font-weight: 800; }
+.wg-hdr-status { font-size: 10px; color: var(--stacked-green-500); font-weight: 700; }
+.wg-hdr-close { margin-left: auto; color: var(--fg-muted); font-size: 16px; cursor: pointer; }
+.wg-body { padding: 14px; display: grid; gap: 10px; min-height: 320px; background: var(--ink-900); }
+.wg-bub  { background: var(--ink-700); padding: 8px 12px; border-radius: 12px; border-bottom-left-radius: 3px; font-size: 12px; line-height: 1.5; max-width: 85%; }
+.wg-bubU { background: var(--stacked-orange-500); color: #fff; padding: 8px 12px; border-radius: 12px; border-bottom-right-radius: 3px; font-size: 12px; line-height: 1.5; max-width: 85%; margin-left: auto; }
+.wg-bub-card { background: var(--ink-800); border: 1px solid var(--border); padding: 10px; border-radius: 10px; }
+.wg-card-label { font-size: 9px; letter-spacing: 0.14px; color: var(--fg-muted); font-family: var(--font-mono); font-weight: 800; }
+.wg-card-title { font-size: 12px; font-weight: 700; margin: 4px 0; }
+.wg-card-body  { font-size: 10px; color: var(--fg-muted); line-height: 1.5; }
+.wg-comp { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--ink-800); border-top: 1px solid var(--border); }
+.wg-comp-ph { font-size: 11px; color: var(--fg-muted); }
+.wg-send { width: 28px; height: 28px; border-radius: 999px; background: var(--stacked-orange-500); color: #fff; display: grid; place-items: center; font-size: 14px; font-weight: 800; }
 </style>
 </head>
 <body>
@@ -2979,6 +3034,10 @@ button { font-family: inherit; cursor: pointer; }
     } else if (r === 'runbooks') {
       content.innerHTML = renderRunbooks();
       wireRunbooks();
+    } else if (r === 'sites') {
+      content.innerHTML = renderSites();
+    } else if (r === 'widget') {
+      content.innerHTML = renderWidget();
     } else {
       content.innerHTML =
         '<div class="content-placeholder"><div>' +
@@ -3715,6 +3774,121 @@ button { font-family: inherit; cursor: pointer; }
         }
       });
     });
+  }
+
+  // ─── SITES SCREEN ─────────────────────────────────────────────────────
+  // Mock estate mirrors extras.jsx SitesScreen — swapped in step 7's data pass.
+  var ST_ROWS = [
+    ['Soho W1',          'The Pelican',     'Lara Kane',    'Square · Dojo · Deliveroo', 96, 0],
+    ['Bristol BS1',      'Pieminister',     'Tom Hughes',   'Square · Dojo · Planday',   68, 1],
+    ['Spitalfields E1',  'Ottolenghi',      'Priya Sharma', 'Lightspeed · SumUp',        82, 1],
+    ['Camden NW1',       'Honest Burgers',  'Omar Nassar',  'Square · Dojo · Uber',      94, 0],
+    ['Canary Wharf E14', "Carluccio's",     'Beth Ford',    'Lightspeed · SumUp',        91, 0],
+    ['Shoreditch EC2',   'The Pelican',     'Lara Kane',    'Square · Dojo · Deliveroo', 62, 1],
+    ['Fitzrovia W1T',    'Ottolenghi',      'Priya Sharma', 'Lightspeed · SumUp',        98, 0],
+    ['Kings Cross N1',   'Pieminister',     'Tom Hughes',   'Square · Dojo · Planday',   93, 0]
+  ];
+
+  function renderSites(){
+    var rows = '';
+    for (var i = 0; i < ST_ROWS.length; i++) {
+      var r = ST_ROWS[i];
+      var tone = scoreColor(r[4]);
+      var issCls = r[5] ? 'open' : 'clean';
+      var issText = r[5] ? '● ' + r[5] + ' open' : '—';
+      rows += '<div class="st-row st-body">' +
+        '<span class="st-site">' + esc(r[0]) + '</span>' +
+        '<span class="st-brand">' + esc(r[1]) + '</span>' +
+        '<span class="st-gm">' + esc(r[2]) + '</span>' +
+        '<span class="st-stack">' + esc(r[3]) + '</span>' +
+        '<span class="st-score ' + tone + '">' + r[4] + '</span>' +
+        '<span class="st-iss ' + issCls + '">' + issText + '</span>' +
+      '</div>';
+    }
+
+    return '<div class="st">' +
+      '<section>' +
+        '<div class="eyebrow">Sites · 14 registered</div>' +
+        '<h1 class="st-h1">Your estate.</h1>' +
+      '</section>' +
+      '<div class="st-table">' +
+        '<div class="st-row st-head">' +
+          '<span>Site</span>' +
+          '<span>Brand</span>' +
+          '<span>GM</span>' +
+          '<span>Stack</span>' +
+          '<span>Score</span>' +
+          '<span>Issues</span>' +
+        '</div>' +
+        rows +
+      '</div>' +
+    '</div>';
+  }
+
+  // ─── WIDGET PREVIEW SCREEN ────────────────────────────────────────────
+  var WG_FEATURES = [
+    'One line of JS on any page',
+    'Auto-detects vendor context from the surrounding app',
+    'Photo + voice input for messy bar situations',
+    'Escalates to your ops team when the AI gets stuck'
+  ];
+
+  function renderWidget(){
+    var features = '';
+    for (var i = 0; i < WG_FEATURES.length; i++) {
+      features += '<div class="wg-feat">' +
+        '<span class="wg-feat-check">✓</span>' + esc(WG_FEATURES[i]) +
+      '</div>';
+    }
+
+    return '<div class="wg">' +
+      '<div class="wg-grid">' +
+        // Left column — copy + install snippet
+        '<div>' +
+          '<div class="eyebrow">Widget preview · embed anywhere</div>' +
+          '<h1 class="wg-h1">The chat that lives in your POS.</h1>' +
+          '<div class="wg-sub">Your team doesn\\'t need to leave what they\\'re doing. Drop Stacked Chat into Square, Lightspeed, your intranet, or a bookmark on the GM\\'s phone. Same AI, same handoff, same runbooks — shrunk to pocket size.</div>' +
+          '<div class="wg-features">' + features + '</div>' +
+          '<div class="wg-snippet">' +
+            '<div class="wg-snippet-label">Install</div>' +
+            '<div class="wg-snippet-code">&lt;script src="stacked.chat/embed.js" data-key="pm_live_a14k92"&gt;&lt;/script&gt;</div>' +
+          '</div>' +
+        '</div>' +
+
+        // Right column — phone mockup
+        '<div class="wg-phone-wrap">' +
+          '<div class="wg-phone">' +
+            '<div class="wg-notch"></div>' +
+            '<div class="wg-sb">' +
+              '<span>18:42</span>' +
+              '<span class="wg-sb-right"><span>●●●●</span><span>5G</span></span>' +
+            '</div>' +
+            '<div class="wg-hdr">' +
+              '<div class="wg-hdr-av"><img src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/bowls-orange.svg" alt=""></div>' +
+              '<div>' +
+                '<div class="wg-hdr-name">Stacked Chat</div>' +
+                '<div class="wg-hdr-status">● online</div>' +
+              '</div>' +
+              '<span class="wg-hdr-close">✕</span>' +
+            '</div>' +
+            '<div class="wg-body">' +
+              '<div class="wg-bub">Hey Lara 👋 I saw the Dojo error at 18:40. Try the fix I sent — tap here if it doesn\\'t work.</div>' +
+              '<div class="wg-bubU">that fix didn\\'t take, the light\\'s still red</div>' +
+              '<div class="wg-bub">Right — I\\'m looping Jo at Dojo. Keep trading, she\\'ll buzz in 4 min. Meanwhile tell card customers to use cash or tap-to-phone.</div>' +
+              '<div class="wg-bub-card">' +
+                '<div class="wg-card-label">ALTERNATE</div>' +
+                '<div class="wg-card-title">Tap-to-phone fallback</div>' +
+                '<div class="wg-card-body">Use your iPhone as a reader. I\\'ve sent the activation link to your email.</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="wg-comp">' +
+              '<span class="wg-comp-ph">Type a message…</span>' +
+              '<div class="wg-send">→</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
   }
 
   // Wire nav clicks
