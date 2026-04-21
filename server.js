@@ -2580,6 +2580,104 @@ button { font-family: inherit; cursor: pointer; }
 .feed-fix.human { color: var(--stacked-amber-500); }
 .feed-open { background: var(--ink-900); border: 1px solid var(--border); color: var(--fg); padding: 6px 10px; border-radius: 6px; font-size: 11px; font-family: inherit; font-weight: 700; }
 .feed-open:hover { border-color: var(--fg-dim); }
+
+/* ─── ISSUE SCREEN ───────────────────────────────────────────────────── */
+.issue { display: grid; gap: 22px; }
+
+/* Header */
+.iss-head { display: grid; grid-template-columns: auto 1fr auto; gap: 24px; align-items: start; }
+.iss-back { background: transparent; border: 1px solid var(--border); color: var(--fg-muted); padding: 8px 14px; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 700; transition: border-color 120ms var(--ease), color 120ms var(--ease); }
+.iss-back:hover { border-color: var(--fg-dim); color: var(--fg); }
+.iss-meta { min-width: 0; }
+.iss-meta-row { display: flex; align-items: center; gap: 12px; }
+.live-badge { font-size: 10px; font-weight: 900; font-family: var(--font-mono); letter-spacing: 0.14px; background: var(--stacked-red-500); color: #fff; padding: 4px 8px; border-radius: 3px; }
+.iss-h1 { font-family: var(--font-display); font-size: 32px; letter-spacing: -0.015em; margin: 0; font-weight: 600; }
+.iss-sub { font-size: 13px; color: var(--fg-muted); font-family: var(--font-mono); margin-top: 6px; }
+.iss-actions { display: flex; gap: 8px; }
+.act-ghost { background: var(--ink-800); border: 1px solid var(--border); color: var(--fg); padding: 10px 14px; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 700; transition: border-color 120ms var(--ease); }
+.act-ghost:hover { border-color: var(--fg-dim); }
+.act-primary { background: var(--stacked-orange-500); color: #fff; border: 0; padding: 10px 16px; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 800; box-shadow: 0 4px 0 0 var(--stacked-orange-700); transition: transform 120ms var(--ease), box-shadow 120ms var(--ease); }
+.act-primary:hover { transform: translateY(-1px); box-shadow: 0 5px 0 0 var(--stacked-orange-700); }
+.act-primary:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
+
+/* Timeline scrubber — novel moment #2 */
+.tl { background: var(--ink-800); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+.tl-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.tl-head-label { font-size: 11px; font-weight: 800; letter-spacing: 0.14px; text-transform: uppercase; color: var(--fg-muted); }
+.tl-head-count { font-size: 11px; font-family: var(--font-mono); color: var(--fg-muted); }
+.tl-track { display: grid; grid-template-columns: repeat(7, 1fr); position: relative; margin-bottom: 18px; }
+.tl-line { position: absolute; top: 14px; left: 7%; right: 7%; height: 2px; background: var(--border); z-index: 0; }
+.tl-step { background: transparent; border: 0; display: grid; gap: 8px; justify-items: center; padding: 0; font-family: inherit; color: inherit; position: relative; z-index: 1; }
+.tl-pin { width: 28px; height: 28px; border-radius: 999px; border: 2px solid var(--border); background: var(--ink-900); display: grid; place-items: center; transition: background 120ms var(--ease), border-color 120ms var(--ease); }
+.tl-pin.done    { border-color: var(--stacked-green-500); }
+.tl-pin.cur     { border-color: var(--stacked-orange-500); }
+.tl-pin.done.scrubbed { background: var(--stacked-green-500); }
+.tl-pin.cur.scrubbed  { background: var(--stacked-orange-500); }
+.tl-pin.idle.scrubbed { background: var(--ink-700); }
+.tl-pin .tl-check  { color: var(--stacked-green-500); font-size: 10px; font-weight: 900; }
+.tl-pin.done.scrubbed .tl-check { color: #fff; }
+.tl-pin .tl-bullet { color: #fff; font-size: 10px; line-height: 1; }
+.tl-pin .tl-num    { color: var(--fg-dim); font-size: 9px; font-family: var(--font-mono); font-weight: 700; }
+.tl-label { font-size: 12px; font-weight: 700; }
+.tl-time  { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); }
+.tl-detail { background: var(--ink-900); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.tl-detail-eyebrow { font-size: 11px; font-family: var(--font-mono); color: var(--stacked-orange-500); letter-spacing: 0.14px; text-transform: uppercase; }
+.tl-detail-body { font-size: 15px; color: var(--fg); margin-top: 6px; line-height: 1.5; }
+
+/* Body: conversation + rail */
+.iss-body { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
+
+/* Conversation */
+.conv { background: var(--ink-800); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.cm { display: flex; gap: 10px; align-items: flex-start; }
+.cm.op { justify-content: flex-end; }
+.bot-av { width: 28px; height: 28px; border-radius: 999px; background: var(--stacked-orange-500); display: grid; place-items: center; flex-shrink: 0; }
+.bot-av img { width: 16px; height: 16px; }
+.cm-stack { display: grid; gap: 4px; max-width: 540px; }
+.cm-name { font-size: 10px; font-family: var(--font-mono); color: var(--fg-muted); letter-spacing: 0.12px; text-transform: uppercase; font-weight: 700; }
+.bub-b    { background: var(--ink-700); border: 1px solid var(--border); padding: 10px 14px; border-radius: 14px; border-bottom-left-radius: 4px; font-size: 14px; line-height: 1.55; }
+.bub-u    { background: var(--stacked-orange-500); color: #fff; padding: 10px 14px; border-radius: 14px; border-bottom-right-radius: 4px; font-size: 14px; line-height: 1.55; }
+.bub-card { background: var(--ink-900); border: 1px solid var(--border); padding: 14px; border-radius: 14px; }
+.ev-label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14px; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 8px; font-weight: 700; }
+.ev-list { display: grid; gap: 6px; font-family: var(--font-mono); font-size: 12px; }
+.ev-list .ok   { color: var(--stacked-green-500); }
+.ev-list .warn { color: var(--stacked-amber-500); }
+.fix-title { font-family: var(--font-display); font-size: 18px; letter-spacing: -0.01em; margin-bottom: 10px; font-weight: 600; }
+.fix-steps { margin: 0; padding-left: 18px; font-size: 14px; line-height: 1.7; }
+.fix-steps b { font-weight: 700; }
+.pair-code { background: var(--ink-800); border-radius: 10px; padding: 14px; margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.pair-label { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); letter-spacing: 0.14px; text-transform: uppercase; font-weight: 700; }
+.pair-num { font-family: var(--font-display); font-size: 48px; letter-spacing: 0.12em; color: var(--stacked-orange-500); text-shadow: 0 6px 0 var(--stacked-orange-700); line-height: 1; font-weight: 700; }
+.copy-code { background: var(--ink-900); border: 1px solid var(--border); color: var(--fg); padding: 6px 10px; border-radius: 6px; font-size: 11px; font-family: inherit; font-weight: 700; transition: border-color 120ms var(--ease); }
+.copy-code:hover { border-color: var(--fg-dim); }
+.fix-note { font-size: 12px; color: var(--fg-muted); margin-top: 10px; }
+.compose { display: flex; gap: 8px; background: var(--ink-900); border: 1px solid var(--border); border-radius: 999px; padding: 6px 6px 6px 16px; margin-top: 6px; }
+.compose input { flex: 1; background: transparent; border: 0; color: var(--fg); font-family: inherit; font-size: 13px; outline: none; }
+.compose input::placeholder { color: var(--fg-muted); }
+.compose .act-ghost { padding: 10px 14px; }
+.send-btn { background: var(--stacked-orange-500); color: #fff; border: 0; border-radius: 999px; padding: 10px 16px; font-family: inherit; font-weight: 800; font-size: 12px; box-shadow: 0 3px 0 0 var(--stacked-orange-700); transition: transform 120ms var(--ease), box-shadow 120ms var(--ease); }
+.send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 0 0 var(--stacked-orange-700); }
+.send-btn:active { transform: translateY(1px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
+
+/* Context rail */
+.rail { display: grid; gap: 12px; }
+.rail-block { background: var(--ink-800); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.rail-label { font-size: 10px; font-weight: 800; letter-spacing: 0.18px; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 10px; }
+.rail-title { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; font-weight: 600; }
+.rail-sub   { font-size: 12px; color: var(--fg-muted); font-family: var(--font-mono); margin-bottom: 14px; }
+.rail-kv { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 12px; }
+.rail-kv:last-child { border-bottom: 0; }
+.rail-kv b { font-weight: 700; }
+.rail-kv .amber { color: var(--stacked-amber-500); }
+.rail-iss { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.rail-pip { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; }
+.rail-pip.ok    { background: var(--stacked-green-500); }
+.rail-pip.human { background: var(--stacked-amber-500); }
+.rail-day   { font-size: 11px; color: var(--fg-muted); font-family: var(--font-mono); width: 36px; flex-shrink: 0; }
+.rail-issue-text { font-size: 12px; flex: 1; }
+.rail-runbook-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.rail-runbook-body  { font-size: 12px; color: var(--fg-muted); line-height: 1.55; }
+.rail-runbook-open { margin-top: 10px; width: 100%; }
 </style>
 </head>
 <body>
@@ -2689,30 +2787,37 @@ button { font-family: inherit; cursor: pointer; }
     sites:    'Sites',
     widget:   'Widget preview'
   };
+  // Sub-routes reached from Triage cards. Left nav collapses these under "Issues".
+  var SUB_ROUTES = { issue: 'Issues', handoff: 'Issues' };
+
+  function validRoute(r){ return !!(ROUTES[r] || SUB_ROUTES[r]); }
 
   function currentRoute(){
     var h = (location.hash || '').replace(/^#\\/?/, '');
-    if (ROUTES[h]) return h;
+    if (validRoute(h)) return h;
     var stored = localStorage.getItem('sc:route');
-    if (stored && ROUTES[stored]) return stored;
+    if (stored && validRoute(stored)) return stored;
     return 'triage';
   }
 
   function setRoute(r){
-    if (!ROUTES[r]) r = 'triage';
-    localStorage.setItem('sc:route', r);
+    if (!validRoute(r)) r = 'triage';
+    // Persist only top-level routes so a reload of a sub-route still
+    // lands them somewhere sensible if they clear the hash.
+    if (ROUTES[r]) localStorage.setItem('sc:route', r);
     if (location.hash !== '#' + r) location.hash = r;
     render(r);
   }
 
   function render(r){
-    // Active state on nav buttons
+    // Active state on nav buttons — sub-routes (issue/handoff) collapse under "Issues"
+    var navKey = SUB_ROUTES[r] ? 'issues' : r;
     var btns = document.querySelectorAll('.nav-btn');
     for (var i = 0; i < btns.length; i++) {
-      btns[i].classList.toggle('active', btns[i].getAttribute('data-route') === r);
+      btns[i].classList.toggle('active', btns[i].getAttribute('data-route') === navKey);
     }
     // Breadcrumb label
-    document.getElementById('crumbCur').textContent = ROUTES[r];
+    document.getElementById('crumbCur').textContent = ROUTES[r] || SUB_ROUTES[r];
 
     // Tear down previous screen state (intervals etc)
     if (window._screenTeardown) { try { window._screenTeardown(); } catch(_){} window._screenTeardown = null; }
@@ -2721,14 +2826,20 @@ button { font-family: inherit; cursor: pointer; }
     if (r === 'triage') {
       content.innerHTML = renderTriage();
       wireTriage();
+    } else if (r === 'issue') {
+      content.innerHTML = renderIssue();
+      wireIssue();
     } else {
       content.innerHTML =
         '<div class="content-placeholder"><div>' +
-        ROUTES[r] + ' screen' +
+        (ROUTES[r] || SUB_ROUTES[r]) + ' screen' +
         '<span>Lands in a later step</span>' +
         '</div></div>';
     }
   }
+
+  // Expose so sub-render wiring can navigate
+  window.scSetRoute = setRoute;
 
   // ─── TRIAGE SCREEN ────────────────────────────────────────────────────
   // Mock data mirrors triage.jsx exactly — swapped for real data in step 7.
@@ -2913,16 +3024,218 @@ button { font-family: inherit; cursor: pointer; }
       }
     }, 1200);
 
-    // Click any site (active card or constellation cell) → will route to /issue
-    // once step 4 lands. For now just log the intent.
+    // Click any site (active card or constellation cell) → route to #issue.
+    // Real site id wiring lands in step 7 when we replace mock data.
     document.querySelectorAll('[data-site]').forEach(function(el){
-      el.addEventListener('click', function(){
-        var id = el.getAttribute('data-site');
-        console.log('[triage] site click:', id, '(issue screen lands in step 4)');
-      });
+      el.addEventListener('click', function(){ window.scSetRoute('issue'); });
     });
 
     window._screenTeardown = function(){ clearInterval(timer); };
+  }
+
+  // ─── ISSUE SCREEN ─────────────────────────────────────────────────────
+  // Mock data mirrors issue.jsx exactly — swapped for real data in step 7.
+  var ISSUE_STEPS = [
+    { t: '18:40:12', label: 'Intake',       desc: 'Operator: "Card terminal at site 6 won\\'t connect. Dojo T2. Already rebooted."', state: 'done' },
+    { t: '18:40:14', label: 'Identify',     desc: 'Matched: Dojo T2 pairing-loss (known issue KB-0412, 847 prior cases)',               state: 'done' },
+    { t: '18:40:16', label: 'Ping vendor',  desc: 'Dojo status API → site 6 terminal registered, last seen 18:37:02',                   state: 'done' },
+    { t: '18:40:18', label: 'Check net',    desc: 'Shoreditch WiFi reachable · 42ms · no loss',                                          state: 'done' },
+    { t: '18:40:22', label: 'Propose fix',  desc: 'Unpair & re-pair sequence · confidence 94%',                                          state: 'active' },
+    { t: '—',        label: 'Verify',       desc: 'Waiting for operator to confirm code entry',                                          state: 'idle' },
+    { t: '—',        label: 'Discharge',    desc: '',                                                                                    state: 'idle' }
+  ];
+
+  function renderTimelinePin(step, index, scrub){
+    var done = step.state === 'done';
+    var cur  = step.state === 'active';
+    var base = done ? 'done' : cur ? 'cur' : 'idle';
+    var classes = 'tl-pin ' + base + (index === scrub ? ' scrubbed' : '');
+    var inner;
+    if (done)      inner = '<span class="tl-check">✓</span>';
+    else if (cur)  inner = '<span class="tl-bullet">●</span>';
+    else           inner = '<span class="tl-num">' + (index + 1) + '</span>';
+    return '<button class="tl-step" data-step="' + index + '" type="button">' +
+      '<div class="' + classes + '">' + inner + '</div>' +
+      '<div class="tl-label">' + esc(step.label) + '</div>' +
+      '<div class="tl-time">' + esc(step.t) + '</div>' +
+    '</button>';
+  }
+
+  function renderBotMsg(innerHtml, isCard){
+    return '<div class="cm">' +
+      '<div class="bot-av"><img src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/bowls-orange.svg" alt=""></div>' +
+      '<div class="cm-stack">' +
+        '<div class="' + (isCard ? 'bub-card' : 'bub-b') + '">' + innerHtml + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderOpMsg(name, text){
+    return '<div class="cm op">' +
+      '<div class="cm-stack">' +
+        (name ? '<div class="cm-name">' + esc(name) + '</div>' : '') +
+        '<div class="bub-u">' + esc(text) + '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderIssue(){
+    // Default scrub = 4 (the 'active' step — Propose fix). Matches prototype.
+    var scrub = 4;
+
+    var pins = '';
+    for (var i = 0; i < ISSUE_STEPS.length; i++) {
+      pins += renderTimelinePin(ISSUE_STEPS[i], i, scrub);
+    }
+
+    var evidenceCard =
+      '<div class="ev-label">Evidence · Dojo status API</div>' +
+      '<div class="ev-list">' +
+        '<div class="ok">✓ terminal.registered = true</div>' +
+        '<div class="ok">✓ last_seen = 18:37:02 (3m ago)</div>' +
+        '<div class="warn">⚠ paired_handset = null</div>' +
+      '</div>';
+
+    var fixCard =
+      '<div class="fix-title">Re-pair the T2</div>' +
+      '<ol class="fix-steps">' +
+        '<li>On the handset: <b>Menu → Settings → Re-pair</b></li>' +
+        '<li>Enter the 4-digit code below</li>' +
+        '<li>Hold for 5 seconds — it\\'ll beep twice</li>' +
+      '</ol>' +
+      '<div class="pair-code">' +
+        '<div>' +
+          '<div class="pair-label">Pairing code</div>' +
+          '<div class="pair-num" id="pairNum">7 4 2 9</div>' +
+        '</div>' +
+        '<button class="copy-code" id="copyCodeBtn" type="button">Copy code</button>' +
+      '</div>' +
+      '<div class="fix-note">94% of similar cases resolved in &lt; 60s with this fix.</div>';
+
+    return '<div class="issue">' +
+      // Header
+      '<section class="iss-head">' +
+        '<button class="iss-back" id="issBack" type="button">← Back to Triage</button>' +
+        '<div class="iss-meta">' +
+          '<div class="iss-meta-row">' +
+            '<span class="live-badge">LIVE · 2m 14s</span>' +
+            '<h1 class="iss-h1">Dojo T2 won\\'t connect</h1>' +
+          '</div>' +
+          '<div class="iss-sub">The Pelican · Shoreditch EC2 · case #INC-20260421-14 · opened 18:40 BST</div>' +
+        '</div>' +
+        '<div class="iss-actions">' +
+          '<button class="act-ghost" type="button">Copy to WhatsApp</button>' +
+          '<button class="act-ghost" type="button">Assign team member</button>' +
+          '<button class="act-primary" id="issHandoff" type="button">Hand off to human →</button>' +
+        '</div>' +
+      '</section>' +
+
+      // Timeline scrubber (novel moment #2)
+      '<section class="tl">' +
+        '<div class="tl-head">' +
+          '<div class="tl-head-label">Diagnostic timeline · scrub to inspect any step</div>' +
+          '<div class="tl-head-count" id="tlCount">step ' + (scrub + 1) + ' / ' + ISSUE_STEPS.length + '</div>' +
+        '</div>' +
+        '<div class="tl-track">' +
+          pins +
+          '<div class="tl-line"></div>' +
+        '</div>' +
+        '<div class="tl-detail">' +
+          '<div class="tl-detail-eyebrow" id="tlDetailHead">' + esc(ISSUE_STEPS[scrub].t) + ' · ' + esc(ISSUE_STEPS[scrub].label) + '</div>' +
+          '<div class="tl-detail-body" id="tlDetailBody">' + esc(ISSUE_STEPS[scrub].desc || 'Not reached yet.') + '</div>' +
+        '</div>' +
+      '</section>' +
+
+      // Body: conversation + context rail
+      '<section class="iss-body">' +
+        '<div class="conv">' +
+          renderOpMsg('Sam · Ops', "Card terminal at site 6 won't connect. Dojo T2. Already rebooted.") +
+          renderBotMsg("Got it. Running the diagnostic — Dojo T2 pairing, Shoreditch EC2. I\\'ll check the vendor first.", false) +
+          renderBotMsg(evidenceCard, true) +
+          renderBotMsg("Terminal\\'s online — the handset just lost its pairing. Here\\'s the fix:", false) +
+          renderBotMsg(fixCard, true) +
+          '<div class="compose">' +
+            '<input placeholder="Type a reply or describe a new issue…">' +
+            '<button class="act-ghost" type="button">Mark fixed ✓</button>' +
+            '<button class="send-btn" type="button">Send →</button>' +
+          '</div>' +
+        '</div>' +
+
+        '<aside class="rail">' +
+          '<div class="rail-block">' +
+            '<div class="rail-label">Site context</div>' +
+            '<div class="rail-title">The Pelican</div>' +
+            '<div class="rail-sub">Shoreditch EC2 · trading now · 42 covers</div>' +
+            '<div class="rail-kv"><span>Opened</span><b>11.00</b></div>' +
+            '<div class="rail-kv"><span>GM on duty</span><b>Lara K.</b></div>' +
+            '<div class="rail-kv"><span>Cover</span><b>Tonight · 180</b></div>' +
+            '<div class="rail-kv"><span>Tech score</span><b class="amber">62 / 100</b></div>' +
+          '</div>' +
+          '<div class="rail-block">' +
+            '<div class="rail-label">Same site · last 7 days</div>' +
+            '<div style="display:grid;gap:4px">' +
+              '<div class="rail-iss"><span class="rail-pip ok"></span><span class="rail-day">Wed</span><span class="rail-issue-text">Square till froze</span></div>' +
+              '<div class="rail-iss"><span class="rail-pip human"></span><span class="rail-day">Mon</span><span class="rail-issue-text">Deliveroo push failed</span></div>' +
+              '<div class="rail-iss"><span class="rail-pip ok"></span><span class="rail-day">Sun</span><span class="rail-issue-text">WiFi dropout</span></div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="rail-block">' +
+            '<div class="rail-label">Runbook · KB-0412</div>' +
+            '<div class="rail-runbook-title">Dojo T2 pairing loss</div>' +
+            '<div class="rail-runbook-body">Most common after firmware update. Re-pair usually fixes it. If third attempt fails — it\\'s the Bluetooth module.</div>' +
+            '<button class="act-ghost rail-runbook-open" type="button">Open full runbook →</button>' +
+          '</div>' +
+        '</aside>' +
+      '</section>' +
+    '</div>';
+  }
+
+  function wireIssue(){
+    // Back → triage
+    var back = document.getElementById('issBack');
+    if (back) back.addEventListener('click', function(){ window.scSetRoute('triage'); });
+
+    // Hand off → handoff screen (step 5 placeholder for now)
+    var ho = document.getElementById('issHandoff');
+    if (ho) ho.addEventListener('click', function(){ window.scSetRoute('handoff'); });
+
+    // Scrubber: click any pin to update detail panel + scrubbed class
+    var scrub = 4;
+    var track = document.querySelector('.tl-track');
+    if (track) {
+      track.addEventListener('click', function(e){
+        var btn = e.target.closest('.tl-step');
+        if (!btn) return;
+        var idx = parseInt(btn.getAttribute('data-step'), 10);
+        if (isNaN(idx) || idx === scrub) return;
+        // Update scrubbed class on all pins (cheap — 7 nodes)
+        var pins = track.querySelectorAll('.tl-pin');
+        for (var i = 0; i < pins.length; i++) {
+          pins[i].classList.toggle('scrubbed', i === idx);
+          // done pin check color swaps depending on scrub — CSS handles it via .done.scrubbed
+        }
+        scrub = idx;
+        var step = ISSUE_STEPS[idx];
+        document.getElementById('tlCount').textContent = 'step ' + (idx + 1) + ' / ' + ISSUE_STEPS.length;
+        document.getElementById('tlDetailHead').textContent = step.t + ' · ' + step.label;
+        document.getElementById('tlDetailBody').textContent = step.desc || 'Not reached yet.';
+      });
+    }
+
+    // Copy pairing code to clipboard
+    var copyBtn = document.getElementById('copyCodeBtn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function(){
+        var code = (document.getElementById('pairNum').textContent || '').replace(/\\s+/g, '');
+        if (navigator.clipboard && code) {
+          navigator.clipboard.writeText(code).then(function(){
+            var orig = copyBtn.textContent;
+            copyBtn.textContent = 'Copied ✓';
+            setTimeout(function(){ copyBtn.textContent = orig; }, 1400);
+          });
+        }
+      });
+    }
   }
 
   // Wire nav clicks
