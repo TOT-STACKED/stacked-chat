@@ -2678,6 +2678,51 @@ button { font-family: inherit; cursor: pointer; }
 .rail-runbook-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
 .rail-runbook-body  { font-size: 12px; color: var(--fg-muted); line-height: 1.55; }
 .rail-runbook-open { margin-top: 10px; width: 100%; }
+
+/* ─── HANDOFF SCREEN — novel moment #3 ───────────────────────────────── */
+.ho { display: grid; gap: 22px; }
+.ho-back { background: transparent; border: 1px solid var(--border); color: var(--fg-muted); padding: 8px 14px; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 700; justify-self: start; transition: border-color 120ms var(--ease), color 120ms var(--ease); }
+.ho-back:hover { border-color: var(--fg-dim); color: var(--fg); }
+.ho-h1 { font-family: var(--font-display); font-size: 40px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
+.ho-sub { font-size: 14px; color: var(--fg-muted); margin-top: 8px; max-width: 560px; }
+
+.ho-grid { display: grid; grid-template-columns: 1fr 1.1fr; gap: 16px; align-items: start; }
+
+/* Recipient cards */
+.ho-options { display: grid; gap: 10px; }
+.ho-opt { background: var(--ink-800); border: 1.5px solid var(--border); border-radius: 14px; padding: 18px; font-family: inherit; color: inherit; text-align: left; transition: border-color 120ms var(--ease), transform 120ms var(--ease); display: block; width: 100%; }
+.ho-opt:hover { transform: translateY(-1px); }
+.ho-opt.recommended { border-color: var(--stacked-green-500); }
+.ho-opt-top { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.ho-av { width: 40px; height: 40px; border-radius: 999px; background: var(--stacked-purple-500); color: var(--stacked-purple-700); display: grid; place-items: center; font-family: var(--font-display); font-size: 13px; font-weight: 700; flex-shrink: 0; }
+.ho-opt-meta { flex: 1; text-align: left; min-width: 0; }
+.ho-opt-name { font-size: 15px; font-weight: 800; }
+.ho-opt-role { font-size: 12px; color: var(--fg-muted); margin-top: 2px; }
+.ho-tag { font-size: 10px; font-family: var(--font-mono); padding: 3px 7px; border-radius: 3px; letter-spacing: 0.14px; font-weight: 800; flex-shrink: 0; }
+.ho-tag.recommended { background: var(--stacked-green-500); color: #0F0F0F; }
+.ho-tag.team        { background: var(--stacked-purple-500); color: #fff; }
+.ho-tag.paid        { background: var(--stacked-orange-500); color: #fff; }
+.ho-opt-foot { display: flex; justify-content: space-between; font-size: 11px; color: var(--fg-muted); border-top: 1px dashed var(--border); padding-top: 10px; }
+.ho-opt-foot b { color: var(--fg); font-weight: 700; }
+
+/* Attached chart */
+.ho-chart { background: var(--ink-800); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.ho-chart-head { margin-bottom: 14px; }
+.ho-chart-title { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; margin-top: 4px; font-weight: 600; }
+.ho-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+.ho-row-glyph { font-family: var(--font-mono); font-size: 12px; width: 16px; flex-shrink: 0; font-weight: 700; }
+.ho-row-glyph.ok    { color: var(--stacked-green-500); }
+.ho-row-glyph.warn  { color: var(--stacked-amber-500); }
+.ho-row-text { font-size: 13px; }
+.ho-hypothesis { display: flex; align-items: flex-start; gap: 10px; border-bottom: 0; margin-top: 8px; background: var(--ink-900); padding: 12px 14px; border-radius: 10px; }
+.ho-hypothesis .ho-row-glyph { padding-top: 1px; }
+.ho-permit { border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px; display: grid; gap: 6px; }
+.ho-check { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-muted); cursor: pointer; }
+.ho-check input { accent-color: var(--stacked-orange-500); cursor: pointer; }
+.ho-send { width: 100%; background: var(--stacked-orange-500); color: #fff; border: 0; padding: 14px 18px; border-radius: 10px; font-family: inherit; font-weight: 800; font-size: 14px; box-shadow: 0 5px 0 0 var(--stacked-orange-700); margin-top: 14px; transition: transform 120ms var(--ease), box-shadow 120ms var(--ease); }
+.ho-send:hover:not(.sent) { transform: translateY(-1px); box-shadow: 0 6px 0 0 var(--stacked-orange-700); }
+.ho-send:active:not(.sent) { transform: translateY(2px); box-shadow: 0 3px 0 0 var(--stacked-orange-700); }
+.ho-send.sent { background: var(--stacked-green-500); color: #0F0F0F; box-shadow: 0 5px 0 0 var(--stacked-green-700); cursor: default; }
 </style>
 </head>
 <body>
@@ -2829,6 +2874,9 @@ button { font-family: inherit; cursor: pointer; }
     } else if (r === 'issue') {
       content.innerHTML = renderIssue();
       wireIssue();
+    } else if (r === 'handoff') {
+      content.innerHTML = renderHandoff();
+      wireHandoff();
     } else {
       content.innerHTML =
         '<div class="content-placeholder"><div>' +
@@ -3234,6 +3282,118 @@ button { font-family: inherit; cursor: pointer; }
             setTimeout(function(){ copyBtn.textContent = orig; }, 1400);
           });
         }
+      });
+    }
+  }
+
+  // ─── HANDOFF SCREEN — novel moment #3 ─────────────────────────────────
+  var HO_RECIPIENTS = [
+    { id: 'vendor', name: 'Jo Adewale · Dojo',    role: 'Payments · Tier-2 Support',    eta: '~ 4 min', tag: 'RECOMMENDED', kind: 'recommended', initials: 'JA' },
+    { id: 'ops',    name: 'Marcus T. · your ops', role: 'Internal · on-shift now',      eta: '~ 1 min', tag: 'TEAM',        kind: 'team',        initials: 'MT' },
+    { id: 'conc',   name: 'Stacked Concierge',    role: 'Chris & team · hospitality',   eta: '~ 8 min', tag: 'PAID',        kind: 'paid',        initials: 'SC' }
+  ];
+
+  var HO_STEPS = [
+    'Intake · card terminal offline · Dojo T2',
+    'Matched KB-0412 (847 prior)',
+    'Dojo status API · terminal registered',
+    'Shoreditch WiFi reachable · 42ms',
+    'Proposed re-pair · code 7429',
+    'Operator entered code · terminal did not acknowledge'
+  ];
+
+  function renderRecipient(o, i){
+    var rec = (i === 0) ? ' recommended' : '';
+    return '<button class="ho-opt' + rec + '" data-recipient="' + esc(o.id) + '" type="button">' +
+      '<div class="ho-opt-top">' +
+        '<div class="ho-av">' + esc(o.initials) + '</div>' +
+        '<div class="ho-opt-meta">' +
+          '<div class="ho-opt-name">' + esc(o.name) + '</div>' +
+          '<div class="ho-opt-role">' + esc(o.role) + '</div>' +
+        '</div>' +
+        '<span class="ho-tag ' + o.kind + '">' + esc(o.tag) + '</span>' +
+      '</div>' +
+      '<div class="ho-opt-foot">' +
+        '<span>Avg response <b>' + esc(o.eta) + '</b></span>' +
+        '<span>Pick →</span>' +
+      '</div>' +
+    '</button>';
+  }
+
+  function renderHandoff(){
+    var recipients = HO_RECIPIENTS.map(renderRecipient).join('');
+
+    var chartRows = '';
+    for (var i = 0; i < HO_STEPS.length; i++) {
+      chartRows += '<div class="ho-row">' +
+        '<span class="ho-row-glyph ok">✓</span>' +
+        '<span class="ho-row-text">' + esc(HO_STEPS[i]) + '</span>' +
+      '</div>';
+    }
+
+    return '<div class="ho">' +
+      '<button class="ho-back" id="hoBack" type="button">← Back to issue</button>' +
+
+      '<div>' +
+        '<div class="eyebrow">Handoff · INC-20260421-14</div>' +
+        '<h1 class="ho-h1">Pass the baton to a human.</h1>' +
+        '<div class="ho-sub">The AI\\'s attached the full chart. Pick who takes over — the vendor\\'s on-call engineer, your own ops team, or Stacked\\'s concierge.</div>' +
+      '</div>' +
+
+      '<div class="ho-grid">' +
+        // Recipients column
+        '<div class="ho-options">' + recipients + '</div>' +
+
+        // Attached chart column
+        '<div class="ho-chart">' +
+          '<div class="ho-chart-head">' +
+            '<div class="eyebrow">Attached chart · read-only</div>' +
+            '<div class="ho-chart-title">What the AI already tried</div>' +
+          '</div>' +
+          chartRows +
+          '<div class="ho-hypothesis">' +
+            '<span class="ho-row-glyph warn">!</span>' +
+            '<span class="ho-row-text"><b>Hypothesis:</b> Bluetooth module on handset — Dojo will need to dispatch or remote-reset.</span>' +
+          '</div>' +
+          '<div class="ho-permit">' +
+            '<label class="ho-check"><input type="checkbox" checked> Include operator name &amp; contact</label>' +
+            '<label class="ho-check"><input type="checkbox" checked> Include site + vendor context</label>' +
+            '<label class="ho-check"><input type="checkbox"> Allow recipient to see stack health score</label>' +
+          '</div>' +
+          '<button class="ho-send" id="hoSend" type="button">Send chart &amp; open thread →</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function wireHandoff(){
+    // Back → issue (not triage — the README says Issue/Handoff are a pair)
+    var back = document.getElementById('hoBack');
+    if (back) back.addEventListener('click', function(){ window.scSetRoute('issue'); });
+
+    // Recipient click → highlight pick, update send button label so
+    // the confirmation names the right recipient.
+    var picked = HO_RECIPIENTS[0]; // default to recommended
+    document.querySelectorAll('[data-recipient]').forEach(function(el){
+      el.addEventListener('click', function(){
+        var id = el.getAttribute('data-recipient');
+        picked = HO_RECIPIENTS.find(function(x){ return x.id === id; }) || picked;
+        // Move the green "recommended" border to the chosen card
+        document.querySelectorAll('.ho-opt').forEach(function(c){ c.classList.remove('recommended'); });
+        el.classList.add('recommended');
+      });
+    });
+
+    // Send → confirm state
+    var send = document.getElementById('hoSend');
+    if (send) {
+      send.addEventListener('click', function(){
+        if (send.classList.contains('sent')) return;
+        send.classList.add('sent');
+        // Use just the first name for the confirmation ("Jo", "Marcus", or
+        // "Stacked Concierge" which has no separator). Matches the prototype.
+        var first = picked.name.split(' ')[0].replace(/·.*$/, '');
+        send.textContent = '✓ Sent to ' + first + ' · awaiting reply';
       });
     }
   }
