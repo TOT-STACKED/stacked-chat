@@ -865,7 +865,23 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    /* Stacked design-system tokens (see colors_and_type.css) */
+    /* Legacy chat-widget tokens (light theme — the chat widget stays
+       light/cream because it's seen by stressed operators on-shift.
+       Only the new accent orange #E87830, Geist body font, Fraunces
+       gate heading, and 4px offset-shadow buttons carry over from the
+       /app dashboard rebrand.) */
+    --cream: #EDEBE5; --cream-dark: #D6D2C8;
+    --orange: {{PRIMARY_COLOR}}; --orange-light: {{PRIMARY_COLOR}}cc;
+    --brown: #1A1A1A; --brown-mid: #6B6867;
+    --white: #ffffff; --green: #2a9d5c; --red: #d64545;
+    --purple: #9B8AC2; --purple-light: #B3A6D6;
+    --green-brand: #B7D46A; --green-brand-light: #D1E58F;
+    --shadow: 0 2px 16px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    /* Stacked design-system tokens — available for opt-in use but not
+       applied as defaults on the chat widget. See colors_and_type.css. */
     --ink-900: #0A0A0A; --ink-800: #131313; --ink-700: #1D1D1D;
     --fg: #F4EFE6; --fg-muted: #928A7C; --fg-dim: #555048;
     --border: #262421;
@@ -877,28 +893,6 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     --font-sans:    'Geist', ui-sans-serif, system-ui, sans-serif;
     --font-display: 'Fraunces', 'Fraunces Placeholder', ui-serif, Georgia, serif;
     --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', monospace;
-
-    /* Legacy token names remapped to dark-theme values so existing CSS
-       rules cascade cleanly. Same names, new values — no need to rewrite
-       every rule. Per-venue branding via {{PRIMARY_COLOR}} still wins
-       through --orange (C2 of the rebrand plan). */
-    --cream:       var(--ink-900);     /* body / page bg */
-    --cream-dark:  var(--border);      /* borders on dark */
-    --orange:      {{PRIMARY_COLOR}};  /* accent — per-venue overridable */
-    --orange-light: {{PRIMARY_COLOR}}cc;
-    --brown:       var(--fg);          /* primary text on dark */
-    --brown-mid:   var(--fg-muted);    /* muted text */
-    --white:       var(--ink-800);     /* card / surface bg (NOT text) */
-    --green:       var(--stacked-green-500);
-    --red:         var(--stacked-red-500);
-    --purple:      var(--stacked-purple-500);
-    --purple-light: #B3A6D6;
-    --green-brand: var(--stacked-green-500);
-    --green-brand-light: #D1E58F;
-    --shadow:    0 2px 16px rgba(0,0,0,0.4);
-    --shadow-lg: 0 8px 32px rgba(0,0,0,0.55);
-    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-    color-scheme: dark;
   }
   ::selection { background: var(--orange); color: #fff; }
   html { height: 100%; height: 100dvh; overflow-x: hidden; overflow-y: hidden; }
@@ -911,93 +905,95 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   /* ─── GATE ─── */
   #gate {
     position: fixed; inset: 0;
-    background: var(--ink-900);
-    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(232,120,48,0.10) 0%, transparent 70%),
-                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(199,179,242,0.06) 0%, transparent 60%);
+    background: #EDEBE5;
+    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(232,120,48,0.07) 0%, transparent 70%),
+                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(232,120,48,0.04) 0%, transparent 60%);
     display: flex; align-items: center; justify-content: center;
     z-index: 100; padding: 16px; overflow-y: auto;
   }
   #gate.hidden { display: none; }
   .gate-card {
-    background: var(--ink-800);
-    border: 1px solid var(--border);
+    background: #ffffff;
+    border: 1px solid #E0DDD5;
     border-radius: 20px;
     padding: 36px 32px;
     width: 100%; max-width: 400px;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.35), 0 16px 48px rgba(0,0,0,0.55);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.04), 0 16px 48px rgba(0,0,0,0.08);
     text-align: left;
   }
   .gate-logo { height: 32px; max-width: 160px; object-fit: contain; margin-bottom: 28px; display: block; opacity: 0; animation: staggerIn 0.5s var(--ease) 0.1s forwards; }
+  /* Gate h2 upgraded to Fraunces display (kept from /app rebrand) */
   .gate-card h2 {
     font-family: var(--font-display);
     font-size: 26px; font-weight: 600;
-    color: var(--fg); letter-spacing: -0.02em;
+    color: #1A1A1A; letter-spacing: -0.02em;
     margin-bottom: 6px; line-height: 1.1;
     opacity: 0; animation: staggerIn 0.5s var(--ease) 0.2s forwards;
   }
   .gate-sub { display: none; }
   .gate-card p {
     font-family: var(--font-sans);
-    font-size: 14px; color: var(--fg-muted);
+    font-size: 14px; color: #6B6867;
     margin-bottom: 24px; line-height: 1.5; font-weight: 400;
     opacity: 0; animation: staggerIn 0.5s var(--ease) 0.3s forwards;
   }
   .gate-input {
     width: 100%; padding: 12px 14px;
-    border: 1px solid var(--border);
+    border: 1px solid #D6D2C8;
     border-radius: 10px;
     font-family: var(--font-sans); font-size: 14px;
-    color: var(--fg);
-    background: var(--ink-900);
+    color: #1A1A1A;
+    background: #F5F3EF;
     margin-bottom: 10px; outline: none;
     transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .gate-input:focus { border-color: var(--orange); background: var(--ink-900); box-shadow: 0 0 0 3px rgba(232,120,48,0.18); }
-  .gate-input::placeholder { color: var(--fg-dim); }
+  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(232,120,48,0.12); }
+  .gate-input::placeholder { color: #A8A49C; }
+  /* Gate CTA upgraded to the 4px offset-shadow button from /app (kept from rebrand) */
   .gate-btn {
     width: 100%; padding: 13px;
     background: var(--orange);
     color: #fff; border: none; border-radius: 10px;
     font-family: var(--font-sans); font-size: 15px; font-weight: 700;
     cursor: pointer; margin-top: 6px;
-    transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+    transition: transform 0.1s, box-shadow 0.15s;
     letter-spacing: -0.2px;
     box-shadow: 0 4px 0 0 var(--stacked-orange-700);
   }
   .gate-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 0 0 var(--stacked-orange-700); }
   .gate-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
-  .gate-error { font-size: 13px; color: var(--stacked-red-500); margin-top: -4px; margin-bottom: 8px; display: none; font-family: var(--font-sans); }
+  .gate-error { font-size: 13px; color: #ff6b6b; margin-top: -4px; margin-bottom: 8px; display: none; font-family: var(--font-sans); }
 
   /* ─── VENUE AUTOCOMPLETE ─── */
   .venue-wrap { position: relative; margin-bottom: 10px; }
   .venue-wrap .gate-input { margin-bottom: 0; }
   .venue-dropdown {
     position: absolute; top: calc(100% + 4px); left: 0; right: 0;
-    background: var(--ink-800); border: 1px solid var(--border);
-    border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 200;
+    background: #fff; border: 1px solid #D6D2C8;
+    border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.10); z-index: 200;
     overflow: hidden; display: none;
   }
   .venue-dropdown.open { display: block; }
   .venue-option {
     padding: 12px 14px; font-size: 14px; font-family: var(--font-sans);
-    color: var(--fg); cursor: pointer; text-align: left;
-    border-bottom: 1px solid var(--border); transition: background 0.1s;
+    color: #1A1A1A; cursor: pointer; text-align: left;
+    border-bottom: 1px solid #EDE9E0; transition: background 0.1s;
     display: flex; align-items: center; gap: 10px;
   }
   .venue-option:last-child { border-bottom: none; }
-  .venue-option:hover { background: var(--ink-700); }
+  .venue-option:hover { background: #F0ECE4; }
   .venue-option .venue-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
-  .venue-option .venue-dot.new { background: var(--stacked-green-500); }
-  .venue-option strong { font-weight: 600; color: var(--fg); }
-  .venue-option span { font-size: 12px; color: var(--fg-muted); }
+  .venue-option .venue-dot.new { background: var(--green); }
+  .venue-option strong { font-weight: 600; color: #1A1A1A; }
+  .venue-option span { font-size: 12px; color: #6B6867; }
   .venue-confirmed {
-    background: rgba(59,211,111,0.10); border: 1px solid rgba(59,211,111,0.28);
+    background: rgba(42,157,92,0.07); border: 1px solid rgba(42,157,92,0.2);
     border-radius: 10px; padding: 10px 14px; margin-bottom: 10px;
     display: none; align-items: center; gap: 10px; font-size: 14px; font-weight: 500;
-    color: var(--fg); text-align: left; font-family: var(--font-sans);
+    color: #1A1A1A; text-align: left; font-family: var(--font-sans);
   }
   .venue-confirmed.show { display: flex; }
-  .venue-confirmed .vc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--stacked-green-500); flex-shrink: 0; }
+  .venue-confirmed .vc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
   .venue-confirmed .vc-change { margin-left: auto; font-size: 12px; color: var(--orange); cursor: pointer; font-weight: 700; }
 
   /* ─── APP SHELL ─── */
@@ -1056,7 +1052,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,84,58,0.1); }
   .link-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; padding-left: 42px; }
   .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: all 0.15s; white-space: nowrap; box-shadow: 0 2px 8px rgba(232,87,60,0.20); }
-  .link-pill:hover { background: var(--stacked-orange-700); transform: translateY(-1px); }
+  .link-pill:hover { background: #C94A30; transform: translateY(-1px); }
   .typing-bubble { display: flex; align-items: flex-start; gap: 10px; }
   .dots { display: flex; gap: 4px; align-items: center; background: var(--white); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow); }
   .dot-anim { width: 8px; height: 8px; border-radius: 50%; animation: dotBounce 1.4s ease-in-out infinite; }
@@ -1107,18 +1103,18 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; color: #fff; transition: background 0.15s; }
   .modal-submit:hover { background: var(--orange-light); }
   .toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--brown); color: #fff; border-radius: 20px; padding: 10px 20px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap; }
-  .reminder-banner { display: flex; align-items: center; gap: 12px; background: rgba(59,211,111,0.10); border: 1.5px solid rgba(59,211,111,0.30); border-radius: 14px; padding: 12px 16px; margin: 8px 16px; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
-  .reminder-banner:hover { box-shadow: 0 4px 16px rgba(59,211,111,0.22); border-color: rgba(59,211,111,0.5); }
+  .reminder-banner { display: flex; align-items: center; gap: 12px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 12px 16px; margin: 8px 16px; cursor: pointer; transition: box-shadow 0.15s; }
+  .reminder-banner:hover { box-shadow: 0 4px 16px rgba(34,197,94,0.15); }
   .reminder-banner .rem-icon { font-size: 22px; flex-shrink: 0; }
   .reminder-banner .rem-body { flex: 1; }
-  .reminder-banner .rem-title { font-family: var(--font-sans); font-size: 13px; font-weight: 700; color: var(--stacked-green-500); }
-  .reminder-banner .rem-sub { font-family: var(--font-sans); font-size: 12px; color: var(--fg-muted); }
-  .reminder-banner .rem-cta { font-family: var(--font-sans); font-size: 12px; font-weight: 700; color: var(--stacked-green-500); white-space: nowrap; }
-  .escalation-banner { display: flex; align-items: flex-start; gap: 12px; background: rgba(245,165,36,0.10); border: 1.5px solid rgba(245,165,36,0.35); border-radius: 16px; padding: 14px 16px; margin: 0 0 4px 42px; max-width: min(calc(100vw - 90px), 520px); }
+  .reminder-banner .rem-title { font-family: var(--font-sans); font-size: 13px; font-weight: 700; color: #15803d; }
+  .reminder-banner .rem-sub { font-family: var(--font-sans); font-size: 12px; color: #16a34a; }
+  .reminder-banner .rem-cta { font-family: var(--font-sans); font-size: 12px; font-weight: 700; color: #15803d; white-space: nowrap; }
+  .escalation-banner { display: flex; align-items: flex-start; gap: 12px; background: #fff8f0; border: 1.5px solid #f59e42; border-radius: 16px; padding: 14px 16px; margin: 0 0 4px 42px; max-width: min(calc(100vw - 90px), 520px); }
   .escalation-banner .esc-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
   .escalation-banner .esc-body { flex: 1; }
-  .escalation-banner .esc-title { font-family: var(--font-sans); font-size: 13px; font-weight: 700; color: var(--stacked-amber-500); margin-bottom: 3px; }
-  .escalation-banner .esc-sub { font-family: var(--font-sans); font-size: 12px; color: var(--fg-muted); line-height: 1.4; }
+  .escalation-banner .esc-title { font-family: var(--font-sans); font-size: 13px; font-weight: 700; color: #92400e; margin-bottom: 3px; }
+  .escalation-banner .esc-sub { font-family: var(--font-sans); font-size: 12px; color: #b45309; line-height: 1.4; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.green { background: var(--green); }
   .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
@@ -1190,9 +1186,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     cursor: pointer; text-align: center; transition: all 0.15s; background: var(--white);
   }
   .sc-opt:hover { border-color: var(--orange); }
-  .sc-opt.selected-green { background: rgba(59,211,111,0.15); border-color: var(--stacked-green-500); color: var(--stacked-green-500); }
-  .sc-opt.selected-amber { background: rgba(245,165,36,0.15); border-color: var(--stacked-amber-500); color: var(--stacked-amber-500); }
-  .sc-opt.selected-red { background: rgba(229,72,77,0.15); border-color: var(--stacked-red-500); color: var(--stacked-red-500); }
+  .sc-opt.selected-green { background: #dcfce7; border-color: #16a34a; color: #166534; }
+  .sc-opt.selected-amber { background: #fef9c3; border-color: #ca8a04; color: #854d0e; }
+  .sc-opt.selected-red { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
   .sc-progress { height: 3px; background: var(--cream-dark); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
   .sc-progress-fill { height: 100%; background: var(--orange); border-radius: 2px; transition: width 0.3s ease; }
   .sc-summary { text-align: center; padding: 8px 0 4px; }
@@ -1200,8 +1196,8 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .sc-summary-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; margin-bottom: 6px; }
   .sc-summary-sub { font-size: 14px; color: var(--brown-mid); margin-bottom: 16px; line-height: 1.5; }
   .sc-issues-list { text-align: left; margin-bottom: 16px; }
-  .sc-issue-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(229,72,77,0.15); border-radius: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--stacked-red-500); }
-  .sc-issue-item.amber { background: rgba(245,165,36,0.15); color: var(--stacked-amber-500); }
+  .sc-issue-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fee2e2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #991b1b; }
+  .sc-issue-item.amber { background: #fef9c3; color: #854d0e; }
   .sc-fix-btn { width: 100%; padding: 13px; background: var(--orange); color: #fff; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
   .sc-done-btn { width: 100%; padding: 11px; background: var(--cream); color: var(--brown); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
 
@@ -1762,9 +1758,7 @@ function renderQRCode() {
   const el = document.getElementById('qrCode');
   if (!el || typeof QRCode === 'undefined') return;
   el.innerHTML = '';
-  // QR needs high contrast to scan — keep dark bars on a cream bg (matches the fg token)
-  // rather than inverting, which some scanners handle unreliably.
-  new QRCode(el, { text: window.location.href.split('?')[0], width: 96, height: 96, colorDark: '#0A0A0A', colorLight: '#F4EFE6', correctLevel: QRCode.CorrectLevel.M });
+  new QRCode(el, { text: window.location.href.split('?')[0], width: 96, height: 96, colorDark: '#1A1A1A', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
 }
 
 function renderQuickBtns() {
@@ -2132,8 +2126,8 @@ function scFinish() {
   const btn = document.getElementById('shiftCheckBtn');
   if (btn) {
     btn.innerHTML = '✅ Shift check done';
-    btn.style.borderColor = 'var(--stacked-green-500)';
-    btn.style.color = 'var(--stacked-green-500)';
+    btn.style.borderColor = '#16a34a';
+    btn.style.color = '#166534';
     btn.onclick = null;
     btn.style.cursor = 'default';
   }
