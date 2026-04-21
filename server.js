@@ -2723,6 +2723,102 @@ button { font-family: inherit; cursor: pointer; }
 .ho-send:hover:not(.sent) { transform: translateY(-1px); box-shadow: 0 6px 0 0 var(--stacked-orange-700); }
 .ho-send:active:not(.sent) { transform: translateY(2px); box-shadow: 0 3px 0 0 var(--stacked-orange-700); }
 .ho-send.sent { background: var(--stacked-green-500); color: #0F0F0F; box-shadow: 0 5px 0 0 var(--stacked-green-700); cursor: default; }
+
+/* ─── HEALTH SCREEN ──────────────────────────────────────────────────── */
+.hl { display: grid; gap: 22px; }
+.hl-head { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: start; }
+.hl-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
+.hl-sub { font-size: 14px; color: var(--fg-muted); margin-top: 8px; max-width: 560px; }
+.hl-sub b { color: var(--fg); font-weight: 700; }
+.hl-overall { background: var(--ink-800); border: 1px solid var(--border); border-radius: 14px; padding: 14px 22px; display: grid; gap: 4px; justify-items: center; min-width: 180px; }
+.hl-overall-label { font-size: 10px; color: var(--fg-muted); letter-spacing: 0.18px; text-transform: uppercase; font-weight: 800; }
+.hl-overall-num { font-family: var(--font-display); font-size: 72px; line-height: 1; letter-spacing: -0.02em; color: var(--stacked-green-500); font-weight: 600; }
+.hl-overall-trend { font-size: 11px; color: var(--stacked-green-500); font-family: var(--font-mono); font-weight: 700; }
+.hl-panel { background: var(--ink-800); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+.hl-panel-head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 18px; gap: 18px; }
+.hl-panel-title { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; font-weight: 600; }
+.hl-panel-meta { font-size: 11px; color: var(--fg-muted); }
+
+/* Heatmap */
+.hl-heat { display: grid; gap: 3px; }
+.hl-heat-row { display: grid; grid-template-columns: 56px repeat(30, 1fr); gap: 3px; align-items: center; }
+.hl-heat-lbl { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); }
+.hl-heat-cell { height: 16px; border-radius: 2px; }
+.hl-heat-cell.l0 { background: rgba(59,211,111,0.18); }
+.hl-heat-cell.l1 { background: rgba(245,165,36,0.35); }
+.hl-heat-cell.l2 { background: rgba(245,165,36,0.75); }
+.hl-heat-cell.l3 { background: var(--stacked-red-500); }
+.hl-heat-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-left: 56px; gap: 18px; }
+.hl-heat-foot > span { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); }
+.hl-heat-legend { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--fg-muted); }
+.hl-heat-legend .sw { width: 10px; height: 10px; display: inline-block; border-radius: 2px; }
+
+/* Vendor grades */
+.hl-vgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.hl-vcard { background: var(--ink-900); border: 1px solid var(--border); border-radius: 12px; padding: 16px; transition: border-color 120ms var(--ease); }
+.hl-vcard:hover { border-color: var(--fg-dim); }
+.hl-vtop { display: flex; justify-content: space-between; }
+.hl-vcat { font-size: 10px; color: var(--fg-muted); font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.14px; font-weight: 700; }
+.hl-vtrend { font-size: 11px; font-family: var(--font-mono); font-weight: 700; }
+.hl-vtrend.up   { color: var(--stacked-green-500); }
+.hl-vtrend.down { color: var(--stacked-red-500); }
+.hl-vmid { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 6px; gap: 10px; }
+.hl-vname { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; font-weight: 600; }
+.hl-vscore { font-family: var(--font-display); font-size: 40px; line-height: 1; font-weight: 600; }
+.hl-vscore.green { color: var(--stacked-green-500); }
+.hl-vscore.amber { color: var(--stacked-amber-500); }
+.hl-vscore.red   { color: var(--stacked-red-500); }
+.hl-vbar { height: 6px; background: var(--ink-700); border-radius: 3px; margin-top: 12px; overflow: hidden; }
+.hl-vbar-fill { height: 100%; transition: width 400ms var(--ease); }
+.hl-vbar-fill.green { background: var(--stacked-green-500); }
+.hl-vbar-fill.amber { background: var(--stacked-amber-500); }
+.hl-vbar-fill.red   { background: var(--stacked-red-500); }
+.hl-vfoot { display: flex; justify-content: space-between; font-size: 11px; color: var(--fg-muted); margin-top: 10px; }
+.hl-drill { background: transparent; border: 0; color: var(--stacked-orange-500); font-size: 11px; font-family: inherit; font-weight: 700; }
+.hl-drill:hover { text-decoration: underline; }
+
+/* Recommendations */
+.hl-rec { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+.hl-rec-label { font-size: 10px; font-family: var(--font-mono); color: var(--stacked-orange-500); letter-spacing: 0.14px; font-weight: 700; }
+.hl-rec-title { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; margin-top: 4px; font-weight: 600; }
+.hl-rec-body  { font-size: 13px; color: var(--fg-muted); margin-top: 6px; line-height: 1.55; max-width: 720px; }
+.hl-rec-btn { background: var(--ink-900); border: 1px solid var(--border); color: var(--fg); padding: 10px 14px; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 700; margin-top: 12px; transition: border-color 120ms var(--ease); }
+.hl-rec-btn:hover { border-color: var(--fg-dim); }
+
+/* ─── RUNBOOKS SCREEN ────────────────────────────────────────────────── */
+.rb { display: grid; gap: 22px; }
+.rb-head { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; }
+.rb-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
+.rb-sub { font-size: 14px; color: var(--fg-muted); margin-top: 8px; max-width: 560px; }
+.rb-add { background: var(--stacked-orange-500); color: #fff; border: 0; padding: 12px 18px; border-radius: 999px; font-family: inherit; font-weight: 800; font-size: 13px; box-shadow: 0 4px 0 0 var(--stacked-orange-700); transition: transform 120ms var(--ease), box-shadow 120ms var(--ease); }
+.rb-add:hover { transform: translateY(-1px); box-shadow: 0 5px 0 0 var(--stacked-orange-700); }
+.rb-add:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
+
+.rb-filters { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.rb-chip { background: var(--ink-800); border: 1px solid var(--border); color: var(--fg-muted); padding: 7px 12px; border-radius: 999px; font-family: inherit; font-size: 12px; font-weight: 700; transition: border-color 120ms var(--ease), background 120ms var(--ease), color 120ms var(--ease); }
+.rb-chip:hover { border-color: var(--fg-dim); color: var(--fg); }
+.rb-chip.on { background: var(--fg); color: var(--ink-900); border-color: var(--fg); }
+.rb-chip.on:hover { border-color: var(--fg); }
+.rb-spacer { flex: 1; }
+.rb-sort { font-size: 12px; color: var(--fg-muted); cursor: pointer; user-select: none; }
+.rb-sort:hover { color: var(--fg); }
+
+.rb-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.rb-card { background: var(--ink-800); border: 1px solid var(--border); border-radius: 14px; padding: 18px; transition: border-color 120ms var(--ease), transform 120ms var(--ease); }
+.rb-card:hover { border-color: var(--fg-dim); transform: translateY(-1px); }
+.rb-card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.rb-id { font-family: var(--font-mono); font-size: 11px; color: var(--stacked-orange-500); letter-spacing: 0.14px; font-weight: 700; }
+.rb-cat-tag { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.14px; background: var(--ink-700); padding: 3px 7px; border-radius: 3px; color: var(--fg-muted); font-weight: 700; }
+.rb-title { font-family: var(--font-display); font-size: 22px; letter-spacing: -0.01em; margin-top: 10px; margin-bottom: 6px; font-weight: 600; }
+.rb-desc { font-size: 13px; color: var(--fg-muted); line-height: 1.55; min-height: 56px; }
+.rb-stats { display: flex; align-items: flex-end; gap: 18px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.rb-st-v { font-family: var(--font-display); font-size: 20px; line-height: 1; font-weight: 600; }
+.rb-st-v.green { color: var(--stacked-green-500); }
+.rb-st-v.amber { color: var(--stacked-amber-500); }
+.rb-st-v.red   { color: var(--stacked-red-500); }
+.rb-st-l { font-size: 9px; font-family: var(--font-mono); color: var(--fg-muted); letter-spacing: 0.14px; font-weight: 700; margin-top: 4px; }
+.rb-open { margin-left: auto; background: transparent; border: 0; color: var(--stacked-orange-500); font-family: inherit; font-size: 12px; font-weight: 700; }
+.rb-open:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -2877,6 +2973,12 @@ button { font-family: inherit; cursor: pointer; }
     } else if (r === 'handoff') {
       content.innerHTML = renderHandoff();
       wireHandoff();
+    } else if (r === 'health') {
+      content.innerHTML = renderHealth();
+      wireHealth();
+    } else if (r === 'runbooks') {
+      content.innerHTML = renderRunbooks();
+      wireRunbooks();
     } else {
       content.innerHTML =
         '<div class="content-placeholder"><div>' +
@@ -3396,6 +3498,223 @@ button { font-family: inherit; cursor: pointer; }
         send.textContent = '✓ Sent to ' + first + ' · awaiting reply';
       });
     }
+  }
+
+  // ─── HEALTH SCREEN ────────────────────────────────────────────────────
+  // Mock data mirrors health.jsx verbatim — swapped for real data in step 7.
+  var HEALTH_VENDORS = [
+    { name: 'Dojo',       cat: 'Payments', score: 71, trend: -4,  incidents: 12 },
+    { name: 'Square',     cat: 'EPOS',     score: 92, trend: 2,   incidents: 3 },
+    { name: 'Deliveroo',  cat: 'Delivery', score: 64, trend: -11, incidents: 18 },
+    { name: 'Planday',    cat: 'Rota',     score: 88, trend: 1,   incidents: 4 },
+    { name: 'SumUp',      cat: 'Payments', score: 84, trend: 3,   incidents: 5 },
+    { name: 'Lightspeed', cat: 'EPOS',     score: 79, trend: -2,  incidents: 7 },
+    { name: 'Uber Eats',  cat: 'Delivery', score: 81, trend: 4,   incidents: 6 },
+    { name: 'Xero',       cat: 'Finance',  score: 96, trend: 1,   incidents: 1 }
+  ];
+
+  var HEALTH_RECS = [
+    { title: 'Deliveroo is costing you ~£1,240/mo',
+      body:  'Push failures at Peckham + Camden are correlated with rush. Consider Uber Eats as primary there — their grade for burger-format sites in London is 91.',
+      cta:   'Compare vendors' },
+    { title: 'Two sites are out-of-spec on WiFi',
+      body:  'Shoreditch EC2 + Borough SE1 see latency spikes when over 40 covers. Both run consumer BT Hubs. A Draytek swap would save roughly 14 incidents/mo.',
+      cta:   'Open ticket with IT' },
+    { title: 'Staff rota keeps breaking Planday on Mondays',
+      body:  '5 of 8 Planday incidents this month were the same error at 09.00. Our runbook KB-0299 has a permanent fix — takes 4 minutes to apply.',
+      cta:   'Apply across estate' }
+  ];
+
+  function scoreColor(s){ return s >= 90 ? 'green' : s >= 75 ? 'amber' : 'red'; }
+
+  function heatLevel(r, c){
+    // Deterministic seed matching the prototype so the heatmap renders
+    // the same across reloads (and the same as the React version).
+    var seed = (r * 31 + c * 7) % 13;
+    return seed > 10 ? 3 : seed > 8 ? 2 : seed > 5 ? 1 : 0;
+  }
+
+  function renderHealth(){
+    // Heatmap: 14 rows × 30 cols
+    var heat = '';
+    for (var r = 0; r < 14; r++) {
+      var row = '<div class="hl-heat-row">' +
+        '<div class="hl-heat-lbl">Site ' + String(r + 1).padStart(2, '0') + '</div>';
+      for (var c = 0; c < 30; c++) {
+        row += '<div class="hl-heat-cell l' + heatLevel(r, c) + '"></div>';
+      }
+      row += '</div>';
+      heat += row;
+    }
+
+    // Vendor grade cards
+    var vendors = '';
+    for (var i = 0; i < HEALTH_VENDORS.length; i++) {
+      var v = HEALTH_VENDORS[i];
+      var tone = scoreColor(v.score);
+      var trendCls = v.trend > 0 ? 'up' : 'down';
+      var trendText = v.trend > 0 ? '▲ +' + v.trend : '▼ ' + v.trend;
+      vendors += '<div class="hl-vcard">' +
+        '<div class="hl-vtop">' +
+          '<span class="hl-vcat">' + esc(v.cat) + '</span>' +
+          '<span class="hl-vtrend ' + trendCls + '">' + trendText + '</span>' +
+        '</div>' +
+        '<div class="hl-vmid">' +
+          '<div class="hl-vname">' + esc(v.name) + '</div>' +
+          '<div class="hl-vscore ' + tone + '">' + v.score + '</div>' +
+        '</div>' +
+        '<div class="hl-vbar"><div class="hl-vbar-fill ' + tone + '" style="width:' + v.score + '%"></div></div>' +
+        '<div class="hl-vfoot">' +
+          '<span>' + v.incidents + ' incidents this month</span>' +
+          '<button class="hl-drill" type="button">Drill →</button>' +
+        '</div>' +
+      '</div>';
+    }
+
+    // Recommendations
+    var recs = '';
+    for (var j = 0; j < HEALTH_RECS.length; j++) {
+      var rec = HEALTH_RECS[j];
+      recs += '<div class="hl-rec">' +
+        '<div class="hl-rec-label">REC · 0' + (j + 1) + '</div>' +
+        '<div class="hl-rec-title">' + esc(rec.title) + '</div>' +
+        '<div class="hl-rec-body">' + esc(rec.body) + '</div>' +
+        '<button class="hl-rec-btn" type="button">' + esc(rec.cta) + ' →</button>' +
+      '</div>';
+    }
+
+    return '<div class="hl">' +
+      // Header + overall score
+      '<section class="hl-head">' +
+        '<div>' +
+          '<div class="eyebrow">Stack health · last 30 days</div>' +
+          '<h1 class="hl-h1">Your tech stack, graded.</h1>' +
+          '<div class="hl-sub">One honest score per vendor. Based on how often they break on <b>your</b> sites — not marketing.</div>' +
+        '</div>' +
+        '<div class="hl-overall">' +
+          '<div class="hl-overall-label">Estate health</div>' +
+          '<div class="hl-overall-num">82</div>' +
+          '<div class="hl-overall-trend">▲ +3 vs. last month</div>' +
+        '</div>' +
+      '</section>' +
+
+      // Incident heatmap
+      '<section class="hl-panel">' +
+        '<div class="hl-panel-head">' +
+          '<div class="hl-panel-title">Incident heatmap</div>' +
+          '<div class="hl-panel-meta">Rows = your 14 sites · Columns = last 30 days</div>' +
+        '</div>' +
+        '<div class="hl-heat">' + heat + '</div>' +
+        '<div class="hl-heat-foot">' +
+          '<span>← 30d ago</span>' +
+          '<div class="hl-heat-legend">Fewer' +
+            '<span class="sw" style="background:rgba(59,211,111,0.18)"></span>' +
+            '<span class="sw" style="background:rgba(245,165,36,0.35)"></span>' +
+            '<span class="sw" style="background:rgba(245,165,36,0.75)"></span>' +
+            '<span class="sw" style="background:var(--stacked-red-500)"></span>' +
+          'More</div>' +
+          '<span>today →</span>' +
+        '</div>' +
+      '</section>' +
+
+      // Vendor grades
+      '<section class="hl-panel">' +
+        '<div class="hl-panel-head">' +
+          '<div class="hl-panel-title">Vendor grades</div>' +
+          '<div class="hl-panel-meta">Based on your estate, your shifts, your customers.</div>' +
+        '</div>' +
+        '<div class="hl-vgrid">' + vendors + '</div>' +
+      '</section>' +
+
+      // Recommendations
+      '<section class="hl-panel">' +
+        '<div class="hl-panel-head">' +
+          '<div class="hl-panel-title">What we\\'d change</div>' +
+          '<div class="hl-panel-meta">3 recommendations · auto-generated from your incident data</div>' +
+        '</div>' +
+        recs +
+      '</section>' +
+    '</div>';
+  }
+
+  function wireHealth(){
+    // No heavy interactions in v1. Drill buttons are placeholders.
+  }
+
+  // ─── RUNBOOKS SCREEN ──────────────────────────────────────────────────
+  var RB_CATS = ['All', 'Payments', 'EPOS', 'Delivery', 'Rota', 'Network', 'Finance'];
+  var RB_BOOKS = [
+    { id: 'KB-0412', title: 'Dojo T2 pairing loss',              cat: 'Payments', uses: 847,  rate: 94, desc: 'Most common after firmware update. Re-pair sequence usually fixes it.' },
+    { id: 'KB-0299', title: 'Planday Monday 09.00 auth fail',    cat: 'Rota',     uses: 412,  rate: 99, desc: 'Known token-refresh race. Apply once per site, stays fixed.' },
+    { id: 'KB-0503', title: 'Deliveroo push backlog',            cat: 'Delivery', uses: 318,  rate: 72, desc: 'Queue a manual sync and confirm receipt ID. Vendor ticket if three strikes.' },
+    { id: 'KB-0187', title: 'Square till frozen',                cat: 'EPOS',     uses: 1204, rate: 97, desc: 'Hard-close app, re-launch. If repeats — SD card near-full.' },
+    { id: 'KB-0622', title: 'SumUp reader unresponsive',         cat: 'Payments', uses: 289,  rate: 88, desc: 'Reset handshake, then re-pair. Battery check at > 5 min idle.' },
+    { id: 'KB-0099', title: 'WiFi latency > 120ms at cover',     cat: 'Network',  uses: 156,  rate: 64, desc: 'Usually the router. Move BT handsets off 2.4GHz.' }
+  ];
+
+  function rateColor(p){ return p >= 90 ? 'green' : p >= 75 ? 'amber' : 'red'; }
+
+  function renderRunbookCard(b){
+    var tone = rateColor(b.rate);
+    return '<article class="rb-card" data-cat="' + esc(b.cat) + '">' +
+      '<div class="rb-card-top">' +
+        '<span class="rb-id">' + esc(b.id) + '</span>' +
+        '<span class="rb-cat-tag">' + esc(b.cat) + '</span>' +
+      '</div>' +
+      '<div class="rb-title">' + esc(b.title) + '</div>' +
+      '<div class="rb-desc">' + esc(b.desc) + '</div>' +
+      '<div class="rb-stats">' +
+        '<div><div class="rb-st-v">' + b.uses.toLocaleString() + '</div><div class="rb-st-l">USES</div></div>' +
+        '<div><div class="rb-st-v ' + tone + '">' + b.rate + '%</div><div class="rb-st-l">FIRST-PASS</div></div>' +
+        '<button class="rb-open" type="button">Open →</button>' +
+      '</div>' +
+    '</article>';
+  }
+
+  function renderRunbooks(){
+    var chips = '';
+    for (var i = 0; i < RB_CATS.length; i++) {
+      chips += '<button class="rb-chip' + (i === 0 ? ' on' : '') + '" data-filter="' + esc(RB_CATS[i]) + '" type="button">' + esc(RB_CATS[i]) + '</button>';
+    }
+
+    var cards = RB_BOOKS.map(renderRunbookCard).join('');
+
+    return '<div class="rb">' +
+      '<section class="rb-head">' +
+        '<div>' +
+          '<div class="eyebrow">Runbook library · 142 entries</div>' +
+          '<h1 class="rb-h1">Every fix we\\'ve ever learned.</h1>' +
+          '<div class="rb-sub">Your AI reads these. So can you. Add your own — or edit ours.</div>' +
+        '</div>' +
+        '<button class="rb-add" type="button">＋ New runbook</button>' +
+      '</section>' +
+
+      '<div class="rb-filters">' +
+        chips +
+        '<div class="rb-spacer"></div>' +
+        '<div class="rb-sort">Sort: Most used ▾</div>' +
+      '</div>' +
+
+      '<div class="rb-grid" id="rbGrid">' + cards + '</div>' +
+    '</div>';
+  }
+
+  function wireRunbooks(){
+    // Filter chips — client-side filter by category
+    var filters = document.querySelectorAll('.rb-chip');
+    var grid = document.getElementById('rbGrid');
+    filters.forEach(function(chip){
+      chip.addEventListener('click', function(){
+        var target = chip.getAttribute('data-filter');
+        filters.forEach(function(c){ c.classList.toggle('on', c === chip); });
+        if (!grid) return;
+        var cards = grid.querySelectorAll('.rb-card');
+        for (var i = 0; i < cards.length; i++) {
+          var cat = cards[i].getAttribute('data-cat');
+          cards[i].style.display = (target === 'All' || cat === target) ? '' : 'none';
+        }
+      });
+    });
   }
 
   // Wire nav clicks
