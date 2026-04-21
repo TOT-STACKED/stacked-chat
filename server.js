@@ -3036,6 +3036,7 @@ button { font-family: inherit; cursor: pointer; }
       wireRunbooks();
     } else if (r === 'sites') {
       content.innerHTML = renderSites();
+      wireSites();
     } else if (r === 'widget') {
       content.innerHTML = renderWidget();
     } else {
@@ -3789,40 +3790,104 @@ button { font-family: inherit; cursor: pointer; }
     ['Kings Cross N1',   'Pieminister',     'Tom Hughes',   'Square · Dojo · Planday',   93, 0]
   ];
 
+  function renderSitesRow(siteName, brand, gm, stack, score, openCount){
+    var tone = scoreColor(score);
+    var issCls = openCount ? 'open' : 'clean';
+    var issText = openCount ? '● ' + openCount + ' open' : '—';
+    return '<div class="st-row st-body">' +
+      '<span class="st-site">' + esc(siteName) + '</span>' +
+      '<span class="st-brand">' + esc(brand || '—') + '</span>' +
+      '<span class="st-gm">' + esc(gm || '—') + '</span>' +
+      '<span class="st-stack">' + esc(stack || '—') + '</span>' +
+      '<span class="st-score ' + tone + '">' + score + '</span>' +
+      '<span class="st-iss ' + issCls + '">' + issText + '</span>' +
+    '</div>';
+  }
+
+  var SITES_HEAD_ROW =
+    '<div class="st-row st-head">' +
+      '<span>Site</span>' +
+      '<span>Brand</span>' +
+      '<span>GM</span>' +
+      '<span>Stack</span>' +
+      '<span>Score</span>' +
+      '<span>Issues</span>' +
+    '</div>';
+
   function renderSites(){
-    var rows = '';
+    // Render mock rows as a placeholder that's immediately visible.
+    // wireSites() swaps them for real data fetched from /analytics,
+    // or leaves mocks in place if the fetch fails. Either way the
+    // table never looks empty.
+    var mockRows = '';
     for (var i = 0; i < ST_ROWS.length; i++) {
       var r = ST_ROWS[i];
-      var tone = scoreColor(r[4]);
-      var issCls = r[5] ? 'open' : 'clean';
-      var issText = r[5] ? '● ' + r[5] + ' open' : '—';
-      rows += '<div class="st-row st-body">' +
-        '<span class="st-site">' + esc(r[0]) + '</span>' +
-        '<span class="st-brand">' + esc(r[1]) + '</span>' +
-        '<span class="st-gm">' + esc(r[2]) + '</span>' +
-        '<span class="st-stack">' + esc(r[3]) + '</span>' +
-        '<span class="st-score ' + tone + '">' + r[4] + '</span>' +
-        '<span class="st-iss ' + issCls + '">' + issText + '</span>' +
-      '</div>';
+      mockRows += renderSitesRow(r[0], r[1], r[2], r[3], r[4], r[5]);
     }
 
     return '<div class="st">' +
       '<section>' +
-        '<div class="eyebrow">Sites · 14 registered</div>' +
+        '<div class="eyebrow" id="stEyebrow">Sites &middot; loading&hellip;</div>' +
         '<h1 class="st-h1">Your estate.</h1>' +
       '</section>' +
-      '<div class="st-table">' +
-        '<div class="st-row st-head">' +
-          '<span>Site</span>' +
-          '<span>Brand</span>' +
-          '<span>GM</span>' +
-          '<span>Stack</span>' +
-          '<span>Score</span>' +
-          '<span>Issues</span>' +
-        '</div>' +
-        rows +
+      '<div class="st-table" id="stTable">' +
+        SITES_HEAD_ROW +
+        mockRows +
       '</div>' +
     '</div>';
+  }
+
+  function wireSites(){
+    var eyebrow = document.getElementById('stEyebrow');
+    var table = document.getElementById('stTable');
+    if (!table) return;
+
+    fetch('/analytics').then(function(r){ return r.json(); }).then(function(data){
+      if (!data || data.error) throw new Error(data && data.error || 'bad data');
+      var venueStats = Array.isArray(data.venueStats) ? data.venueStats : [];
+      var tickets = Array.isArray(data.tickets) ? data.tickets : [];
+
+      // Open tickets per venue
+      var openByVenue = {};
+      for (var i = 0; i < tickets.length; i++) {
+        var t = tickets[i];
+        if (t.status === 'open') {
+          var k = t.venue || 'Unknown venue';
+          openByVenue[k] = (openByVenue[k] || 0) + 1;
+        }
+      }
+
+      // Sort venues by activity so busiest sites are up top
+      var venues = venueStats.slice().sort(function(a, b){
+        return (b.convs || 0) - (a.convs || 0);
+      });
+
+      if (venues.length === 0) {
+        // No real data yet — keep the mock rows and mark the eyebrow honestly.
+        if (eyebrow) eyebrow.textContent = 'Sites · sample data (no venues yet)';
+        return;
+      }
+
+      if (eyebrow) eyebrow.textContent = 'Sites · ' + venues.length + ' registered';
+
+      var rowsHtml = SITES_HEAD_ROW;
+      for (var j = 0; j < venues.length; j++) {
+        var v = venues[j];
+        var open = openByVenue[v.venue] || 0;
+        // Simple health score until per-site telemetry exists:
+        // 100 baseline, -10 per open ticket, -5 per escalated ticket, floor 10.
+        var escalatedCount = v.escalated || 0;
+        var score = Math.max(10, 100 - (open * 10) - (escalatedCount * 5));
+        // Brand/GM/Stack aren't captured in the venues schema yet — show
+        // em-dashes so the column shape is preserved for when they land.
+        rowsHtml += renderSitesRow(v.venue || '—', null, null, null, score, open);
+      }
+      table.innerHTML = rowsHtml;
+    }).catch(function(err){
+      // Network / API failure — leave the mock rows and tell the user what happened.
+      console.error('[sites] could not load real data, showing sample:', err);
+      if (eyebrow) eyebrow.textContent = 'Sites · sample data (live feed unavailable)';
+    });
   }
 
   // ─── WIDGET PREVIEW SCREEN ────────────────────────────────────────────
