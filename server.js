@@ -5526,7 +5526,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
 
         const https = require('https');
         const apiBody = JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-6',
           max_tokens: 1000,
           system: systemPrompt,
           messages
@@ -5547,6 +5547,12 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
           r.on('error', reject); r.write(apiBody); r.end();
         });
 
+        // If the API didn't return content, log the full response so we can see
+        // why (model deprecation, auth issue, rate limit, etc.) instead of
+        // silently falling through to the user-facing error string.
+        if (!apiRes.content?.[0]?.text) {
+          console.error('[chat] Anthropic API returned no content. Response:', JSON.stringify(apiRes));
+        }
         const rawReply = apiRes.content?.[0]?.text || 'Sorry, I could not get a response. Please try again.';
 
         // Detect supportUrl BEFORE cleaning — user message first (most accurate), then Claude's reply
