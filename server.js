@@ -5349,6 +5349,7 @@ const server = http.createServer(async (req, res) => {
         // NPS detection: only use USER messages (not bot replies which mention many vendors)
         let vendorContext = '';
         let detectedVendor = null;
+        let npsForced = false;
         try {
           const userMsgsLower = (message + ' ' + (history.slice(-4).filter(m=>m.role==='user').map(m=>m.content).join(' '))).toLowerCase();
           // Also build a broader context including bot replies for knowledge injection (not NPS)
@@ -5383,6 +5384,20 @@ const server = http.createServer(async (req, res) => {
             const botVendors = Object.entries(VENDOR_PROFILES).filter(([key]) => lastBotReply.includes(key));
             // Only use bot reply if exactly 1 vendor is strongly referenced (not a list of suggestions)
             if (botVendors.length === 1) detectedVendor = botVendors[0][0];
+          }
+          // List-free NPS: if the bot just asked which vendor to rate, the
+          // user's reply IS the vendor — allow ANY vendor, no allow-list.
+          if (!detectedVendor && history.length > 0) {
+            const lastBot = (history.filter(m=>m.role==='assistant').slice(-1)[0]?.content || '').toLowerCase();
+            const askedToRate = /(which|what)[^.?!]{0,50}(vendor|product|tool|system|supplier)[^.?!]{0,50}(rate|rating|review|feedback|nps)/.test(lastBot)
+                              || /(rate|rating|review|feedback|nps)[^.?!]{0,50}(which|what)[^.?!]{0,30}(vendor|product|tool|system|supplier)/.test(lastBot);
+            const v = message.trim()
+              .replace(/^(the |my |it'?s? |rate |i'?(d| would)? ?(like|want)? ?to ?rate ?|let'?s ?rate ?)/i,'')
+              .replace(/[.!?,]+$/,'').trim();
+            if (askedToRate && v && v.length <= 40 && v.split(/\s+/).length <= 5) {
+              detectedVendor = v.toLowerCase();
+              npsForced = true;
+            }
           }
         } catch(e) {}
 
@@ -5451,7 +5466,7 @@ Once you know the product, respond with:
 NPS / VENDOR RATING REQUESTS:
 When a user says they want to rate their tech vendors, rate a product, give feedback, or provide an NPS score:
 1. Ask them which specific vendor/product they would like to rate. Be friendly and concise, e.g. "Sure! Which vendor would you like to rate? For example Lightspeed, Square, Tevalis, Dojo, OpenTable, Deputy, or any other product you use."
-2. Once they name the vendor, reply with a short confirmation like "Great — rating [vendor name] now." and add [NPS:vendorname] on its own line at the very end of your response (e.g. [NPS:lightspeed] or [NPS:resdiary]). Use the lowercase vendor key. The system will display the NPS rating widget automatically.
+2. Once they name the vendor — ANY vendor or product, even one not in your support list — reply with a short confirmation like "Great — rating [vendor name] now." and ALWAYS add [NPS:vendorname] on its own line at the very end (use the exact name the user gave, lowercased, e.g. [NPS:tenzo]). Never skip this tag. The system displays the rating widget automatically.
 3. Do NOT ask them to rate on a scale yourself — the system handles the rating UI.
 
 Support URLs:
@@ -5643,11 +5658,12 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         finalReply = finalReply.replace(/\[ESCALATE\]/g, '').trim();
 
         // Handle [NPS:vendorname] tag — AI-triggered NPS rating
-        const npsMatch = reply.match(/\[NPS:([a-z0-9 ]+)\]/i);
+        const npsMatch = reply.match(/\[NPS:([^\]]+)\]/i);
         if (npsMatch) {
           detectedVendor = npsMatch[1].toLowerCase().trim();
-          reply = reply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
-          finalReply = finalReply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
+          npsForced = true;
+          reply = reply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
+          finalReply = finalReply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
         }
 
         if (shouldEscalate) {
@@ -5665,7 +5681,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         }
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: !!npsMatch}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: npsForced || !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
