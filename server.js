@@ -1048,25 +1048,26 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .welcome h2 { font-family: var(--font-display); font-size: clamp(34px, 9vw, 52px); font-weight: 400; line-height: 1.02; letter-spacing: -0.02em; color: var(--brown); margin-bottom: 10px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
   .welcome h2 .accent { color: var(--orange); }
   .welcome p { font-family: var(--font-sans); font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
-  /* ─── ROTATING CARDS CAROUSEL (Tinder-style portrait) ─── */
-  .carousel-wrap { width: 100%; max-width: 300px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 16px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
-  .carousel-track { position: relative; height: 320px; overflow: hidden; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
-  .carousel-card { position: absolute; inset: 0; border-radius: 24px; padding: 32px 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; opacity: 0; transform: translateX(50px) rotate(3deg); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); pointer-events: none; }
-  .carousel-card.active { opacity: 1; transform: translateX(0) rotate(0deg); pointer-events: auto; }
-  .carousel-card.exit { opacity: 0; transform: translateX(-50px) rotate(-3deg); pointer-events: none; }
-  .carousel-card.orange { background: linear-gradient(160deg, #F07A63 0%, var(--orange) 100%); color: #fff; }
-  .carousel-card.purple { background: linear-gradient(160deg, #B3A6D6 0%, var(--purple) 100%); color: #1E1E1E; }
-  .carousel-card.green { background: linear-gradient(160deg, #D1E58F 0%, var(--green-brand) 100%); color: #1E1E1E; }
-  .carousel-card .cc-emoji { font-size: 48px; margin-bottom: 20px; }
-  .carousel-card .cc-label { font-family: var(--font-sans); font-size: 20px; font-weight: 700; line-height: 1.25; letter-spacing: -0.3px; }
-  .carousel-card .cc-sub { font-size: 14px; opacity: 0.7; font-weight: 500; margin-top: 8px; line-height: 1.5; max-width: 220px; }
-  .carousel-card .cc-tap { font-size: 12px; font-weight: 600; opacity: 0.5; margin-top: 24px; letter-spacing: 0.04em; }
-  .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
-  .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-dark); border: none; padding: 0; cursor: pointer; transition: all 0.3s var(--ease); }
-  .carousel-dot.active { width: 20px; border-radius: 3px; }
-  .carousel-dot.orange.active { background: var(--orange); }
-  .carousel-dot.purple.active { background: var(--purple); }
-  .carousel-dot.green.active { background: var(--green-brand); }
+  /* ─── ASK ROTATOR (kinetic one-liner) ─── */
+  .ask-rotator {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; max-width: 340px; margin: 4px auto 18px;
+    padding: 15px 20px; text-align: left;
+    background: var(--white); border: 1px solid var(--cream-dark);
+    border-radius: var(--r-lg); box-shadow: var(--shadow);
+    cursor: pointer; position: relative; z-index: 1;
+    transition: border-color var(--t-mid), box-shadow var(--t-mid), transform var(--t-fast);
+    opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards;
+  }
+  .ask-rotator:hover { border-color: var(--orange); box-shadow: var(--e2); transform: translateY(-1px); }
+  .ask-rotator:active { transform: translateY(0); }
+  .ask-rotator .ar-caret { color: var(--orange); font-weight: 700; font-size: 18px; line-height: 1; flex-shrink: 0; }
+  .ask-rotator .ar-text {
+    font-family: var(--font-sans); font-size: 15px; font-weight: 500;
+    color: var(--brown); line-height: 1.4; flex: 1; min-width: 0;
+    transition: opacity 0.34s var(--ease), transform 0.34s var(--ease);
+  }
+  .ask-rotator.swapping .ar-text { opacity: 0; transform: translateY(4px); }
 
   /* Keep quick-grid as fallback / below carousel */
   .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-bottom: 12px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.6s forwards; }
@@ -1239,20 +1240,30 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .sc-fix-btn:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
   .sc-done-btn { width: 100%; padding: 11px; background: var(--cream); color: var(--brown); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 14px; font-weight: 500; cursor: pointer; }
 
-  /* ─── TIP OF THE DAY ─── */
-  .tip-card {
-    width: 100%; max-width: 380px; background: var(--white);
-    border: 2px solid var(--cream-dark); border-radius: 16px;
-    padding: 14px 16px; cursor: pointer; text-align: left;
-    transition: border-color 0.2s, box-shadow 0.2s; margin-top: 8px;
-    box-shadow: var(--shadow);
+  /* ─── TIP OF THE DAY (editorial footnote) ─── */
+  .tip-note {
+    width: 100%; max-width: 420px; margin: 18px auto 0;
+    text-align: center; cursor: pointer; position: relative; z-index: 1;
+    opacity: 0; animation: staggerIn 0.6s var(--ease) 0.55s forwards;
   }
-  .tip-card:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
-  .tip-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .tip-badge { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--orange); background: var(--orange-glow-08); border-radius: 6px; padding: 3px 8px; }
-  .tip-product { font-size: 11px; color: var(--brown-mid); font-weight: 500; }
-  .tip-text { font-size: 13px; font-weight: 600; color: var(--brown); line-height: 1.45; }
-  .tip-cta { font-size: 12px; color: var(--orange); font-weight: 600; margin-top: 6px; }
+  .tip-eyebrow { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  .tip-rule { flex: 1; height: 1px; background: var(--cream-dark); }
+  .tip-key {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--brown-mid); white-space: nowrap;
+  }
+  .tip-key .tip-product { color: var(--orange); }
+  .tip-text {
+    font-family: var(--font-sans); font-size: 14px; font-weight: 500;
+    color: var(--brown-mid); line-height: 1.55; max-width: 340px; margin: 0 auto;
+  }
+  .tip-cta {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--orange);
+    margin-top: 12px; opacity: 0.65; transition: opacity var(--t-mid);
+  }
+  .tip-note:hover .tip-cta { opacity: 1; }
 
   /* ─── NPS WIDGET ─── */
   .nps-wrap { padding-left: 42px; margin-top: -4px; }
@@ -1424,14 +1435,18 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
         <img class="welcome-wordmark" id="welcomeWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
         <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Hospitality tech support, powered by AI</span></div>
         <h2>{{WELCOME_HEADING}}</h2>
-        <div class="carousel-wrap" id="carouselWrap">
-          <div class="carousel-track" id="carouselTrack"></div>
-          <div class="carousel-dots" id="carouselDots"></div>
-        </div>
-        <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none">
-          <div class="tip-header"><span class="tip-badge">Tip of the day</span><span class="tip-product" id="tipProduct"></span></div>
+        <button class="ask-rotator" id="askRotator" type="button" data-action="quickSend" data-msg="" aria-label="Ask this question">
+          <span class="ar-caret">&rsaquo;</span>
+          <span class="ar-text" id="askRotatorText"></span>
+        </button>
+        <div class="tip-note" id="tipCard" onclick="fireTip()" style="display:none">
+          <div class="tip-eyebrow">
+            <span class="tip-rule"></span>
+            <span class="tip-key">TIP &middot; <span class="tip-product" id="tipProduct"></span></span>
+            <span class="tip-rule"></span>
+          </div>
           <div class="tip-text" id="tipText"></div>
-          <div class="tip-cta">Tap to explore &rarr;</div>
+          <div class="tip-cta">explore &rarr;</div>
         </div>
       </div>
     </div>
@@ -1822,88 +1837,48 @@ function renderQuickBtns() {
   ).join('');
 }
 
-// ─── CAROUSEL ─────────────────────────────────────────────────────────────
-const CAROUSEL_CARDS = [
-  { color: 'orange', emoji: '💻', label: 'EPOS crashed mid-service?', sub: 'We\\'ll walk you through a fix in seconds', msg: 'My EPOS has crashed mid-service', tap: 'Tap to get help →' },
-  { color: 'purple', emoji: '💳', label: 'Payment terminal offline?', sub: 'Step-by-step troubleshooting, right now', msg: 'My payment terminal is offline', tap: 'Tap to fix it →' },
-  { color: 'green', emoji: '📶', label: 'WiFi down in your venue?', sub: 'Get your systems back online fast', msg: 'WiFi is down in my venue', tap: 'Tap to diagnose →' },
-  { color: 'orange', emoji: '🖨️', label: 'Kitchen printer not working?', sub: 'Orders not reaching the kitchen? Let\\'s fix it', msg: 'Kitchen printer not receiving orders', tap: 'Tap to troubleshoot →' },
-  { color: 'purple', emoji: '📅', label: 'Reservation system issues?', sub: 'Bookings not syncing? We can help', msg: 'My reservation system is not working', tap: 'Tap to get help →' },
-  { color: 'green', emoji: '🔒', label: 'Staff can\\'t log in?', sub: 'Access issues sorted in minutes', msg: 'Staff cannot log in to the system', tap: 'Tap to fix it →' },
-  { color: 'purple', emoji: '⭐', label: 'Rate your tech stack', sub: 'Share your NPS score to help other operators build theirs', msg: 'I\\'d like to rate my tech vendors', tap: 'Tap to rate →' },
+// ─── ASK ROTATOR (kinetic one-liner) ──────────────────────────────────────
+const ASK_PROMPTS = [
+  'How do I reset the card terminal?',
+  'My EPOS has crashed mid-service',
+  'The kitchen printer isn\\'t receiving orders',
+  'WiFi is down across the venue',
+  'What time does the wine delivery arrive?',
+  'A guest is asking about allergens',
+  'Staff can\\'t log in to the system',
+  'Contactless payments aren\\'t working',
+  'How do I run the end-of-day report?',
+  'The reservation system isn\\'t syncing',
 ];
 
-let _carouselIdx = 0;
-let _carouselTimer = null;
+let _askIdx = 0;
+let _askTimer = null;
 
 function renderCarousel() {
-  const track = document.getElementById('carouselTrack');
-  const dots = document.getElementById('carouselDots');
-  if (!track || !dots) return;
-  // Shuffle and pick 4
-  const cards = [...CAROUSEL_CARDS].sort(() => Math.random() - 0.5).slice(0, 4);
-  track.innerHTML = cards.map((c, i) =>
-    '<div class="carousel-card ' + c.color + (i === 0 ? ' active' : '') + '" data-action="quickSend" data-msg="' + c.msg.replace(/"/g,'&quot;') + '">' +
-    '<div><span class="cc-emoji">' + c.emoji + '</span><div class="cc-label">' + c.label + '</div><div class="cc-sub">' + c.sub + '</div></div>' +
-    '<div class="cc-tap">' + c.tap + '</div></div>'
-  ).join('');
-  dots.innerHTML = cards.map((c, i) =>
-    '<button class="carousel-dot ' + c.color + (i === 0 ? ' active' : '') + '" data-idx="' + i + '"></button>'
-  ).join('');
-  // Dot clicks
-  dots.querySelectorAll('.carousel-dot').forEach(d => {
-    d.addEventListener('click', function() { goToCard(parseInt(this.dataset.idx), cards); });
-  });
-  _carouselIdx = 0;
-  clearInterval(_carouselTimer);
-  _carouselTimer = setInterval(() => {
-    const next = (_carouselIdx + 1) % cards.length;
-    goToCard(next, cards);
-  }, 4000);
-  initCarouselSwipe(cards);
+  const btn = document.getElementById('askRotator');
+  const txt = document.getElementById('askRotatorText');
+  if (!btn || !txt) return;
+  const prompts = [...ASK_PROMPTS].sort(() => Math.random() - 0.5);
+  _askIdx = 0;
+  const paint = () => {
+    const q = prompts[_askIdx % prompts.length];
+    txt.textContent = '\\u201C' + q + '\\u201D';
+    btn.dataset.msg = q;
+  };
+  paint();
+  clearInterval(_askTimer);
+  _askTimer = setInterval(() => {
+    btn.classList.add('swapping');
+    setTimeout(() => {
+      _askIdx = (_askIdx + 1) % prompts.length;
+      paint();
+      btn.classList.remove('swapping');
+    }, 340);
+  }, 3400);
 }
 
-function goToCard(idx, cards) {
-  const track = document.getElementById('carouselTrack');
-  const dots = document.getElementById('carouselDots');
-  if (!track) return;
-  const allCards = track.querySelectorAll('.carousel-card');
-  const allDots = dots ? dots.querySelectorAll('.carousel-dot') : [];
-  allCards.forEach((c, i) => {
-    c.classList.remove('active', 'exit');
-    if (i === _carouselIdx) c.classList.add('exit');
-    if (i === idx) setTimeout(() => c.classList.add('active'), 50);
-  });
-  allDots.forEach((d, i) => { d.classList.toggle('active', i === idx); });
-  _carouselIdx = idx;
-}
-
-// Swipe support
-function initCarouselSwipe(cards) {
-  const track = document.getElementById('carouselTrack');
-  if (!track) return;
-  let startX = 0, startY = 0, swiping = false;
-  track.addEventListener('touchstart', function(e) {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    swiping = true;
-    clearInterval(_carouselTimer);
-  }, { passive: true });
-  track.addEventListener('touchend', function(e) {
-    if (!swiping) return;
-    swiping = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) goToCard((_carouselIdx + 1) % cards.length, cards);
-      else goToCard((_carouselIdx - 1 + cards.length) % cards.length, cards);
-    }
-    _carouselTimer = setInterval(function() { goToCard((_carouselIdx + 1) % cards.length, cards); }, 4000);
-  }, { passive: true });
-}
-
-// Stop carousel when chat starts
-function stopCarousel() { clearInterval(_carouselTimer); }
+// Stop the rotator when chat starts
+function stopCarousel() { clearInterval(_askTimer); }
 
 // ─── TIPS OF THE DAY ──────────────────────────────────────────────────────
 const ALL_TIPS = [
