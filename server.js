@@ -1527,6 +1527,20 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   </div>
 </div>
 
+<!-- ─── ADD VIDEO LINK MODAL ─── -->
+<div class="modal-overlay" id="vidLinkOverlay">
+  <div class="modal">
+    <h3>Add a video link</h3>
+    <p>Paste a YouTube, Vimeo or video URL &mdash; no size limit, ideal for longer training videos.</p>
+    <input class="gate-input" id="vidLinkUrl" type="url" placeholder="https://youtube.com/watch?v=&hellip;">
+    <input class="gate-input" id="vidLinkTitle" type="text" placeholder="Title (optional)">
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeVideoLink()">Cancel</button>
+      <button class="modal-submit" onclick="handleVideoLink()">Add video</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <div class="cv-modal" id="cvModal" style="display:none" onclick="if(event.target===this)closeCvModal()">
@@ -2106,6 +2120,7 @@ document.addEventListener('click', function(e) {
   if (action === 'kbRemove') kbRemove(btn.dataset.file);
   if (action === 'kbAddClick') { closeAdmin(); const f = document.getElementById('kbFile'); if (f) f.click(); }
   if (action === 'vidAddClick') { closeAdmin(); const vf = document.getElementById('vidFile'); if (vf) vf.click(); }
+  if (action === 'vidLinkClick') { closeAdmin(); openVideoLink(); }
   if (action === 'openTeamFromAdmin') { closeAdmin(); openTeam(); }
 });
 
@@ -2600,6 +2615,26 @@ async function handleVideoUpload(files) {
   }
   const vf = document.getElementById('vidFile'); if (vf) vf.value = '';
 }
+function openVideoLink() {
+  document.getElementById('vidLinkUrl').value = '';
+  document.getElementById('vidLinkTitle').value = '';
+  document.getElementById('vidLinkOverlay').classList.add('open');
+}
+function closeVideoLink() { document.getElementById('vidLinkOverlay').classList.remove('open'); }
+async function handleVideoLink() {
+  const link = (document.getElementById('vidLinkUrl').value || '').trim();
+  const title = (document.getElementById('vidLinkTitle').value || '').trim();
+  if (!/^https?:\\/\\//i.test(link)) { showToast('Paste a valid video URL'); return; }
+  try {
+    const r = await fetch(SERVER_URL + '/kb-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: link, title: title || 'Video', venue_id: user.venue_id, token: getAuthToken() }) });
+    const d = await r.json();
+    if (!d || !d.ok) { showToast((d && d.error) || 'Could not add video'); return; }
+    closeVideoLink();
+    showToast('Video added', 'green');
+    hideWelcome();
+    addMessage('assistant', '\\u2705 Added a video to your knowledge base.', false);
+  } catch(e) { showToast('Could not add video'); }
+}
 
 // ─── ADMIN PANEL (scoped analytics + knowledge, admins only) ──────────────
 function openAdmin() { loadAdmin(); document.getElementById('adminOverlay').classList.add('open'); document.getElementById('adminDrawer').classList.add('open'); }
@@ -2632,7 +2667,7 @@ async function loadAdmin() {
         return '<div class="kb-row"><div class="kb-icon">' + teamEsc(ext) + '</div><div class="kb-name">' + teamEsc(doc.filename) + '</div><span class="kb-chunks">' + (doc.chunks || 0) + '</span><button class="kb-del" data-action="kbRemove" data-file="' + teamEsc(doc.filename) + '" title="Remove">\\u2715</button></div>';
       }).join('');
     }
-    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="vidAddClick">+ Add video</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
+    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="vidAddClick">+ Upload video</button><button class="admin-cta primary" data-action="vidLinkClick">+ Video link</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
     bodyEl.innerHTML = '<div class="admin-section-label">Overview</div>' + stats + kb + buttons;
   } catch(e) { bodyEl.innerHTML = '<div class="empty-history">Could not load admin.</div>'; }
 }
