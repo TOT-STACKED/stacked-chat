@@ -1158,6 +1158,25 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .team-action:hover { border-color: var(--orange); color: var(--orange); }
   .team-you { font-family: var(--font-mono); font-size: 10px; color: var(--brown-mid); flex-shrink: 0; }
   .team-note { font-size: 12px; color: var(--brown-mid); padding: 4px 0 12px; line-height: 1.5; }
+  /* ─── ADMIN (scoped panel) ─── */
+  .admin-section-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brown-mid); margin: 18px 0 10px; }
+  .admin-section-label:first-child { margin-top: 4px; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { background: var(--cream); border: 1px solid var(--cream-dark); border-radius: var(--r-md); padding: 12px 14px; }
+  .stat-num { font-family: var(--font-display); font-size: 26px; line-height: 1; color: var(--brown); }
+  .stat-num .accent { color: var(--orange); }
+  .stat-label { font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brown-mid); margin-top: 6px; }
+  .kb-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--cream-dark); }
+  .kb-row:last-child { border-bottom: none; }
+  .kb-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--orange-glow-08); color: var(--peach-link); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: var(--font-mono); font-size: 9px; font-weight: 700; }
+  .kb-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; color: var(--brown); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kb-chunks { font-family: var(--font-mono); font-size: 10px; color: var(--brown-mid); flex-shrink: 0; }
+  .kb-del { background: none; border: none; cursor: pointer; color: var(--brown-mid); padding: 4px; flex-shrink: 0; font-size: 16px; line-height: 1; transition: color 0.15s; }
+  .kb-del:hover { color: var(--red); }
+  .admin-btn-row { display: flex; gap: 8px; margin-top: 14px; }
+  .admin-cta { flex: 1; padding: 11px; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; border: none; }
+  .admin-cta.primary { background: var(--orange); color: #fff; box-shadow: var(--btn-offset); }
+  .admin-cta.ghost { background: var(--cream); color: var(--brown); border: 1px solid var(--cream-dark); }
   .topics-list { display: flex; flex-direction: column; gap: 8px; }
   .topic-chip { background: var(--cream); border: 1.5px solid var(--cream-dark); border-left: 3px solid transparent; border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 500; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: all 0.25s var(--ease); }
   .topic-chip:hover { border-color: var(--cream-dark); border-left-color: var(--orange); background: var(--white); transform: translateX(2px); }
@@ -1364,8 +1383,8 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     </a>
     <div class="header-actions">
       <div class="user-chip"><div class="dot"></div><span id="userLabel">You</span></div>
-      <button class="icon-btn" id="teamBtn" onclick="openTeam()" title="Manage team" style="display:none">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <button class="icon-btn" id="adminBtn" onclick="openAdmin()" title="Admin" style="display:none">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       </button>
       <button class="icon-btn" onclick="openHistory()" title="Chat history">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/></svg>
@@ -1429,6 +1448,14 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
       <button class="topic-chip" onclick="quickSend('My EPOS system has frozen or crashed'); closeTopics()">&#x1F4BB; EPOS frozen or crashed</button>
     </div>
   </div>
+</div>
+
+<!-- ─── ADMIN DRAWER (scoped analytics + knowledge) ─── -->
+<div class="drawer-overlay" id="adminOverlay" onclick="closeAdmin()"></div>
+<div class="drawer" id="adminDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header"><span>Admin</span><button class="drawer-close" onclick="closeAdmin()">&times;</button></div>
+  <div class="drawer-body" id="adminBody"><div class="empty-history">Loading&hellip;</div></div>
 </div>
 
 <!-- ─── TEAM DRAWER (admin manage-team) ─── -->
@@ -1668,8 +1695,8 @@ function showApp() {
   document.getElementById('gate').classList.add('hidden');
   document.getElementById('userLabel').textContent = user.name.split(' ')[0];
   const isAdmin = user && user.role === 'admin';
-  const teamBtn = document.getElementById('teamBtn');
-  if (teamBtn) teamBtn.style.display = isAdmin ? 'flex' : 'none';
+  const adminBtn = document.getElementById('adminBtn');
+  if (adminBtn) adminBtn.style.display = isAdmin ? 'flex' : 'none';
   const kbAdd = document.getElementById('kbAdd');
   if (kbAdd) kbAdd.style.display = isAdmin ? 'flex' : 'none';
   personaliseWelcome();
@@ -2014,6 +2041,9 @@ document.addEventListener('click', function(e) {
   if (action === 'scAnswer') scAnswer(btn.dataset.val);
   if (action === 'predictSend' || action === 'quickSend') { hideWelcome(); quickSend(msg); }
   if (action === 'setRole') setMemberRole(btn.dataset.email, btn.dataset.role);
+  if (action === 'kbRemove') kbRemove(btn.dataset.file);
+  if (action === 'kbAddClick') { closeAdmin(); const f = document.getElementById('kbFile'); if (f) f.click(); }
+  if (action === 'openTeamFromAdmin') { closeAdmin(); openTeam(); }
 });
 
 function renderScSummary() {
@@ -2427,6 +2457,52 @@ async function handleKbUpload(files) {
     } catch(e) { showToast('Could not add ' + file.name); }
   }
   const f = document.getElementById('kbFile'); if (f) f.value = '';
+}
+
+// ─── ADMIN PANEL (scoped analytics + knowledge, admins only) ──────────────
+function openAdmin() { loadAdmin(); document.getElementById('adminOverlay').classList.add('open'); document.getElementById('adminDrawer').classList.add('open'); }
+function closeAdmin() { document.getElementById('adminOverlay').classList.remove('open'); document.getElementById('adminDrawer').classList.remove('open'); }
+async function loadAdmin() {
+  const bodyEl = document.getElementById('adminBody');
+  if (!bodyEl) return;
+  if (!user || !user.venue_id) { bodyEl.innerHTML = '<div class="empty-history">No workspace yet.</div>'; return; }
+  bodyEl.innerHTML = '<div class="empty-history">Loading&hellip;</div>';
+  try {
+    const r = await fetch(SERVER_URL + '/admin-summary', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, email: user.email }) });
+    const d = await r.json();
+    if (!d || !d.ok) { bodyEl.innerHTML = '<div class="empty-history">' + teamEsc((d && d.error) || 'Could not load admin') + '</div>'; return; }
+    const s = d.stats || {};
+    const card = function(n, l) { return '<div class="stat-card"><div class="stat-num">' + n + '</div><div class="stat-label">' + l + '</div></div>'; };
+    let stats = '<div class="stat-grid">' +
+      card(s.documents || 0, 'Documents') +
+      card(s.questions || 0, 'Questions asked') +
+      card(s.conversations || 0, 'Conversations') +
+      card(s.team || 0, 'Team members') +
+      (s.npsCount ? card((s.avgNps != null ? s.avgNps : '\\u2013') + '<span class="accent">/10</span>', 'Avg NPS (' + s.npsCount + ')') : '') +
+      '</div>';
+    const docs = d.docs || [];
+    let kb = '<div class="admin-section-label">Knowledge</div>';
+    if (!docs.length) {
+      kb += '<div class="team-note">No documents yet. Add a handbook, SOP or policy with the button below.</div>';
+    } else {
+      kb += docs.map(function(doc) {
+        const ext = ((doc.filename.split('.').pop()) || 'DOC').toUpperCase().slice(0, 4);
+        return '<div class="kb-row"><div class="kb-icon">' + teamEsc(ext) + '</div><div class="kb-name">' + teamEsc(doc.filename) + '</div><span class="kb-chunks">' + (doc.chunks || 0) + '</span><button class="kb-del" data-action="kbRemove" data-file="' + teamEsc(doc.filename) + '" title="Remove">\\u2715</button></div>';
+      }).join('');
+    }
+    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add knowledge</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
+    bodyEl.innerHTML = '<div class="admin-section-label">Overview</div>' + stats + kb + buttons;
+  } catch(e) { bodyEl.innerHTML = '<div class="empty-history">Could not load admin.</div>'; }
+}
+async function kbRemove(filename) {
+  if (!confirm('Remove \"' + filename + '\" from your knowledge base?')) return;
+  try {
+    const r = await fetch(SERVER_URL + '/kb-remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, email: user.email, filename: filename }) });
+    const d = await r.json();
+    if (!d || !d.ok) { showToast((d && d.error) || 'Could not remove'); return; }
+    showToast('Removed', 'green');
+    loadAdmin();
+  } catch(e) { showToast('Could not remove'); }
 }
 function openTicket() { document.getElementById('ticketNote').value = ''; document.getElementById('ticketOverlay').classList.add('open'); }
 function closeTicket() { document.getElementById('ticketOverlay').classList.remove('open'); }
@@ -5348,6 +5424,68 @@ const server = http.createServer(async (req, res) => {
         for (const chunk of chunks) await sbFetch('/rest/v1/documents', { method:'POST', headers:{'Prefer':'return=minimal'}, body: chunk });
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ ok:true, chunks: chunks.length, workspace_id: workspaceId }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
+  // ─── ADMIN SUMMARY (scoped analytics + knowledge list, admins only) ───────
+  if (method === 'POST' && url === '/admin-summary') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id, email } = JSON.parse(body);
+        if (!venue_id || !email) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const members = Array.isArray(mem.data) ? mem.data : [];
+        const me = members.find(m => (m.email || '').toLowerCase() === String(email).toLowerCase());
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can view this'})); return; }
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
+        const ws = (Array.isArray(vr.data) && vr.data[0]) ? (vr.data[0].workspace_id || null) : null;
+        let docs = [];
+        if (ws) {
+          const d = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(ws) + '&select=filename&limit=2000');
+          const counts = {};
+          (Array.isArray(d.data) ? d.data : []).forEach(x => { counts[x.filename] = (counts[x.filename] || 0) + 1; });
+          docs = Object.keys(counts).map(f => ({ filename: f, chunks: counts[f] }));
+        }
+        const conv = await sbFetch('/rest/v1/conversations?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=messages&limit=500');
+        const convs = Array.isArray(conv.data) ? conv.data : [];
+        let questions = 0;
+        convs.forEach(c => { if (Array.isArray(c.messages)) questions += c.messages.filter(m => m.role === 'user').length; });
+        const npsR = await sbFetch('/rest/v1/nps_scores?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=score&limit=500');
+        const scores = (Array.isArray(npsR.data) ? npsR.data : []).map(x => x.score).filter(s => typeof s === 'number');
+        const avgNps = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true, workspace_id: ws, stats: { documents: docs.length, conversations: convs.length, questions: questions, team: members.length, avgNps: avgNps, npsCount: scores.length }, docs: docs }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
+  // ─── KB REMOVE (admin removes a doc from THEIR workspace only) ────────────
+  if (method === 'POST' && url === '/kb-remove') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id, email, filename } = JSON.parse(body);
+        if (!venue_id || !email || !filename) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === String(email).toLowerCase());
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can remove knowledge'})); return; }
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
+        const ws = (Array.isArray(vr.data) && vr.data[0]) ? (vr.data[0].workspace_id || null) : null;
+        if (!ws) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'no workspace'})); return; }
+        // Scoped delete: only docs in this workspace with this filename.
+        await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(ws) + '&filename=eq.' + encodeURIComponent(filename), { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true }));
       } catch(e) {
         res.writeHead(500, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ ok:false, error:e.message }));
