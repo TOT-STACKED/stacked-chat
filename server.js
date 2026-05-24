@@ -833,9 +833,9 @@ function buildChatPage(b = {}) {
   const logoUrl = b.logo_url || 'https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg';
   const primaryColor = b.primary_color || '#e64e1a';
   const botName = b.bot_name || 'Stacked Chat';
-  const welcomeMsg = b.welcome_message || 'AI support for hospitality tech — enter your details to get started.';
+  const welcomeMsg = b.welcome_message || 'Stacked Chat knows your business — handbooks, SOPs, supplier info, opening procedures and tech setup. Ask anything and get the right answer in seconds, with its source. Pop your details in to start.';
   const welcomeHeading = b.welcome_heading || 'Your knowledge,<br><span class="accent">on tap.</span>';
-  const poweredBy = b.white_label ? '' : '<a href="https://stackedchat.io" target="_blank" rel="noopener" style="display:block;text-align:center;padding:8px;font-size:11px;color:#A8A49C;text-decoration:none;font-family:Inter,sans-serif;">Powered by <strong style="color:#E8573C">Stacked Chat</strong></a>';
+  const poweredBy = b.white_label ? '' : '<a href="https://stackedchat.io" target="_blank" rel="noopener" style="display:block;text-align:center;padding:8px;font-size:11px;color:#A8A49C;text-decoration:none;font-family:var(--font-sans);">Powered by <strong style="color:#e64e1a">Stacked Chat</strong></a>';
   const presetVenueId = b.venue_id || '';
   const presetVenueName = (b.venue_name || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
   // Inject branding into the template
@@ -967,11 +967,18 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     opacity: 0; animation: staggerIn 0.5s var(--ease) 0.2s forwards;
   }
   .gate-sub { display: none; }
+  .gate-card h2 .accent { color: var(--orange); }
   .gate-card p {
     font-family: var(--font-sans);
     font-size: 14px; color: #6B6867;
-    margin-bottom: 24px; line-height: 1.5; font-weight: 400;
+    margin-bottom: 16px; line-height: 1.5; font-weight: 400;
     opacity: 0; animation: staggerIn 0.5s var(--ease) 0.3s forwards;
+  }
+  .gate-caps {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.12em; color: var(--brown-mid);
+    margin-bottom: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    opacity: 0.55;
   }
   .gate-input {
     width: 100%; padding: 12px 14px;
@@ -1297,8 +1304,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="gate-scrim"></div>
   <div class="gate-card">
     <img class="gate-logo" id="gateWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
-    <h2>Fix it fast.</h2>
+    <h2>Ask your business<br><span class="accent">anything.</span></h2>
     <p>{{WELCOME_MSG}}</p>
+    <div class="gate-caps">HANDBOOKS &middot; SOPs &middot; SUPPLIERS &middot; ROTAS &middot; TECH</div>
     <input class="gate-input" type="text" id="gateName" placeholder="Your name" autocomplete="given-name">
 
     <!-- Venue autocomplete -->
@@ -1587,8 +1595,8 @@ async function submitGate() {
     user = { name, venue: selectedVenueName, venue_id: venueId, phone, email };
     localStorage.setItem('stacked_user', JSON.stringify(user));
 
-    // Save lead and venue member in parallel
-    await Promise.all([
+    // Save lead and venue member in parallel; capture the assigned role.
+    const [, memberRes] = await Promise.all([
       fetch(SERVER_URL + '/save-lead', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, venue: selectedVenueName, venue_id: venueId, phone, email })
@@ -1598,6 +1606,11 @@ async function submitGate() {
         body: JSON.stringify({ venue_id: venueId, name, email, phone })
       })
     ]);
+    try {
+      const md = await memberRes.json();
+      user.role = (md && md.role) ? md.role : 'staff';
+      localStorage.setItem('stacked_user', JSON.stringify(user));
+    } catch(e) { /* role optional */ }
   } catch(e) {
     // Fail gracefully - still let them in
     user = { name, venue: selectedVenueName, venue_id: null, phone, email };
@@ -5022,6 +5035,18 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body);
+        // Self-serve roles: the FIRST member of a venue becomes its admin;
+        // everyone after is staff. Never downgrade an existing admin.
+        let role = 'staff';
+        try {
+          const ex = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(payload.venue_id || '') + '&select=email,role&limit=200');
+          if (Array.isArray(ex.data)) {
+            const mine = ex.data.find(m => (m.email || '').toLowerCase() === (payload.email || '').toLowerCase());
+            if (mine) role = mine.role || 'staff';        // keep existing role
+            else if (ex.data.length === 0) role = 'admin'; // first ever member
+          }
+        } catch(e) { /* table/role lookup issue — default staff */ }
+        payload.role = role;
         // Upsert on email+venue_id to avoid duplicates
         await sbFetch('/rest/v1/venue_members?on_conflict=email,venue_id', {
           method: 'POST',
@@ -5029,7 +5054,7 @@ const server = http.createServer(async (req, res) => {
           body: payload
         });
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ok:true}));
+        res.end(JSON.stringify({ok:true, role}));
       } catch(e) {
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ok:false,error:e.message}));
