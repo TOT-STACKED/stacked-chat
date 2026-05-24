@@ -974,6 +974,14 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     margin-bottom: 16px; line-height: 1.5; font-weight: 400;
     opacity: 0; animation: staggerIn 0.5s var(--ease) 0.3s forwards;
   }
+  .gate-eyebrow {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.15em; text-transform: uppercase; color: var(--brown-mid);
+    display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+    opacity: 0; animation: staggerIn 0.5s var(--ease) 0.15s forwards;
+  }
+  .gate-eyebrow .accent { color: var(--orange); }
+  .gate-eyebrow .ge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
   .gate-caps {
     font-family: var(--font-mono); font-size: 10px; font-weight: 600;
     letter-spacing: 0.12em; color: var(--brown-mid);
@@ -1304,6 +1312,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="gate-scrim"></div>
   <div class="gate-card">
     <img class="gate-logo" id="gateWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
+    <div class="gate-eyebrow"><span class="ge-dot"></span>AN <span class="accent">AI KNOWLEDGE BASE</span> FOR HOSPITALITY</div>
     <h2>Ask your business<br><span class="accent">anything.</span></h2>
     <p>{{WELCOME_MSG}}</p>
     <div class="gate-caps">HANDBOOKS &middot; SOPs &middot; SUPPLIERS &middot; ROTAS &middot; TECH</div>
