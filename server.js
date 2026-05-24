@@ -3,10 +3,10 @@ const http = require('http');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yuzlfocqovwhqdpitvxj.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
-// Approved-reporting portal (stackcollect) ‚Äî NPS from every touchpoint is
+// Approved-reporting portal (stackcollect) — NPS from every touchpoint is
 // mirrored here so it lands in the central dashboard at approvedreporting.netlify.app.
 // Anon key is public-facing, rate-limited, and restricted by RLS to INSERT only
-// on nps_scores ‚Äî same security model as the bot's own SUPABASE_KEY above.
+// on nps_scores — same security model as the bot's own SUPABASE_KEY above.
 // If either is unset, the portal mirror silently no-ops.
 const STACKCOLLECT_SUPABASE_URL = process.env.STACKCOLLECT_SUPABASE_URL || 'https://gfbswivkhfsegpvfocox.supabase.co';
 const STACKCOLLECT_SUPABASE_KEY = process.env.STACKCOLLECT_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmYnN3aXZraGZzZWdwdmZvY294Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzc4ODQsImV4cCI6MjA3NDgxMzg4NH0.YBuuMRXtMu2sUXBG7nJ6ue5LFgkHD8Dj1OP5Zu_J9_U';
@@ -65,7 +65,7 @@ General troubleshooting:
 PSP contacts: Worldpay 0330 333 3967, SumUp 020 3510 0160, Square support.squareup.com/en/gb, Stripe 0800 041 8604, Zettle 020 3455 0690, Dojo 0800 060 8085, Adyen support.adyen.com, Elavon 0345 850 0195
 `;
 
-// ‚îÄ‚îÄ‚îÄ VENDOR PROFILES ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── VENDOR PROFILES ─────────────────────────────────────────────────────
 const VENDOR_PROFILES = {
   'lightspeed': `LIGHTSPEED RESTAURANT
 Support: 0800 023 2777 | support.lightspeedhq.com/hc/en-gb | Chat available in app
@@ -428,7 +428,7 @@ Error codes: DEVICE_OFFLINE = tablet not connected to internet. SCALE_ERR = scal
 Pro tips: Hold weekly kitchen waste reviews using Winnow data. Use Winnow's benchmarking data to compare against similar operations. Enable automatic daily email reports for kitchen managers.`
 };
 
-// ‚îÄ‚îÄ‚îÄ VENDOR SUPPORT URL LOOKUP ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── VENDOR SUPPORT URL LOOKUP ────────────────────────────────────────────
 const VENDOR_SUPPORT_URLS = {
   // POS
   'tevalis': 'https://support.tevalis.com',
@@ -563,8 +563,8 @@ const VENDOR_SUPPORT_URLS = {
   'flow learning': 'https://support.flowlearning.co',
 };
 
-// ‚îÄ‚îÄ‚îÄ VENDOR NAME CACHE (for NPS detection) ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-// Derived dynamically from Supabase documents table ‚Äî adding a doc makes
+// ─── VENDOR NAME CACHE (for NPS detection) ────────────────────────────────
+// Derived dynamically from Supabase documents table — adding a doc makes
 // that vendor automatically eligible for NPS prompts, no code change needed.
 let _vendorNameCache = [];
 let _vendorCacheAt = 0;
@@ -575,7 +575,7 @@ async function getVendorNames() {
     const docs = await sbFetch('/rest/v1/documents?select=filename&limit=1000');
     if (Array.isArray(docs.data) && docs.data.length) {
       const names = [...new Set(docs.data.map(d => {
-        // Strip extension and normalise: "Lightspeed_Restaurant_Guide.pdf" ‚Üí "lightspeed restaurant guide"
+        // Strip extension and normalise: "Lightspeed_Restaurant_Guide.pdf" → "lightspeed restaurant guide"
         return d.filename.toLowerCase()
           .replace(/\.(txt|pdf|md|docx?|csv)$/i, '')
           .replace(/[_\-]+/g, ' ')
@@ -592,13 +592,13 @@ async function getVendorNames() {
   return _vendorNameCache;
 }
 
-// ‚îÄ‚îÄ‚îÄ SLACK ALERT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── SLACK ALERT ──────────────────────────────────────────────────────────
 async function sendSlackAlert({ venue, userName, email, issue, turns }) {
   if (!SLACK_WEBHOOK_URL) return;
   const https = require('https');
   const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const text = [
-    'üö® *Escalation Alert ‚Äî Stacked Chat*',
+    '🚨 *Escalation Alert — Stacked Chat*',
     `*Venue:* ${venue || 'Unknown'}`,
     `*User:* ${userName || 'Unknown'} (${email || 'no email'})`,
     `*Issue:* ${issue}`,
@@ -624,7 +624,7 @@ async function sendSlackTicketAlert(ticket) {
   const issue = (ticket.issue || '').substring(0, 300);
   const convoLen = Array.isArray(ticket.conversation) ? ticket.conversation.length : 0;
   const text = [
-    'üé´ *New Support Ticket ‚Äî Stacked Chat*',
+    '🎫 *New Support Ticket — Stacked Chat*',
     `*Venue:* ${ticket.venue || 'Unknown'}`,
     `*User:* ${ticket.name || 'Unknown'} (${ticket.email || 'no email'})`,
     `*Issue:* ${issue}`,
@@ -643,7 +643,7 @@ async function sendSlackTicketAlert(ticket) {
   });
 }
 
-// ‚îÄ‚îÄ‚îÄ SUPABASE HELPERS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── SUPABASE HELPERS ──────────────────────────────────────────────────────
 // Mirror a /save-nps payload into the approved-reporting portal's unified
 // nps_scores table. Silent no-op if STACKCOLLECT env vars aren't set.
 // Payload shape (from npsSubmit in the client): { vendor, score, comment,
@@ -826,15 +826,15 @@ async function getAnalytics() {
   } catch(e) { console.error('Analytics error:', e); return { error: e.message }; }
 }
 
-// ‚îÄ‚îÄ‚îÄ CHAT PAGE BUILDER ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── CHAT PAGE BUILDER ─────────────────────────────────────────────────────
 // Accepts a branding object and returns a fully branded HTML page.
 // Default branding = Stacked. White-label = venue's own logo/colour/botname.
 function buildChatPage(b = {}) {
   const logoUrl = b.logo_url || 'https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg';
-  const primaryColor = b.primary_color || '#e64e1a';
+  const primaryColor = b.primary_color || '#E87830';
   const botName = b.bot_name || 'Stacked Chat';
-  const welcomeMsg = b.welcome_message || 'AI support for hospitality tech ‚Äî enter your details to get started.';
-  const welcomeHeading = b.welcome_heading || 'Your knowledge,<br><span class="accent">on tap.</span>';
+  const welcomeMsg = b.welcome_message || 'AI support for hospitality tech — enter your details to get started.';
+  const welcomeHeading = b.welcome_heading || 'What can we fix<br>for you today?';
   const poweredBy = b.white_label ? '' : '<a href="https://stackedchat.io" target="_blank" rel="noopener" style="display:block;text-align:center;padding:8px;font-size:11px;color:#A8A49C;text-decoration:none;font-family:Inter,sans-serif;">Powered by <strong style="color:#E8573C">Stacked Chat</strong></a>';
   const presetVenueId = b.venue_id || '';
   const presetVenueName = (b.venue_name || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
@@ -850,7 +850,7 @@ function buildChatPage(b = {}) {
     .replace(/\{\{VENUE_NAME\}\}/g, presetVenueName);
 }
 
-// ‚îÄ‚îÄ‚îÄ STACKED CHAT PAGE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── STACKED CHAT PAGE ────────────────────────────────────────────────────
 // Gate has venue autocomplete: user types, dropdown shows matching venues,
 // they pick one (joins) or hit "Create new venue" (creates).
 const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
@@ -861,11 +861,11 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <title>{{BOT_NAME}}</title>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Righteous&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    /* Legacy chat-widget tokens (light theme ‚Äî the chat widget stays
+    /* Legacy chat-widget tokens (light theme — the chat widget stays
        light/cream because it's seen by stressed operators on-shift.
        Only the new accent orange #E87830, Geist body font, Fraunces
        gate heading, and 4px offset-shadow buttons carry over from the
@@ -873,52 +873,26 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     --cream: #EDEBE5; --cream-dark: #D6D2C8;
     --orange: {{PRIMARY_COLOR}}; --orange-light: {{PRIMARY_COLOR}}cc;
     --brown: #1A1A1A; --brown-mid: #6B6867;
-    /* Answer/"solution" bubble ‚Äî soft pinky-orange peach (deck chat style) */
-    --peach: #F8DBCC; --peach-border: #F0C7B4; --peach-link: #B8480F;
-    --white: #ffffff; --green: #2A9D5C; --red: #D64545;
+    --white: #ffffff; --green: #2a9d5c; --red: #d64545;
     --purple: #9B8AC2; --purple-light: #B3A6D6;
     --green-brand: #B7D46A; --green-brand-light: #D1E58F;
-
-    /* Accent glow ‚Äî single source, derived from the live brand orange
-       (#E87830 ‚Üí 230,78,26). Replaces the legacy 230,84,58 / 232,87,60
-       glows that no longer matched the button colour. */
-    --orange-glow-08: rgba(230,78,26,0.08);
-    --orange-glow-15: rgba(230,78,26,0.15);
-    --orange-glow-25: rgba(230,78,26,0.25);
-    --orange-ring:    rgba(230,78,26,0.14);
-
-    /* Elevation scale */
-    --shadow:    0 1px 2px rgba(26,21,16,0.04), 0 2px 12px rgba(26,21,16,0.06);
-    --shadow-lg: 0 4px 6px rgba(26,21,16,0.04), 0 16px 40px rgba(26,21,16,0.10);
-    --e1: 0 1px 2px rgba(26,21,16,0.05);
-    --e2: 0 2px 10px rgba(26,21,16,0.07);
-    --e3: 0 8px 28px rgba(26,21,16,0.12);
-
-    /* Radius scale */
-    --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 999px;
-
-    /* Motion */
+    --shadow: 0 2px 16px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-    --t-fast: 0.12s; --t-mid: 0.2s; --t-slow: 0.32s;
 
-    /* Brand primary-button offset shadow (carried from the /app system) */
-    --btn-offset:        0 4px 0 0 var(--stacked-orange-700);
-    --btn-offset-hover:  0 5px 0 0 var(--stacked-orange-700);
-    --btn-offset-active: 0 2px 0 0 var(--stacked-orange-700);
-
-    /* Stacked design-system tokens ‚Äî available for opt-in use but not
+    /* Stacked design-system tokens — available for opt-in use but not
        applied as defaults on the chat widget. See colors_and_type.css. */
     --ink-900: #0A0A0A; --ink-800: #131313; --ink-700: #1D1D1D;
     --fg: #F4EFE6; --fg-muted: #928A7C; --fg-dim: #555048;
     --border: #262421;
-    --stacked-orange-500: #e64e1a; --stacked-orange-700: #B7351F;
+    --stacked-orange-500: #E87830; --stacked-orange-700: #A34F15;
     --stacked-green-500:  #3BD36F; --stacked-green-700:  #1E8A44;
     --stacked-amber-500:  #F5A524;
     --stacked-red-500:    #E5484D;
     --stacked-purple-500: #C7B3F2; --stacked-purple-700: #1D1340;
-    --font-sans:    'DM Sans', ui-sans-serif, system-ui, sans-serif;
-    --font-display: 'Chunko Bold', 'Archivo Black', 'DM Sans', sans-serif;
-    --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+    --font-sans:    'Geist', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Fraunces', 'Fraunces Placeholder', ui-serif, Georgia, serif;
+    --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', monospace;
   }
   ::selection { background: var(--orange); color: #fff; }
   html { height: 100%; height: 100dvh; overflow-x: hidden; overflow-y: hidden; }
@@ -928,26 +902,16 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   @keyframes msgIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
   @keyframes dotBounce { 0%,60%,100% { transform: translateY(0); opacity: 0.4; } 30% { transform: translateY(-6px); opacity: 1; } }
 
-  /* ‚îÄ‚îÄ‚îÄ GATE ‚îÄ‚îÄ‚îÄ */
+  /* ─── GATE ─── */
   #gate {
     position: fixed; inset: 0;
     background: #EDEBE5;
-    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(230,78,26,0.07) 0%, transparent 70%),
-                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(230,78,26,0.04) 0%, transparent 60%);
+    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(232,120,48,0.07) 0%, transparent 70%),
+                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(232,120,48,0.04) 0%, transparent 60%);
     display: flex; align-items: center; justify-content: center;
     z-index: 100; padding: 16px; overflow-y: auto;
   }
   #gate.hidden { display: none; }
-  /* Full-bleed hero photo + cream scrim (shown only when GATE_BG_URL is set;
-     otherwise the cream radial-gradient above is the graceful fallback). */
-  .gate-bg, .gate-scrim { position: absolute; inset: 0; pointer-events: none; }
-  .gate-bg { z-index: 0; background: var(--gate-bg) center/cover no-repeat; filter: saturate(0.9); }
-  .gate-scrim { z-index: 1; background:
-      linear-gradient(180deg, rgba(237,235,229,0.82) 0%, rgba(237,235,229,0.74) 42%, rgba(237,235,229,0.90) 100%),
-      radial-gradient(ellipse 60% 45% at 50% 8%, rgba(230,78,26,0.10) 0%, transparent 70%); }
-  #gate:not(.has-bg) .gate-bg, #gate:not(.has-bg) .gate-scrim { display: none; }
-  #gate .gate-card { position: relative; z-index: 2; }
-  #gate.has-bg .gate-card { box-shadow: 0 8px 10px rgba(26,21,16,0.10), 0 24px 60px rgba(26,21,16,0.22); }
   .gate-card {
     background: #ffffff;
     border: 1px solid #E0DDD5;
@@ -983,7 +947,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     margin-bottom: 10px; outline: none;
     transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.12); }
+  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(232,120,48,0.12); }
   .gate-input::placeholder { color: #A8A49C; }
   /* Gate CTA upgraded to the 4px offset-shadow button from /app (kept from rebrand) */
   .gate-btn {
@@ -992,15 +956,15 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     color: #fff; border: none; border-radius: 10px;
     font-family: var(--font-sans); font-size: 15px; font-weight: 700;
     cursor: pointer; margin-top: 6px;
-    transition: transform var(--t-fast), box-shadow var(--t-fast);
+    transition: transform 0.1s, box-shadow 0.15s;
     letter-spacing: -0.2px;
-    box-shadow: var(--btn-offset);
+    box-shadow: 0 4px 0 0 var(--stacked-orange-700);
   }
-  .gate-btn:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
-  .gate-btn:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
+  .gate-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 0 0 var(--stacked-orange-700); }
+  .gate-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
   .gate-error { font-size: 13px; color: #ff6b6b; margin-top: -4px; margin-bottom: 8px; display: none; font-family: var(--font-sans); }
 
-  /* ‚îÄ‚îÄ‚îÄ VENUE AUTOCOMPLETE ‚îÄ‚îÄ‚îÄ */
+  /* ─── VENUE AUTOCOMPLETE ─── */
   .venue-wrap { position: relative; margin-bottom: 10px; }
   .venue-wrap .gate-input { margin-bottom: 0; }
   .venue-dropdown {
@@ -1032,7 +996,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .venue-confirmed .vc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
   .venue-confirmed .vc-change { margin-left: auto; font-size: 12px; color: var(--orange); cursor: pointer; font-weight: 700; }
 
-  /* ‚îÄ‚îÄ‚îÄ APP SHELL ‚îÄ‚îÄ‚îÄ */
+  /* ─── APP SHELL ─── */
   #app { display: flex; flex-direction: column; height: 100%; height: 100dvh; width: 100%; max-width: 100vw; overflow: hidden; }
   header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: var(--white); border-bottom: none; flex-shrink: 0; box-shadow: 0 1px 8px rgba(0,0,0,0.04); width: 100%; max-width: 100vw; position: relative; }
   header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--orange), var(--purple) 50%, var(--green-brand)); opacity: 0.7; }
@@ -1045,69 +1009,67 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   main { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px 16px 8px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; width: 100%; }
   .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 28px 20px 20px; gap: 0; text-align: center; position: relative; }
-  .welcome::before { content: ''; position: absolute; top: 25%; left: 50%; transform: translate(-50%,-50%); width: 260px; height: 260px; background: radial-gradient(circle, rgba(230,78,26,0.06) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
+  .welcome::before { content: ''; position: absolute; top: 25%; left: 50%; transform: translate(-50%,-50%); width: 260px; height: 260px; background: radial-gradient(circle, rgba(230,84,58,0.06) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
   .welcome-wordmark { height: 36px; margin-bottom: 16px; max-width: 200px; object-fit: contain; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.1s forwards; }
-  .welcome h2 { font-family: var(--font-display); font-size: clamp(34px, 9vw, 52px); font-weight: 400; line-height: 1.02; letter-spacing: -0.02em; color: var(--brown); margin-bottom: 10px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
-  .welcome h2 .accent { color: var(--orange); }
-  .welcome p { font-family: var(--font-sans); font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
-  /* ‚îÄ‚îÄ‚îÄ ASK ROTATOR (kinetic one-liner) ‚îÄ‚îÄ‚îÄ */
-  .ask-rotator {
-    display: flex; align-items: center; gap: 12px;
-    width: 100%; max-width: 340px; margin: 4px auto 18px;
-    padding: 15px 20px; text-align: left;
-    background: var(--white); border: 1px solid var(--cream-dark);
-    border-radius: var(--r-lg); box-shadow: var(--shadow);
-    cursor: pointer; position: relative; z-index: 1;
-    transition: border-color var(--t-mid), box-shadow var(--t-mid), transform var(--t-fast);
-    opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards;
-  }
-  .ask-rotator:hover { border-color: var(--orange); box-shadow: var(--e2); transform: translateY(-1px); }
-  .ask-rotator:active { transform: translateY(0); }
-  .ask-rotator .ar-caret { color: var(--orange); font-weight: 700; font-size: 18px; line-height: 1; flex-shrink: 0; }
-  .ask-rotator .ar-text {
-    font-family: var(--font-sans); font-size: 15px; font-weight: 500;
-    color: var(--brown); line-height: 1.4; flex: 1; min-width: 0;
-    transition: opacity 0.34s var(--ease), transform 0.34s var(--ease);
-  }
-  .ask-rotator.swapping .ar-text { opacity: 0; transform: translateY(4px); }
+  .welcome h2 { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -0.4px; color: var(--brown); margin-bottom: 6px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
+  .welcome p { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
+  /* ─── ROTATING CARDS CAROUSEL (Tinder-style portrait) ─── */
+  .carousel-wrap { width: 100%; max-width: 300px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 16px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+  .carousel-track { position: relative; height: 320px; overflow: hidden; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+  .carousel-card { position: absolute; inset: 0; border-radius: 24px; padding: 32px 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; opacity: 0; transform: translateX(50px) rotate(3deg); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); pointer-events: none; }
+  .carousel-card.active { opacity: 1; transform: translateX(0) rotate(0deg); pointer-events: auto; }
+  .carousel-card.exit { opacity: 0; transform: translateX(-50px) rotate(-3deg); pointer-events: none; }
+  .carousel-card.orange { background: linear-gradient(160deg, #F07A63 0%, var(--orange) 100%); color: #fff; }
+  .carousel-card.purple { background: linear-gradient(160deg, #B3A6D6 0%, var(--purple) 100%); color: #1E1E1E; }
+  .carousel-card.green { background: linear-gradient(160deg, #D1E58F 0%, var(--green-brand) 100%); color: #1E1E1E; }
+  .carousel-card .cc-emoji { font-size: 48px; margin-bottom: 20px; }
+  .carousel-card .cc-label { font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 700; line-height: 1.25; letter-spacing: -0.3px; }
+  .carousel-card .cc-sub { font-size: 14px; opacity: 0.7; font-weight: 500; margin-top: 8px; line-height: 1.5; max-width: 220px; }
+  .carousel-card .cc-tap { font-size: 12px; font-weight: 600; opacity: 0.5; margin-top: 24px; letter-spacing: 0.04em; }
+  .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+  .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-dark); border: none; padding: 0; cursor: pointer; transition: all 0.3s var(--ease); }
+  .carousel-dot.active { width: 20px; border-radius: 3px; }
+  .carousel-dot.orange.active { background: var(--orange); }
+  .carousel-dot.purple.active { background: var(--purple); }
+  .carousel-dot.green.active { background: var(--green-brand); }
 
   /* Keep quick-grid as fallback / below carousel */
   .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-bottom: 12px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.6s forwards; }
-  .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: all 0.3s var(--ease); line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
-  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(230,78,26,0.12); transform: translateY(-2px); }
+  .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: all 0.3s var(--ease); line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
+  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(230,84,58,0.12); transform: translateY(-2px); }
   .quick-btn:active { transform: translateY(0); }
   .quick-btn .emoji { font-size: 20px; }
   .msg { display: flex; align-items: flex-start; gap: 10px; max-width: 100%; animation: msgIn 0.4s var(--ease); }
   .msg.user { flex-direction: row-reverse; }
   .msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: var(--cream-dark); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--brown); overflow: hidden; }
   .msg-avatar img { width: 100%; height: 100%; object-fit: contain; }
-  .msg-bubble { background: var(--peach); color: var(--brown); border: 1px solid var(--peach-border); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-size: 15px; line-height: 1.55; max-width: min(calc(100vw - 90px), 520px); box-shadow: var(--e1); white-space: pre-wrap; word-wrap: break-word; }
-  .msg-bubble a { color: var(--peach-link); font-weight: 600; text-decoration: underline; }
+  .msg-bubble { background: var(--white); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-size: 15px; line-height: 1.55; max-width: min(calc(100vw - 90px), 520px); box-shadow: var(--shadow); white-space: pre-wrap; word-wrap: break-word; }
+  .msg-bubble a { color: var(--orange); font-weight: 600; text-decoration: underline; }
   .msg-bubble strong { font-weight: 700; }
-  .msg.user .msg-bubble { background: var(--brown); color: #fff; border: none; border-radius: 18px 18px 4px 18px; box-shadow: var(--e2); }
+  .msg.user .msg-bubble { background: var(--orange); color: #fff; border-radius: 18px 18px 4px 18px; box-shadow: 0 2px 12px rgba(232,87,60,0.20); }
   .ticket-row { display: flex; justify-content: center; margin-top: -4px; }
-  .ticket-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 16px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--brown-mid); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.3s var(--ease); }
-  .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,78,26,0.1); }
+  .ticket-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 16px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--brown-mid); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.3s var(--ease); }
+  .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,84,58,0.1); }
   .link-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; padding-left: 42px; }
-  .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: var(--r-pill); padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: transform var(--t-fast), box-shadow var(--t-mid); white-space: nowrap; box-shadow: 0 2px 8px var(--orange-glow-25); }
+  .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: all 0.15s; white-space: nowrap; box-shadow: 0 2px 8px rgba(232,87,60,0.20); }
   .link-pill:hover { background: #C94A30; transform: translateY(-1px); }
   .typing-bubble { display: flex; align-items: flex-start; gap: 10px; }
-  .dots { display: flex; gap: 4px; align-items: center; background: var(--peach); border: 1px solid var(--peach-border); border-radius: 18px 18px 18px 4px; padding: 12px 16px; box-shadow: var(--e1); }
+  .dots { display: flex; gap: 4px; align-items: center; background: var(--white); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow); }
   .dot-anim { width: 8px; height: 8px; border-radius: 50%; animation: dotBounce 1.4s ease-in-out infinite; }
   .dot-anim:nth-child(1) { background: var(--orange); animation-delay: 0s; }
   .dot-anim:nth-child(2) { background: var(--purple); animation-delay: 0.15s; }
   .dot-anim:nth-child(3) { background: var(--green-brand); animation-delay: 0.3s; }
   .input-bar { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: var(--white); border-top: 1px solid var(--cream-dark); flex-shrink: 0; display: flex; gap: 8px; align-items: flex-end; min-width: 0; }
-  #input { flex: 1; min-width: 0; padding: 11px 14px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 20px; font-family: var(--font-sans); font-size: 15px; color: var(--brown); resize: none; outline: none; max-height: 120px; line-height: 1.4; transition: border-color 0.2s; }
-  #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
+  #input { flex: 1; min-width: 0; padding: 11px 14px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 20px; font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--brown); resize: none; outline: none; max-height: 120px; line-height: 1.4; transition: border-color 0.2s; }
+  #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,84,58,0.1); }
   #input::placeholder { color: var(--brown-mid); opacity: 0.6; }
   #mic { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); }
   #mic:hover { border-color: var(--orange); color: var(--orange); }
   #mic.listening { background: var(--orange); border-color: var(--orange); color: #fff; animation: pulse 1s infinite; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(230,78,26,0.4); } 50% { box-shadow: 0 0 0 8px rgba(230,78,26,0); } }
-  #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(230,78,26,0.30); }
-  #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(230,78,26,0.4); }
-  #send:active { transform: scale(0.93); box-shadow: 0 1px 6px rgba(230,78,26,0.2); }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,87,60,0.4); } 50% { box-shadow: 0 0 0 8px rgba(232,87,60,0); } }
+  #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(230,84,58,0.30); }
+  #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(230,84,58,0.4); }
+  #send:active { transform: scale(0.93); box-shadow: 0 1px 6px rgba(230,84,58,0.2); }
   #send svg { width: 18px; height: 18px; fill: #fff; }
   #send:disabled { opacity: 0.35; cursor: default; transform: none; box-shadow: none; }
   .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); backdrop-filter: blur(2px); }
@@ -1115,13 +1077,13 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .drawer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); border-radius: 24px 24px 0 0; z-index: 51; max-height: 70vh; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
   .drawer.open { transform: translateY(0); }
   .drawer-handle { width: 40px; height: 4px; background: var(--cream-dark); border-radius: 2px; margin: 12px auto 0; }
-  .drawer-header { padding: 16px 20px 12px; font-family: var(--font-display); font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--cream-dark); display: flex; align-items: center; justify-content: space-between; }
+  .drawer-header { padding: 16px 20px 12px; font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--cream-dark); display: flex; align-items: center; justify-content: space-between; }
   .drawer-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--brown-mid); padding: 4px; }
   .drawer-body { overflow-y: auto; padding: 16px 20px; flex: 1; }
   .history-item { padding: 14px 0; border-bottom: 1px solid var(--cream-dark); cursor: pointer; }
   .history-item:last-child { border-bottom: none; }
   .history-item:hover .history-preview { color: var(--orange); }
-  .history-date { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--brown-mid); margin-bottom: 4px; }
+  .history-date { font-size: 11px; color: var(--brown-mid); margin-bottom: 4px; }
   .history-preview { font-size: 14px; font-weight: 500; color: var(--brown); transition: color 0.15s; }
   .history-count { font-size: 12px; color: var(--brown-mid); margin-top: 2px; }
   .empty-history { text-align: center; padding: 32px 0; color: var(--brown-mid); font-size: 14px; }
@@ -1132,15 +1094,14 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .modal-overlay.open { opacity: 1; pointer-events: all; }
   .modal { background: var(--white); border-radius: 24px 24px 0 0; padding: 24px 24px calc(24px + env(safe-area-inset-bottom)); width: 100%; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
   .modal-overlay.open .modal { transform: translateY(0); }
-  .modal h3 { font-family: var(--font-display); font-size: 20px; margin-bottom: 6px; }
+  .modal h3 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 6px; }
   .modal p { font-size: 14px; color: var(--brown-mid); margin-bottom: 20px; }
-  .modal textarea { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 12px 14px; font-family: var(--font-sans); font-size: 14px; color: var(--brown); background: var(--cream); resize: none; height: 100px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
-  .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
+  .modal textarea { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 12px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--brown); background: var(--cream); resize: none; height: 100px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
+  .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,84,58,0.1); }
   .modal-actions { display: flex; gap: 10px; }
-  .modal-cancel { flex: 1; padding: 13px; background: var(--cream); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 15px; font-weight: 500; cursor: pointer; color: var(--brown); }
-  .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 15px; font-weight: 700; cursor: pointer; color: #fff; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
-  .modal-submit:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
-  .modal-submit:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
+  .modal-cancel { flex: 1; padding: 13px; background: var(--cream); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; color: var(--brown); }
+  .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; color: #fff; transition: background 0.15s; }
+  .modal-submit:hover { background: var(--orange-light); }
   .toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--brown); color: #fff; border-radius: 20px; padding: 10px 20px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap; }
   .reminder-banner { display: flex; align-items: center; gap: 12px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 12px 16px; margin: 8px 16px; cursor: pointer; transition: box-shadow 0.15s; }
   .reminder-banner:hover { box-shadow: 0 4px 16px rgba(34,197,94,0.15); }
@@ -1156,13 +1117,13 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .escalation-banner .esc-sub { font-family: var(--font-sans); font-size: 12px; color: #b45309; line-height: 1.4; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.green { background: var(--green); }
-  .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: var(--font-sans); font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
+  .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
   .social-proof .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse-green 2s infinite; }
   @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(42,157,92,0.4); } 50% { box-shadow: 0 0 0 5px rgba(42,157,92,0); } }
   .predict-section { width: 100%; max-width: 380px; margin-top: 4px; }
-  .predict-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.7; margin-bottom: 8px; text-align: left; padding-left: 2px; }
+  .predict-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.6; margin-bottom: 8px; text-align: left; padding-left: 2px; }
   .predict-grid { display: flex; flex-direction: column; gap: 8px; }
-  .predict-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 10px 14px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; }
+  .predict-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; }
   .predict-btn:hover { border-color: var(--orange); box-shadow: 0 2px 12px rgba(0,0,0,0.10); }
   .predict-btn .predict-icon { font-size: 16px; flex-shrink: 0; }
   .predict-tag { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--orange); color: #fff; border-radius: 8px; padding: 2px 7px; flex-shrink: 0; }
@@ -1179,9 +1140,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .logo-strip::after { right: 0; background: linear-gradient(to left, var(--white), transparent); }
   .logo-track { display: flex; align-items: center; gap: 44px; width: max-content; animation: logoScroll 60s linear infinite; }
   .logo-track:hover { animation-play-state: paused; }
-  .logo-text { font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brown); opacity: 0.32; white-space: nowrap; flex-shrink: 0; user-select: none; }
+  .logo-text { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brown); opacity: 0.3; white-space: nowrap; flex-shrink: 0; user-select: none; }
   .logo-dot { width: 4px; height: 4px; background: var(--brown); border-radius: 50%; opacity: 0.15; flex-shrink: 0; }
-  .strip-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.5; white-space: nowrap; flex-shrink: 0; }
+  .strip-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.45; white-space: nowrap; flex-shrink: 0; }
   @keyframes logoScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
   .video-row{display:flex;flex-direction:column;gap:8px;margin-top:-4px;padding-left:42px}
   .chat-video-card{background:var(--white);border:1.5px solid var(--cream-dark);border-radius:16px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s;max-width:320px}
@@ -1198,16 +1159,16 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .cv-modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--brown-mid);padding:4px;line-height:1}
   .cv-modal-body{background:#000}
   .cv-modal-body iframe,.cv-modal-body video{display:block;width:100%;aspect-ratio:16/9}
-  .video-pill{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;border:none;border-radius:20px;padding:10px 16px;font-family:var(--font-sans);font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;transition:transform var(--t-fast),box-shadow var(--t-mid);box-shadow:var(--btn-offset)}
+  .video-pill{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;border:none;border-radius:20px;padding:10px 16px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;transition:background 0.15s;box-shadow:0 2px 12px rgba(232,87,60,0.25)}
   .video-pill:hover{background:var(--orange-light)}
   .video-pill-row{display:flex;padding-left:42px;margin-top:-4px}
 
-  /* ‚îÄ‚îÄ‚îÄ SHIFT CHECK ‚îÄ‚îÄ‚îÄ */
+  /* ─── SHIFT CHECK ─── */
   .shift-check-btn {
     display: flex; align-items: center; gap: 6px;
     background: none; border: 1px solid var(--cream-dark);
     border-radius: 20px; padding: 8px 16px;
-    font-family: var(--font-sans); font-size: 12px; font-weight: 600;
+    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
     color: var(--brown-mid); cursor: pointer; margin-top: 4px;
     transition: border-color 0.15s, color 0.15s;
   }
@@ -1221,7 +1182,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .sc-options { display: flex; gap: 8px; }
   .sc-opt {
     flex: 1; padding: 10px 8px; border-radius: 10px; border: 2px solid var(--cream-dark);
-    font-family: var(--font-sans); font-size: 12px; font-weight: 700;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700;
     cursor: pointer; text-align: center; transition: all 0.15s; background: var(--white);
   }
   .sc-opt:hover { border-color: var(--orange); }
@@ -1232,42 +1193,30 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .sc-progress-fill { height: 100%; background: var(--orange); border-radius: 2px; transition: width 0.3s ease; }
   .sc-summary { text-align: center; padding: 8px 0 4px; }
   .sc-summary-icon { font-size: 40px; margin-bottom: 8px; }
-  .sc-summary-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .sc-summary-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; margin-bottom: 6px; }
   .sc-summary-sub { font-size: 14px; color: var(--brown-mid); margin-bottom: 16px; line-height: 1.5; }
   .sc-issues-list { text-align: left; margin-bottom: 16px; }
   .sc-issue-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fee2e2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #991b1b; }
   .sc-issue-item.amber { background: #fef9c3; color: #854d0e; }
-  .sc-fix-btn { width: 100%; padding: 13px; background: var(--orange); color: #fff; border: none; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 12px; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
-  .sc-fix-btn:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
-  .sc-fix-btn:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
-  .sc-done-btn { width: 100%; padding: 11px; background: var(--cream); color: var(--brown); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 14px; font-weight: 500; cursor: pointer; }
+  .sc-fix-btn { width: 100%; padding: 13px; background: var(--orange); color: #fff; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
+  .sc-done-btn { width: 100%; padding: 11px; background: var(--cream); color: var(--brown); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
 
-  /* ‚îÄ‚îÄ‚îÄ TIP OF THE DAY (editorial footnote) ‚îÄ‚îÄ‚îÄ */
-  .tip-note {
-    width: 100%; max-width: 420px; margin: 18px auto 0;
-    text-align: center; cursor: pointer; position: relative; z-index: 1;
-    opacity: 0; animation: staggerIn 0.6s var(--ease) 0.55s forwards;
+  /* ─── TIP OF THE DAY ─── */
+  .tip-card {
+    width: 100%; max-width: 380px; background: var(--white);
+    border: 2px solid var(--cream-dark); border-radius: 16px;
+    padding: 14px 16px; cursor: pointer; text-align: left;
+    transition: border-color 0.2s, box-shadow 0.2s; margin-top: 8px;
+    box-shadow: var(--shadow);
   }
-  .tip-eyebrow { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
-  .tip-rule { flex: 1; height: 1px; background: var(--cream-dark); }
-  .tip-key {
-    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
-    letter-spacing: 0.18em; text-transform: uppercase;
-    color: var(--brown-mid); white-space: nowrap;
-  }
-  .tip-key .tip-product { color: var(--orange); }
-  .tip-text {
-    font-family: var(--font-sans); font-size: 14px; font-weight: 500;
-    color: var(--brown-mid); line-height: 1.55; max-width: 340px; margin: 0 auto;
-  }
-  .tip-cta {
-    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
-    letter-spacing: 0.14em; text-transform: uppercase; color: var(--orange);
-    margin-top: 12px; opacity: 0.65; transition: opacity var(--t-mid);
-  }
-  .tip-note:hover .tip-cta { opacity: 1; }
+  .tip-card:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
+  .tip-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .tip-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); background: rgba(232,87,60,0.10); border-radius: 6px; padding: 2px 7px; }
+  .tip-product { font-size: 11px; color: var(--brown-mid); font-weight: 500; }
+  .tip-text { font-size: 13px; font-weight: 600; color: var(--brown); line-height: 1.45; }
+  .tip-cta { font-size: 12px; color: var(--orange); font-weight: 600; margin-top: 6px; }
 
-  /* ‚îÄ‚îÄ‚îÄ NPS WIDGET ‚îÄ‚îÄ‚îÄ */
+  /* ─── NPS WIDGET ─── */
   .nps-wrap { padding-left: 42px; margin-top: -4px; }
   .nps-card { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 16px; padding: 14px 16px; max-width: 340px; box-shadow: var(--shadow); }
   .nps-q { font-size: 13px; font-weight: 600; color: var(--brown); margin-bottom: 12px; line-height: 1.4; }
@@ -1276,25 +1225,21 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .nps-label { font-size: 10px; color: var(--brown-mid); font-weight: 500; }
   .nps-row { display: flex; gap: 4px; margin-bottom: 10px; }
   .nps-btn { flex: 1; height: 32px; border-radius: 8px; border: 1.5px solid var(--cream-dark); background: var(--white); font-size: 12px; font-weight: 600; color: var(--brown); cursor: pointer; transition: all 0.15s; padding: 0; min-width: 0; }
-  .nps-btn:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-glow-08); }
+  .nps-btn:hover { border-color: var(--orange); color: var(--orange); background: rgba(232,87,60,0.06); }
   .nps-btn.selected { background: var(--orange); border-color: var(--orange); color: #fff; }
   .nps-comment { display: none; margin-top: 6px; }
   .nps-comment.show { display: flex; gap: 6px; }
-  .nps-input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: var(--font-sans); font-size: 13px; color: var(--brown); outline: none; background: var(--cream); transition: border-color 0.15s; }
+  .nps-input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--brown); outline: none; background: var(--cream); transition: border-color 0.15s; }
   .nps-input:focus { border-color: var(--orange); background: #fff; }
-  .nps-send { padding: 8px 14px; background: var(--orange); border: none; border-radius: var(--r-sm); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
-  .nps-send:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
-  .nps-send:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
+  .nps-send { padding: 8px 14px; background: var(--orange); border: none; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .nps-done { font-size: 13px; color: var(--green); font-weight: 600; display: none; align-items: center; gap: 6px; padding-top: 4px; }
   .nps-done.show { display: flex; }
 </style>
 </head>
 <body>
 
-<!-- ‚îÄ‚îÄ‚îÄ GATE ‚îÄ‚îÄ‚îÄ -->
+<!-- ─── GATE ─── -->
 <div id="gate">
-  <div class="gate-bg"></div>
-  <div class="gate-scrim"></div>
   <div class="gate-card">
     <img class="gate-logo" id="gateWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
     <h2>Fix it fast.</h2>
@@ -1320,12 +1265,12 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   </div>
 </div>
 
-<!-- ‚îÄ‚îÄ‚îÄ APP ‚îÄ‚îÄ‚îÄ -->
+<!-- ─── APP ─── -->
 <div id="app">
   <header>
     <a href="https://stackedchat.io" style="display:flex;flex-direction:column;align-items:flex-start;text-decoration:none;gap:2px;">
       <img class="header-logo" id="headerIcon" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
-      <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--orange);padding-left:2px;margin-top:3px;">CHAT</span>
+      <span style="font-family:'Righteous',sans-serif;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--orange);padding-left:1px;margin-top:2px;">CHAT</span>
     </a>
     <div class="header-actions">
       <div class="user-chip"><div class="dot"></div><span id="userLabel">You</span></div>
@@ -1338,18 +1283,120 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     </div>
   </header>
 
+  <div class="logo-strip">
+    <div class="logo-track">
+      <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
+      <span class="logo-text">Square</span><span class="logo-dot"></span>
+      <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
+      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
+      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
+      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
+      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
+      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
+      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
+      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
+      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
+      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
+      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
+      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
+      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
+      <span class="logo-text">Collins</span><span class="logo-dot"></span>
+      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
+      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
+      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
+      <span class="logo-text">Airship</span><span class="logo-dot"></span>
+      <span class="logo-text">Stampede</span><span class="logo-dot"></span>
+      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
+      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
+      <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
+      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
+      <span class="logo-text">Mews</span><span class="logo-dot"></span>
+      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
+      <span class="logo-text">Planday</span><span class="logo-dot"></span>
+      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
+      <span class="logo-text">Sona</span><span class="logo-dot"></span>
+      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
+      <span class="logo-text">Nory</span><span class="logo-dot"></span>
+      <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
+      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
+      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
+      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
+      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
+      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
+      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
+      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
+      <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
+      <span class="logo-text">Square</span><span class="logo-dot"></span>
+      <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
+      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
+      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
+      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
+      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
+      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
+      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
+      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
+      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
+      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
+      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
+      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
+      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
+      <span class="logo-text">Collins</span><span class="logo-dot"></span>
+      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
+      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
+      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
+      <span class="logo-text">Airship</span><span class="logo-dot"></span>
+      <span class="logo-text">Stampede</span><span class="logo-dot"></span>
+      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
+      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
+      <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
+      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
+      <span class="logo-text">Mews</span><span class="logo-dot"></span>
+      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
+      <span class="logo-text">Planday</span><span class="logo-dot"></span>
+      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
+      <span class="logo-text">Sona</span><span class="logo-dot"></span>
+      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
+      <span class="logo-text">Nory</span><span class="logo-dot"></span>
+      <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
+      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
+      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
+      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
+      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
+      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
+      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
+      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
+    </div>
+  </div>
 
   <main>
+    <div id="shiftReminder" style="display:none" class="reminder-banner" onclick="dismissReminder()">
+      <div class="rem-icon">☀️</div>
+      <div class="rem-body">
+        <div class="rem-title">Good morning — time for your shift check</div>
+        <div class="rem-sub">Tap to run through your systems before service</div>
+      </div>
+      <div class="rem-cta">Start →</div>
+    </div>
     <div id="messages">
       <div class="welcome" id="welcome">
-        <h2 id="welcomeGreeting">Hi there.</h2>
-        <p id="welcomeSub">How can I help you today?</p>
+        <img class="welcome-wordmark" id="welcomeWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
+        <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Hospitality tech support, powered by AI</span></div>
+        <h2>{{WELCOME_HEADING}}</h2>
+        <div class="carousel-wrap" id="carouselWrap">
+          <div class="carousel-track" id="carouselTrack"></div>
+          <div class="carousel-dots" id="carouselDots"></div>
+        </div>
+        <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none">
+          <div class="tip-header"><span class="tip-badge">Tip of the day</span><span class="tip-product" id="tipProduct"></span></div>
+          <div class="tip-text" id="tipText"></div>
+          <div class="tip-cta">Tap to explore &rarr;</div>
+        </div>
       </div>
     </div>
   </main>
 
   <div class="input-bar">
-    <textarea id="input" placeholder="Ask anything about your business&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <textarea id="input" placeholder="Describe your tech issue&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
     <button id="mic" onclick="toggleMic()" title="Voice input">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8"/></svg>
     </button>
@@ -1359,7 +1406,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   </div>
 </div>
 
-<!-- ‚îÄ‚îÄ‚îÄ HISTORY DRAWER ‚îÄ‚îÄ‚îÄ -->
+<!-- ─── HISTORY DRAWER ─── -->
 <div class="drawer-overlay" id="histOverlay" onclick="closeHistory()"></div>
 <div class="drawer" id="histDrawer">
   <div class="drawer-handle"></div>
@@ -1367,7 +1414,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="drawer-body" id="histBody"><div class="empty-history">No previous chats yet.</div></div>
 </div>
 
-<!-- ‚îÄ‚îÄ‚îÄ TOPICS DRAWER ‚îÄ‚îÄ‚îÄ -->
+<!-- ─── TOPICS DRAWER ─── -->
 <div class="drawer-overlay" id="topicOverlay" onclick="closeTopics()"></div>
 <div class="drawer" id="topicDrawer">
   <div class="drawer-handle"></div>
@@ -1386,8 +1433,20 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   </div>
 </div>
 
-<!-- ‚îÄ‚îÄ‚îÄ SHIFT CHECK DRAWER ‚îÄ‚îÄ‚îÄ -->
-<!-- ‚îÄ‚îÄ‚îÄ TICKET MODAL ‚îÄ‚îÄ‚îÄ -->
+<!-- ─── SHIFT CHECK DRAWER ─── -->
+<div class="drawer-overlay" id="scOverlay" onclick="closeShiftCheck()"></div>
+<div class="drawer" id="scDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header">
+    <span id="scDrawerTitle">Shift check</span>
+    <button class="drawer-close" onclick="closeShiftCheck()">&times;</button>
+  </div>
+  <div class="drawer-body" id="scBody">
+    <!-- injected by JS -->
+  </div>
+</div>
+
+<!-- ─── TICKET MODAL ─── -->
 <div class="modal-overlay" id="ticketOverlay">
   <div class="modal">
     <h3>Raise a support ticket</h3>
@@ -1410,21 +1469,16 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 </div>
 
 <script>
-// ‚îÄ‚îÄ‚îÄ CONFIG ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── CONFIG ───────────────────────────────────────────────────────────────
 const SERVER_URL = 'https://toast-support-bot.onrender.com';
 const SUPABASE_URL = 'https://yuzlfocqovwhqdpitvxj.supabase.co';
-// Preset venue ‚Äî injected server-side when page is served via /chat/:slug
+// Preset venue — injected server-side when page is served via /chat/:slug
 const PRESET_VENUE_ID = '{{VENUE_ID}}';
 const PRESET_VENUE_NAME = '{{VENUE_NAME}}';
-// ‚îÄ‚îÄ GATE HERO BACKGROUND ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-// Paste a hosted image URL here for a full-bleed photo behind the gate
-// (a cream scrim keeps the card readable). Leave '' for the brand-gradient
-// fallback. Use a direct image link (.jpg/.png/.webp), e.g. a raw GitHub URL.
-const GATE_BG_URL = 'https://raw.githubusercontent.com/TOT-STACKED/stacked-chat/main/ChatGPT%20Image%20May%2018%2C%202026%2C%2002_05_23%20PM.png';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
 const ICON_URL = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iODgiIHZpZXdCb3g9IjAgMCA1NiA4OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTU1LjQxNTIgNjIuOTkzNUM1NS40MzM0IDY2LjczMTcgNTQuOTA2MSA3MC4wODA5IDUzLjg0MDcgNzMuMDMzNkM1Mi43NzE2IDc1Ljk5IDUxLjEwOTcgNzguNTI0NiA0OC44NTUyIDgwLjY0MUM0Ni41OTcgODIuNzU3NCA0My43MzUxIDg0LjM3OTIgNDAuMjYyMyA4NS40OTkyQzM2Ljc4OTYgODYuNjE5MiAzMi42NTUgODcuMTkwMiAyNy44NjIyIDg3LjIxMkMyMy4wNjk0IDg3LjIzMDIgMTguOTE2NiA4Ni42OTU2IDE1LjQxMTEgODUuNjA0N0MxMS45MDIgODQuNTEzOCA5LjAyNTYxIDgyLjkxNzQgNi43NzgzMSA4MC44MTkyQzQuNTMxMDEgNzguNzI0NiAyLjg1ODI2IDc2LjIwMDkgMS43NjczNCA3My4yNTU0QzAuNjc2NDIxIDcwLjMxIDAuMTIwMDUxIDY2Ljk2ODEgMC4xMDU1MDYgNjMuMjI5OUw0Ljk4MTQ1ZS0wNSA0OS45ODYxQy0wLjAwNzIyMyA0OC40MDQzIDAuNzgxODc3IDQ3LjYxMTUgMi4zNjAwOCA0Ny42MDQyTDExLjkwNTYgNDcuNTY0MkMxMi41MDkzIDQ4LjE2MDYgMTMuMTcxMSA0OC43MDYxIDEzLjg4MDIgNDkuMjA0M0MxNS44NjkzIDUwLjU5NyAxOC4yOTg0IDUxLjUyNzkgMjEuMTY3NiA1MS45OTdDMjQuMDMzMSA1Mi40NjI1IDI3LjM0MjIgNTIuNDI2MSAzMS4wOTEzIDUxLjg4MDdDMzQuODQ0MSA1MS4zMzUyIDM4LjAxNSA1MC40MzM0IDQwLjYxMTQgNDkuMTcxNUM0MS42ODc4IDQ4LjY0NzkgNDIuNjczMyA0OC4wNjYxIDQzLjU2NzggNDcuNDI5N0w1Mi45MzE2IDQ3LjM4OTdDNTQuNTEzNCA0Ny4zODI0IDU1LjMwNjEgNDguMTY3OSA1NS4zMTM0IDQ5Ljc0OTdMNTUuNDE1MiA2Mi45OTM1WiIgZmlsbD0iI0U2NTQzQSIvPgo8cGF0aCBkPSJNNDMuNTY5NCA0Ny40MzA3QzQyLjY3NDggNDguMDY3IDQxLjY4OTQgNDguNjQ4OSA0MC42MTMgNDkuMTcyNUMzOC4wMTY2IDUwLjQzNDMgMzQuODQ1NyA1MS4zMzYyIDMxLjA5MjkgNTEuODgxNkMyNy4zNDM4IDUyLjQyNzEgMjQuMDM0NiA1Mi40NjM0IDIxLjE2OTIgNTEuOTk4QzE4LjMgNTEuNTI4OSAxNS44NzA5IDUwLjU5OCAxMy44ODE4IDQ5LjIwNTJDMTMuMTcyNyA0OC43MDcgMTIuNTEwOSA0OC4xNjE2IDExLjkwNzIgNDcuNTY1Mkw0My41Njk0IDQ3LjQzMDdaIiBmaWxsPSIjQjczNTFGIi8+CjxwYXRoIGQ9Ik00OS44NjA5IDM3LjkxNjVDNDkuMzUxOCA0MC4zNDU3IDQ4LjMzIDQyLjUxMyA0Ni43OTkxIDQ0LjQyMjFDNDUuOTAwOSA0NS41MzQ4IDQ0LjgyNDUgNDYuNTM4NSA0My41NjYzIDQ3LjQyOTRMMTEuOTA0MSA0Ny41NjM5QzEwLjgwNTkgNDYuNDgzOSA5Ljg3ODYzIDQ1LjI0MDMgOS4xMjIyNiA0My44MzY2QzcuOTQwNDMgNDEuNjQ3NSA3LjEzNjc4IDM5LjA5NDcgNi43MTQ5NiAzNi4xNjc0TDUuMTY5NDkgMjUuODEwOUM0Ljk5MTMgMjQuNTc0NiA1LjUxODU4IDIzLjg2NTUgNi43NTQ5NiAyMy42ODczTDEyLjI2NDEgMjIuODg3M0MxMy4xMjIzIDIzLjUyMzYgMTQuMTAwNSAyNC4wODczIDE1LjE5MTQgMjQuNTc4MkMxNy4yODYgMjUuNTIgMTkuODIwNiAyNi4xNjM3IDIyLjc5ODggMjYuNTEyOEMyNS43NzM0IDI2Ljg1ODIgMjguMzgwNyAyNi44MTQ2IDMwLjYyMDcgMjYuMzgxOUMzMi44NjA3IDI1Ljk0NTUgMzQuNzU4OSAyNS4xNTY0IDM2LjMxODkgMjQuMDE0NkMzNy44NzUzIDIyLjg2OTEgMzkuMDk3MiAyMS40MjE4IDM5Ljk4NDQgMTkuNjY5MUM0MC4xMjYzIDE5LjM4NTQgNDAuMjYwOCAxOS4wOTgxIDQwLjM4MDggMTguOEw0Ni4zMjI3IDE3LjkzODFDNDcuNTU5MSAxNy43NTYzIDQ4LjI2NDUgMTguMjg3MiA0OC40NDY0IDE5LjUyMzZMNDkuOTg4MiAyOS44ODAxQzUwLjQxMzYgMzIuODAzNyA1MC4zNyAzNS40ODM4IDQ5Ljg2MDkgMzcuOTE2NVoiIGZpbGw9IiNFNjU0M0EiLz4KPHBhdGggZD0iTTQwLjM4MTMgMTguODAwOEM0MC4yNjEzIDE5LjA5OSA0MC4xMjY4IDE5LjM4NjIgMzkuOTg1IDE5LjY2OTlDMzkuMDk3NyAyMS40MjI2IDM3Ljg3NTkgMjIuODY5OSAzNi4zMTk1IDI0LjAxNTRDMzQuNzU5NSAyNS4xNTcyIDMyLjg2MTMgMjUuOTQ2MyAzMC42MjEyIDI2LjM4MjdDMjguMzgxMiAyNi44MTU0IDI1Ljc3MzkgMjYuODU5MSAyMi43OTkzIDI2LjUxMzZDMTkuODIxMSAyNi4xNjQ1IDE3LjI4NjUgMjUuNTIwOSAxNS4xOTIgMjQuNTc5QzE0LjEwMSAyNC4wODgxIDEzLjEyMjggMjMuNTI0NSAxMi4yNjQ2IDIyLjg4ODFMNDAuMzgxMyAxOC44MDA4WiIgZmlsbD0iI0I3MzUxRiIvPgo8cGF0aCBkPSJNNDIuNjUwNCA1LjMzMTI4TDQxLjcxOTQgMTMuNTU2OEM0MS40OTA0IDE1LjUwNTkgNDEuMDQ2NyAxNy4yNTUxIDQwLjM4MTIgMTguODAwNUwxMi4yNjQ2IDIyLjg4NzlDMTEuNDc5MSAyMi4zMDYgMTAuNzg4MiAyMS42NjI0IDEwLjE5NTQgMjAuOTYwNkM4Ljk1OTA3IDE5LjQ5MTQgOC4xMTE3OCAxNy44MDA1IDcuNjUzNiAxNS44OTE0QzcuMTk5MDUgMTMuOTc4NyA3LjEwODEzIDExLjg2NTkgNy4zNzcyMyA5LjU0MjI0TDguMzA4MTUgMS4zMTY2OUM4LjQyNDUxIDAuMzM0ODYyIDguOTczNjEgLTAuMDk3ODY5OSA5Ljk1MTggMC4wMTg0OTUxTDQxLjM0ODUgMy42ODc2M0M0Mi4zMzA0IDMuODAwMzYgNDIuNzYzMSA0LjM0OTQ1IDQyLjY1MDQgNS4zMzEyOFoiIGZpbGw9IiNFNjU0M0EiLz4KPC9zdmc+Cg==';
 
-// ‚îÄ‚îÄ‚îÄ STATE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── STATE ────────────────────────────────────────────────────────────────
 let user = null;
 let messages = [];
 let conversationId = null;
@@ -1438,12 +1492,13 @@ let selectedIsNew = false;
 let venueSearchTimeout = null;
 let dropdownBlurTimeout = null;
 
-// ‚îÄ‚îÄ‚îÄ INIT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── INIT ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  if (GATE_BG_URL) {
-    document.documentElement.style.setProperty('--gate-bg', 'url("' + GATE_BG_URL + '")');
-    document.getElementById('gate').classList.add('has-bg');
-  }
+  renderCarousel();
+  renderQuickBtns();
+  loadSocialProof();
+  loadPredictiveFixes();
+  renderTipOfTheDay();
 
   // If this is a branded slug page, hide the venue picker and show a locked badge
   if (PRESET_VENUE_ID && PRESET_VENUE_NAME) {
@@ -1462,11 +1517,12 @@ window.addEventListener('DOMContentLoaded', () => {
     user = JSON.parse(saved);
     showApp();
   }
+  checkShiftReminder();
 });
 
 function checkShiftReminder() {
   const hour = new Date().getHours();
-  if (hour < 7 || hour >= 11) return; // only show 7am‚Äì11am
+  if (hour < 7 || hour >= 11) return; // only show 7am–11am
   const today = new Date().toDateString();
   const lastCheck = localStorage.getItem('stacked_last_shift_check');
   if (lastCheck === today) return; // already done today
@@ -1486,7 +1542,7 @@ function markShiftCheckDone() {
   if (banner) banner.style.display = 'none';
 }
 
-// ‚îÄ‚îÄ‚îÄ VENUE AUTOCOMPLETE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── VENUE AUTOCOMPLETE ───────────────────────────────────────────────────
 async function handleVenueInput(val) {
   clearTimeout(venueSearchTimeout);
   if (val.length < 2) { closeDropdown(); return; }
@@ -1558,7 +1614,7 @@ function resetVenue() {
 
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-// ‚îÄ‚îÄ‚îÄ GATE SUBMIT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── GATE SUBMIT ──────────────────────────────────────────────────────────
 async function submitGate() {
   const name = document.getElementById('gateName').value.trim();
   const phone = document.getElementById('gatePhone').value.trim();
@@ -1614,27 +1670,27 @@ function showApp() {
   loadHistory();
 }
 
-// ‚îÄ‚îÄ‚îÄ SUPABASE HELPERS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── SUPABASE HELPERS ─────────────────────────────────────────────────────
 async function supabaseSelect(table, filter) {
   const url = SUPABASE_URL + '/rest/v1/' + table + '?' + filter + '&order=created_at.desc';
   const r = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
   return r.json();
 }
 
-// ‚îÄ‚îÄ‚îÄ CHAT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── CHAT ─────────────────────────────────────────────────────────────────
 function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
 function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
 function quickSend(text) { document.getElementById('input').value = text; sendMessage(); }
 
 const ALL_QUICK_BTNS = [
-  { emoji: 'üíª', label: 'EPOS crashed', msg: 'My EPOS has crashed mid-service' },
-  { emoji: 'üí≥', label: 'Payment terminal offline', msg: 'My payment terminal is offline' },
-  { emoji: 'üì∂', label: 'WiFi down', msg: 'WiFi is down in my venue' },
-  { emoji: 'üñ®Ô∏è', label: 'Kitchen printer issue', msg: 'Kitchen printer not receiving orders' },
-  { emoji: 'üìÖ', label: 'Reservation system down', msg: 'My reservation system is not working' },
-  { emoji: 'üîí', label: "Cannot log in", msg: 'Staff cannot log in to the system' },
-  { emoji: 'üì±', label: 'Contactless not working', msg: 'Contactless payments not working' },
-  { emoji: 'üêå', label: 'EPOS running slow', msg: 'EPOS is running slowly mid-service' },
+  { emoji: '💻', label: 'EPOS crashed', msg: 'My EPOS has crashed mid-service' },
+  { emoji: '💳', label: 'Payment terminal offline', msg: 'My payment terminal is offline' },
+  { emoji: '📶', label: 'WiFi down', msg: 'WiFi is down in my venue' },
+  { emoji: '🖨️', label: 'Kitchen printer issue', msg: 'Kitchen printer not receiving orders' },
+  { emoji: '📅', label: 'Reservation system down', msg: 'My reservation system is not working' },
+  { emoji: '🔒', label: "Cannot log in", msg: 'Staff cannot log in to the system' },
+  { emoji: '📱', label: 'Contactless not working', msg: 'Contactless payments not working' },
+  { emoji: '🐌', label: 'EPOS running slow', msg: 'EPOS is running slowly mid-service' },
 ];
 
 async function loadSocialProof() {
@@ -1651,19 +1707,16 @@ async function loadSocialProof() {
 
 function personaliseWelcome() {
   if (!user) return;
-  const first = ((user.name || '').trim().split(' ')[0] || 'there').replace(/[<>&]/g, '');
-  const g = document.getElementById('welcomeGreeting');
-  if (g) g.innerHTML = 'Hi <span class="accent">' + first + '</span>.';
-  const s = document.getElementById('welcomeSub');
-  if (s) s.textContent = 'How can I help you today?';
+  const el = document.getElementById('welcomeVenue');
+  if (el) el.textContent = user.venue ? 'Tech support for ' + user.venue + '.' : 'Ask anything about your hospitality tech.';
 }
 
 const TIME_ISSUES = {
-  morning:   [{ icon:'\‚òï', text:'Till not opening at start of day', tag:'Common 8-11am' }, { icon:'üì∂', text:'WiFi not connecting for staff', tag:'Morning issue' }],
-  lunch:     [{ icon:'üí≥', text:'Payment terminal slow during rush', tag:'Common 12-2pm' }, { icon:'üñ®Ô∏è', text:'Kitchen printer missing orders', tag:'Rush hour' }],
-  afternoon: [{ icon:'üìã', text:'Reservations not syncing', tag:'Common 2-5pm' }, { icon:'üîí', text:'Staff login issues after shift change', tag:'Afternoon' }],
-  evening:   [{ icon:'üíª', text:'EPOS freezing mid-service', tag:'Common 5-10pm' }, { icon:'üì±', text:'Contactless not working at table', tag:'Service issue' }],
-  latenight: [{ icon:'üîå', text:'System not closing down properly', tag:'End of night' }, { icon:'üìä', text:'Reports not generating', tag:'Close of day' }],
+  morning:   [{ icon:'\☕', text:'Till not opening at start of day', tag:'Common 8-11am' }, { icon:'📶', text:'WiFi not connecting for staff', tag:'Morning issue' }],
+  lunch:     [{ icon:'💳', text:'Payment terminal slow during rush', tag:'Common 12-2pm' }, { icon:'🖨️', text:'Kitchen printer missing orders', tag:'Rush hour' }],
+  afternoon: [{ icon:'📋', text:'Reservations not syncing', tag:'Common 2-5pm' }, { icon:'🔒', text:'Staff login issues after shift change', tag:'Afternoon' }],
+  evening:   [{ icon:'💻', text:'EPOS freezing mid-service', tag:'Common 5-10pm' }, { icon:'📱', text:'Contactless not working at table', tag:'Service issue' }],
+  latenight: [{ icon:'🔌', text:'System not closing down properly', tag:'End of night' }, { icon:'📊', text:'Reports not generating', tag:'Close of day' }],
 };
 
 async function loadPredictiveFixes() {
@@ -1680,7 +1733,7 @@ async function loadPredictiveFixes() {
     const r = await fetch(SERVER_URL + '/analytics');
     const data = await r.json();
     if (data.topTopics && data.topTopics.length > 0) {
-      const topicMap = { 'epos': { icon:'üíª', text:'EPOS issues' }, 'payment': { icon:'üí≥', text:'Payment terminal problems' }, 'wifi': { icon:'üì∂', text:'WiFi / network issues' }, 'printer': { icon:'üñ®Ô∏è', text:'Printer not working' }, 'login': { icon:'üîí', text:'Login / access issues' }, 'reservation': { icon:'üìÖ', text:'Reservation system issues' } };
+      const topicMap = { 'epos': { icon:'💻', text:'EPOS issues' }, 'payment': { icon:'💳', text:'Payment terminal problems' }, 'wifi': { icon:'📶', text:'WiFi / network issues' }, 'printer': { icon:'🖨️', text:'Printer not working' }, 'login': { icon:'🔒', text:'Login / access issues' }, 'reservation': { icon:'📅', text:'Reservation system issues' } };
       data.topTopics.slice(0, 2).forEach(topic => {
         const key = Object.keys(topicMap).find(k => topic.toLowerCase().includes(k));
         if (key) issues.unshift({ ...topicMap[key], tag: 'Trending now' });
@@ -1692,7 +1745,7 @@ async function loadPredictiveFixes() {
   const grid = document.getElementById('predictGrid');
   const section = document.getElementById('predictSection');
   if (!grid || !section) return;
-  if (label) label.textContent = 'Common issues ' + (isWeekend ? 'this weekend' : 'today') + ' \¬∑ ' + (period === 'evening' ? 'evening service' : period);
+  if (label) label.textContent = 'Common issues ' + (isWeekend ? 'this weekend' : 'today') + ' \· ' + (period === 'evening' ? 'evening service' : period);
   grid.innerHTML = issues.slice(0,3).map(i =>
     '<button class="predict-btn" data-action="predictSend" data-msg="' + i.text.replace(/"/g,'&quot;') + '">' +
     '<span class="predict-icon">' + i.icon + '</span><span>' + i.text + '</span>' +
@@ -1718,76 +1771,116 @@ function renderQuickBtns() {
   ).join('');
 }
 
-// ‚îÄ‚îÄ‚îÄ ASK ROTATOR (kinetic one-liner) ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-const ASK_PROMPTS = [
-  'How do I reset the card terminal?',
-  'My EPOS has crashed mid-service',
-  'The kitchen printer isn\\'t receiving orders',
-  'WiFi is down across the venue',
-  'What time does the wine delivery arrive?',
-  'A guest is asking about allergens',
-  'Staff can\\'t log in to the system',
-  'Contactless payments aren\\'t working',
-  'How do I run the end-of-day report?',
-  'The reservation system isn\\'t syncing',
+// ─── CAROUSEL ─────────────────────────────────────────────────────────────
+const CAROUSEL_CARDS = [
+  { color: 'orange', emoji: '💻', label: 'EPOS crashed mid-service?', sub: 'We\\'ll walk you through a fix in seconds', msg: 'My EPOS has crashed mid-service', tap: 'Tap to get help →' },
+  { color: 'purple', emoji: '💳', label: 'Payment terminal offline?', sub: 'Step-by-step troubleshooting, right now', msg: 'My payment terminal is offline', tap: 'Tap to fix it →' },
+  { color: 'green', emoji: '📶', label: 'WiFi down in your venue?', sub: 'Get your systems back online fast', msg: 'WiFi is down in my venue', tap: 'Tap to diagnose →' },
+  { color: 'orange', emoji: '🖨️', label: 'Kitchen printer not working?', sub: 'Orders not reaching the kitchen? Let\\'s fix it', msg: 'Kitchen printer not receiving orders', tap: 'Tap to troubleshoot →' },
+  { color: 'purple', emoji: '📅', label: 'Reservation system issues?', sub: 'Bookings not syncing? We can help', msg: 'My reservation system is not working', tap: 'Tap to get help →' },
+  { color: 'green', emoji: '🔒', label: 'Staff can\\'t log in?', sub: 'Access issues sorted in minutes', msg: 'Staff cannot log in to the system', tap: 'Tap to fix it →' },
+  { color: 'purple', emoji: '⭐', label: 'Rate your tech stack', sub: 'Share your NPS score to help other operators build theirs', msg: 'I\\'d like to rate my tech vendors', tap: 'Tap to rate →' },
 ];
 
-let _askIdx = 0;
-let _askTimer = null;
+let _carouselIdx = 0;
+let _carouselTimer = null;
 
 function renderCarousel() {
-  const btn = document.getElementById('askRotator');
-  const txt = document.getElementById('askRotatorText');
-  if (!btn || !txt) return;
-  const prompts = [...ASK_PROMPTS].sort(() => Math.random() - 0.5);
-  _askIdx = 0;
-  const paint = () => {
-    const q = prompts[_askIdx % prompts.length];
-    txt.textContent = '\\u201C' + q + '\\u201D';
-    btn.dataset.msg = q;
-  };
-  paint();
-  clearInterval(_askTimer);
-  _askTimer = setInterval(() => {
-    btn.classList.add('swapping');
-    setTimeout(() => {
-      _askIdx = (_askIdx + 1) % prompts.length;
-      paint();
-      btn.classList.remove('swapping');
-    }, 340);
-  }, 3400);
+  const track = document.getElementById('carouselTrack');
+  const dots = document.getElementById('carouselDots');
+  if (!track || !dots) return;
+  // Shuffle and pick 4
+  const cards = [...CAROUSEL_CARDS].sort(() => Math.random() - 0.5).slice(0, 4);
+  track.innerHTML = cards.map((c, i) =>
+    '<div class="carousel-card ' + c.color + (i === 0 ? ' active' : '') + '" data-action="quickSend" data-msg="' + c.msg.replace(/"/g,'&quot;') + '">' +
+    '<div><span class="cc-emoji">' + c.emoji + '</span><div class="cc-label">' + c.label + '</div><div class="cc-sub">' + c.sub + '</div></div>' +
+    '<div class="cc-tap">' + c.tap + '</div></div>'
+  ).join('');
+  dots.innerHTML = cards.map((c, i) =>
+    '<button class="carousel-dot ' + c.color + (i === 0 ? ' active' : '') + '" data-idx="' + i + '"></button>'
+  ).join('');
+  // Dot clicks
+  dots.querySelectorAll('.carousel-dot').forEach(d => {
+    d.addEventListener('click', function() { goToCard(parseInt(this.dataset.idx), cards); });
+  });
+  _carouselIdx = 0;
+  clearInterval(_carouselTimer);
+  _carouselTimer = setInterval(() => {
+    const next = (_carouselIdx + 1) % cards.length;
+    goToCard(next, cards);
+  }, 4000);
+  initCarouselSwipe(cards);
 }
 
-// Stop the rotator when chat starts
-function stopCarousel() { clearInterval(_askTimer); }
+function goToCard(idx, cards) {
+  const track = document.getElementById('carouselTrack');
+  const dots = document.getElementById('carouselDots');
+  if (!track) return;
+  const allCards = track.querySelectorAll('.carousel-card');
+  const allDots = dots ? dots.querySelectorAll('.carousel-dot') : [];
+  allCards.forEach((c, i) => {
+    c.classList.remove('active', 'exit');
+    if (i === _carouselIdx) c.classList.add('exit');
+    if (i === idx) setTimeout(() => c.classList.add('active'), 50);
+  });
+  allDots.forEach((d, i) => { d.classList.toggle('active', i === idx); });
+  _carouselIdx = idx;
+}
 
-// ‚îÄ‚îÄ‚îÄ TIPS OF THE DAY ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// Swipe support
+function initCarouselSwipe(cards) {
+  const track = document.getElementById('carouselTrack');
+  if (!track) return;
+  let startX = 0, startY = 0, swiping = false;
+  track.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    swiping = true;
+    clearInterval(_carouselTimer);
+  }, { passive: true });
+  track.addEventListener('touchend', function(e) {
+    if (!swiping) return;
+    swiping = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) goToCard((_carouselIdx + 1) % cards.length, cards);
+      else goToCard((_carouselIdx - 1 + cards.length) % cards.length, cards);
+    }
+    _carouselTimer = setInterval(function() { goToCard((_carouselIdx + 1) % cards.length, cards); }, 4000);
+  }, { passive: true });
+}
+
+// Stop carousel when chat starts
+function stopCarousel() { clearInterval(_carouselTimer); }
+
+// ─── TIPS OF THE DAY ──────────────────────────────────────────────────────
 const ALL_TIPS = [
   { product: 'Square', text: 'Did you know Square can split a bill by seat? Tap the item, then "Split item" to divide it across covers.' },
   { product: 'Square', text: 'Square offline mode lets you take card payments even when your internet goes down. Transactions sync automatically when you reconnect.' },
-  { product: 'Square', text: 'You can print a kitchen ticket and a customer receipt simultaneously on Square ‚Äî set it up in Printing > Printer Settings.' },
-  { product: 'Lightspeed', text: 'Lightspeed‚Äôs floor plan view lets you drag and merge tables mid-service. Long-press any table to start.' },
-  { product: 'Lightspeed', text: 'You can set automatic happy hour pricing in Lightspeed ‚Äî go to Settings > Price rules > Time-based discounts.' },
-  { product: 'Deputy', text: 'Deputy can auto-approve shift swaps between staff with matching roles ‚Äî turn it on under Scheduling > Swap settings.' },
+  { product: 'Square', text: 'You can print a kitchen ticket and a customer receipt simultaneously on Square — set it up in Printing > Printer Settings.' },
+  { product: 'Lightspeed', text: 'Lightspeed’s floor plan view lets you drag and merge tables mid-service. Long-press any table to start.' },
+  { product: 'Lightspeed', text: 'You can set automatic happy hour pricing in Lightspeed — go to Settings > Price rules > Time-based discounts.' },
+  { product: 'Deputy', text: 'Deputy can auto-approve shift swaps between staff with matching roles — turn it on under Scheduling > Swap settings.' },
   { product: 'Deputy', text: 'Did you know Deputy sends SMS reminders to staff before their shift? Reduce no-shows by enabling it in Notifications.' },
-  { product: 'OpenTable', text: 'OpenTable‚Äôs shift notes let you brief your floor team before service ‚Äî add them in Reservations > Shift summary.' },
+  { product: 'OpenTable', text: 'OpenTable’s shift notes let you brief your floor team before service — add them in Reservations > Shift summary.' },
   { product: 'OpenTable', text: 'You can set a minimum dining duration per table in OpenTable to prevent back-to-back bookings that are too tight.' },
-  { product: 'Tevalis', text: 'Tevalis holds orders in a print queue if the kitchen printer goes offline ‚Äî they all fire through when it reconnects.' },
-  { product: 'Deliverect', text: 'Deliverect can auto-pause your delivery platforms if you‚Äôre approaching max kitchen capacity. Set a threshold in your hub settings.' },
-  { product: 'Tenzo', text: 'Tenzo can show you your revenue per cover by day part ‚Äî useful for spotting which sessions are underperforming.' },
-  { product: 'Airship', text: 'Airship‚Äôs birthday campaign can be fully automated ‚Äî set it once and it sends a personalised offer to every customer on their birthday.' },
-  { product: 'SumUp', text: 'SumUp‚Äôs Solo terminal has a tipping prompt built in ‚Äî enable it in your SumUp app under Payment settings.' },
-  { product: 'ResDiary', text: 'ResDiary can send automated pre-visit emails with your menu and parking info ‚Äî set up in Marketing > Pre-visit messages.' },
-  { product: 'SevenRooms', text: 'SevenRooms tracks a guest‚Äôs lifetime spend and visit history automatically ‚Äî your team can see it on the host app before they arrive.' },
-  { product: 'Nory', text: 'Nory predicts your busiest shifts using weather data and local events ‚Äî check the forecast view before building your rota.' },
-  { product: 'Bizimply', text: 'Bizimply‚Äôs clock-in app can enforce geofencing ‚Äî staff can only clock in when they‚Äôre physically at your venue.' },
-  { product: 'Planday', text: 'Planday‚Äôs punch clock can take a photo on clock-in to prevent buddy punching ‚Äî enable it in Clock-in settings.' },
-  { product: 'Collins', text: 'Collins can automatically add a deposit to large-party bookings ‚Äî set the threshold in your venue settings.' },
-  { product: 'Stampede', text: 'Stampede captures WiFi login data and lets you send automated follow-up messages to guests ‚Äî connect it to your router in 10 minutes.' },
-  { product: 'EPOS Now', text: 'EPOS Now can send automated low-stock alerts by email ‚Äî set your par levels in Inventory > Stock alerts.' },
-  { product: 'Nutritics', text: 'Nutritics can generate allergen info sheets and menus automatically once your recipes are set up ‚Äî go to Print > Allergen report.' },
-  { product: 'Fourth', text: 'Fourth‚Äôs labour scheduling can factor in your forecasted covers ‚Äî link it to your reservation system for smarter rotas.' },
-  { product: 'Zonal', text: 'Zonal‚Äôs kitchen display can colour-code orders by course ‚Äî reducing the chance of mains going out before starters are cleared.' },
+  { product: 'Tevalis', text: 'Tevalis holds orders in a print queue if the kitchen printer goes offline — they all fire through when it reconnects.' },
+  { product: 'Deliverect', text: 'Deliverect can auto-pause your delivery platforms if you’re approaching max kitchen capacity. Set a threshold in your hub settings.' },
+  { product: 'Tenzo', text: 'Tenzo can show you your revenue per cover by day part — useful for spotting which sessions are underperforming.' },
+  { product: 'Airship', text: 'Airship’s birthday campaign can be fully automated — set it once and it sends a personalised offer to every customer on their birthday.' },
+  { product: 'SumUp', text: 'SumUp’s Solo terminal has a tipping prompt built in — enable it in your SumUp app under Payment settings.' },
+  { product: 'ResDiary', text: 'ResDiary can send automated pre-visit emails with your menu and parking info — set up in Marketing > Pre-visit messages.' },
+  { product: 'SevenRooms', text: 'SevenRooms tracks a guest’s lifetime spend and visit history automatically — your team can see it on the host app before they arrive.' },
+  { product: 'Nory', text: 'Nory predicts your busiest shifts using weather data and local events — check the forecast view before building your rota.' },
+  { product: 'Bizimply', text: 'Bizimply’s clock-in app can enforce geofencing — staff can only clock in when they’re physically at your venue.' },
+  { product: 'Planday', text: 'Planday’s punch clock can take a photo on clock-in to prevent buddy punching — enable it in Clock-in settings.' },
+  { product: 'Collins', text: 'Collins can automatically add a deposit to large-party bookings — set the threshold in your venue settings.' },
+  { product: 'Stampede', text: 'Stampede captures WiFi login data and lets you send automated follow-up messages to guests — connect it to your router in 10 minutes.' },
+  { product: 'EPOS Now', text: 'EPOS Now can send automated low-stock alerts by email — set your par levels in Inventory > Stock alerts.' },
+  { product: 'Nutritics', text: 'Nutritics can generate allergen info sheets and menus automatically once your recipes are set up — go to Print > Allergen report.' },
+  { product: 'Fourth', text: 'Fourth’s labour scheduling can factor in your forecasted covers — link it to your reservation system for smarter rotas.' },
+  { product: 'Zonal', text: 'Zonal’s kitchen display can colour-code orders by course — reducing the chance of mains going out before starters are cleared.' },
 ];
 
 function renderTipOfTheDay() {
@@ -1812,7 +1905,7 @@ function renderTipOfTheDay() {
   card.style.display = 'block';
 }
 
-// ‚îÄ‚îÄ‚îÄ NPS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── NPS ──────────────────────────────────────────────────────────────────
 var _npsScore = null;
 var _npsVendor = null;
 
@@ -1865,13 +1958,13 @@ function fireTip() {
   quickSend(window._currentTip.text + ' Can you tell me more about this?');
 }
 
-// ‚îÄ‚îÄ‚îÄ SHIFT CHECK ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── SHIFT CHECK ──────────────────────────────────────────────────────────
 const SC_STEPS = [
-  { id: 'epos',     emoji: 'üíª', label: 'EPOS / till system' },
-  { id: 'payments', emoji: 'üí≥', label: 'Card / payment terminal' },
-  { id: 'wifi',     emoji: 'üì∂', label: 'WiFi / internet' },
-  { id: 'printer',  emoji: 'üñ®Ô∏è', label: 'Kitchen printer' },
-  { id: 'bookings', emoji: 'üìÖ', label: 'Booking / reservation system' },
+  { id: 'epos',     emoji: '💻', label: 'EPOS / till system' },
+  { id: 'payments', emoji: '💳', label: 'Card / payment terminal' },
+  { id: 'wifi',     emoji: '📶', label: 'WiFi / internet' },
+  { id: 'printer',  emoji: '🖨️', label: 'Kitchen printer' },
+  { id: 'bookings', emoji: '📅', label: 'Booking / reservation system' },
 ];
 
 let scAnswers = {};
@@ -1912,9 +2005,9 @@ function renderScStep() {
     '<div class="sc-step">' +
     '<div class="sc-step-label"><span class="sc-emoji">' + step.emoji + '</span>' + step.label + '</div>' +
     '<div class="sc-options">' +
-    '<button class="sc-opt" data-val="green" data-action="scAnswer">‚úÖ All good</button>' +
-    '<button class="sc-opt" data-val="amber" data-action="scAnswer">‚ö†Ô∏è Slow / issue</button>' +
-    '<button class="sc-opt" data-val="red" data-action="scAnswer">üî¥ Down</button>' +
+    '<button class="sc-opt" data-val="green" data-action="scAnswer">✅ All good</button>' +
+    '<button class="sc-opt" data-val="amber" data-action="scAnswer">⚠️ Slow / issue</button>' +
+    '<button class="sc-opt" data-val="red" data-action="scAnswer">🔴 Down</button>' +
     '</div></div>';
 
   // Highlight previously selected if user goes back (not implemented but defensive)
@@ -1943,7 +2036,7 @@ function scAnswer(val) {
   }, 280);
 }
 
-// ‚îÄ‚îÄ‚îÄ GLOBAL EVENT DELEGATION ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── GLOBAL EVENT DELEGATION ──────────────────────────────────────────────
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
@@ -1963,15 +2056,15 @@ function renderScSummary() {
 
   let icon, headline, sub;
   if (allGood) {
-    icon = 'üü¢';
+    icon = '🟢';
     headline = 'All systems go';
     sub = 'Everything is looking good. Have a great service!';
   } else if (issues.length > 0) {
-    icon = 'üî¥';
+    icon = '🔴';
     headline = issues.length + ' system' + (issues.length > 1 ? 's' : '') + ' need' + (issues.length === 1 ? 's' : '') + ' attention';
     sub = 'Get these sorted before service starts.';
   } else {
-    icon = '‚ö†Ô∏è';
+    icon = '⚠️';
     headline = warnings.length + ' thing' + (warnings.length > 1 ? 's' : '') + ' to keep an eye on';
     sub = 'Not critical, but worth monitoring during service.';
   }
@@ -2032,7 +2125,7 @@ function scFinish() {
   markShiftCheckDone();
   const btn = document.getElementById('shiftCheckBtn');
   if (btn) {
-    btn.innerHTML = '‚úÖ Shift check done';
+    btn.innerHTML = '✅ Shift check done';
     btn.style.borderColor = '#16a34a';
     btn.style.color = '#166534';
     btn.onclick = null;
@@ -2047,16 +2140,16 @@ const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 function toggleMic() {
   const mic = document.getElementById('mic');
   const input = document.getElementById('input');
-  if (isIOS) { input.focus(); showToast('Tap the üé§ mic on your keyboard to speak'); return; }
+  if (isIOS) { input.focus(); showToast('Tap the 🎤 mic on your keyboard to speak'); return; }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { input.focus(); showToast('Tap the üé§ mic on your keyboard to speak'); return; }
+  if (!SR) { input.focus(); showToast('Tap the 🎤 mic on your keyboard to speak'); return; }
   if (isListening) { recognition?.stop(); return; }
   recognition = new SR();
   recognition.lang = 'en-GB'; recognition.interimResults = false; recognition.maxAlternatives = 1;
   recognition.onstart = () => { isListening = true; mic.classList.add('listening'); };
   recognition.onresult = (e) => { input.value = e.results[0][0].transcript; autoResize(input); };
   recognition.onend = () => { isListening = false; mic.classList.remove('listening'); };
-  recognition.onerror = () => { isListening = false; mic.classList.remove('listening'); showToast('Could not hear anything ‚Äî try again'); };
+  recognition.onerror = () => { isListening = false; mic.classList.remove('listening'); showToast('Could not hear anything — try again'); };
   recognition.start();
 }
 
@@ -2084,7 +2177,7 @@ async function sendMessage() {
     let videoData = null, displayReply = reply;
     const vtagStart = reply.indexOf('[STACKEDVIDEO:');
     if (vtagStart > -1) {
-      const vtagEnd = reply.lastIndexOf(']'); // use lastIndexOf ‚Äî titles may contain ] characters
+      const vtagEnd = reply.lastIndexOf(']'); // use lastIndexOf — titles may contain ] characters
       if (vtagEnd > vtagStart) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
     }
     addMessage('assistant', displayReply, true, videoData, supportUrl);
@@ -2133,34 +2226,34 @@ function addMessage(role, content, showTicket, video, supportUrl) {
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
   if (role === 'assistant' && supportUrl) {
     const pillMap = {
-      'squareup.com':'üì¶ Square support','sumup.com':'üí≥ SumUp support','zettle.com':'üí≥ Zettle support',
-      'worldpay.com':'üí≥ Worldpay support','stripe.com':'üí≥ Stripe support','dojo.tech':'üí≥ Dojo support',
-      'adyen.com':'üí≥ Adyen support','elavon.co.uk':'üí≥ Elavon support','paymentsense.com':'üí≥ PaymentSense support',
-      'tyl.co.uk':'üí≥ Tyl support','barclaycard.co.uk':'üí≥ Barclaycard support','pleo.io':'üí≥ Pleo support',
-      'lightspeedhq.com':'üñ• Lightspeed support','tevalis.com':'üñ• Tevalis support','eposnow.com':'üñ• EPOS Now support',
-      'vitamojo.com':'üçΩ Vita Mojo support','zonal.co.uk':'üñ• Zonal support','icrtouch.com':'üñ• ICRTouch support',
-      'toasttab.com':'üñ• Toast support','tabology.com':'üñ• Tabology support','storekit.com':'üñ• Storekit support',
-      'getpepper.io':'üñ• Pepper support','partech.com':'üñ• Par Brink support','revelsystems.com':'üñ• Revel support',
-      'opentable.com':'üìÖ OpenTable support','resdiary.com':'üìÖ ResDiary support','sevenrooms.com':'üìÖ SevenRooms support',
-      'designmynight.com':'üìÖ Collins support','resy.com':'üìÖ Resy support','quandoo.com':'üìÖ Quandoo support',
-      'exploretock.com':'üìÖ Tock support','eatapp.co':'üìÖ Eat App support','waitwhile.com':'üìÖ Waitwhile support',
-      'fourth.com':'üë• Fourth support','deputy.com':'üë• Deputy support','getsona.com':'üë• Sona support',
-      'rotaready.com':'üë• Rotaready support','bizimply.com':'üë• Bizimply support','planday.com':'üë• Planday support',
-      's4labour.co.uk':'üë• S4Labour support','hotschedules.com':'üë• HotSchedules support','workforce.com':'üë• Workforce.com support',
-      'harri.com':'üë• Harri support','nory.ai':'üë• Nory support','humanforce.com':'üë• Humanforce support',
-      'deliverect.com':'üì¶ Deliverect support','flipdish.com':'üì¶ Flipdish support','slerp.com':'üì¶ Slerp support',
-      'orderswift.com':'üì¶ Orderswift support','yoello.com':'üì¶ Yoello support','tryotter.com':'üì¶ Otter support',
-      'airship.com':'üéØ Airship support','stampede.ai':'üéØ Stampede support','yumpingo.com':'üéØ Yumpingo support',
-      'eagleeye.com':'üéØ Eagle Eye support','klaviyo.com':'üéØ Klaviyo support',
-      'apicbase.com':'üìã Apicbase support','nutritics.com':'üìã Nutritics support','crunchtime.com':'üìã Crunchtime support',
-      'marketman.com':'üìã Marketman support','kitchencut.com':'üìã Kitchen CUT support','winnowsolutions.com':'üìã Winnow support',
-      'mews.com':'üè® Mews support','cloudbeds.com':'üè® Cloudbeds support','guestline.net':'üè® Guestline support',
-      'clock-software.com':'üè® Clock PMS support','oracle.com':'üè® Opera support',
-      'tenzo.io':'üìä Tenzo support','otainsight.com':'üìä OTA Insight support',
-      'purple.ai':'üì∂ Purple Wi-Fi support','meraki.com':'üì∂ Cisco Meraki support',
-      'revinate.com':'üí¨ Revinate support','guestrevu.com':'üí¨ GuestRevu support',
-      'hibob.com':'üë§ HiBob support','personio.de':'üë§ Personio support','bamboohr.com':'üë§ BambooHR support',
-      'typsy.com':'üéì Typsy support','beekeeper.io':'üéì Beekeeper support',
+      'squareup.com':'📦 Square support','sumup.com':'💳 SumUp support','zettle.com':'💳 Zettle support',
+      'worldpay.com':'💳 Worldpay support','stripe.com':'💳 Stripe support','dojo.tech':'💳 Dojo support',
+      'adyen.com':'💳 Adyen support','elavon.co.uk':'💳 Elavon support','paymentsense.com':'💳 PaymentSense support',
+      'tyl.co.uk':'💳 Tyl support','barclaycard.co.uk':'💳 Barclaycard support','pleo.io':'💳 Pleo support',
+      'lightspeedhq.com':'🖥 Lightspeed support','tevalis.com':'🖥 Tevalis support','eposnow.com':'🖥 EPOS Now support',
+      'vitamojo.com':'🍽 Vita Mojo support','zonal.co.uk':'🖥 Zonal support','icrtouch.com':'🖥 ICRTouch support',
+      'toasttab.com':'🖥 Toast support','tabology.com':'🖥 Tabology support','storekit.com':'🖥 Storekit support',
+      'getpepper.io':'🖥 Pepper support','partech.com':'🖥 Par Brink support','revelsystems.com':'🖥 Revel support',
+      'opentable.com':'📅 OpenTable support','resdiary.com':'📅 ResDiary support','sevenrooms.com':'📅 SevenRooms support',
+      'designmynight.com':'📅 Collins support','resy.com':'📅 Resy support','quandoo.com':'📅 Quandoo support',
+      'exploretock.com':'📅 Tock support','eatapp.co':'📅 Eat App support','waitwhile.com':'📅 Waitwhile support',
+      'fourth.com':'👥 Fourth support','deputy.com':'👥 Deputy support','getsona.com':'👥 Sona support',
+      'rotaready.com':'👥 Rotaready support','bizimply.com':'👥 Bizimply support','planday.com':'👥 Planday support',
+      's4labour.co.uk':'👥 S4Labour support','hotschedules.com':'👥 HotSchedules support','workforce.com':'👥 Workforce.com support',
+      'harri.com':'👥 Harri support','nory.ai':'👥 Nory support','humanforce.com':'👥 Humanforce support',
+      'deliverect.com':'📦 Deliverect support','flipdish.com':'📦 Flipdish support','slerp.com':'📦 Slerp support',
+      'orderswift.com':'📦 Orderswift support','yoello.com':'📦 Yoello support','tryotter.com':'📦 Otter support',
+      'airship.com':'🎯 Airship support','stampede.ai':'🎯 Stampede support','yumpingo.com':'🎯 Yumpingo support',
+      'eagleeye.com':'🎯 Eagle Eye support','klaviyo.com':'🎯 Klaviyo support',
+      'apicbase.com':'📋 Apicbase support','nutritics.com':'📋 Nutritics support','crunchtime.com':'📋 Crunchtime support',
+      'marketman.com':'📋 Marketman support','kitchencut.com':'📋 Kitchen CUT support','winnowsolutions.com':'📋 Winnow support',
+      'mews.com':'🏨 Mews support','cloudbeds.com':'🏨 Cloudbeds support','guestline.net':'🏨 Guestline support',
+      'clock-software.com':'🏨 Clock PMS support','oracle.com':'🏨 Opera support',
+      'tenzo.io':'📊 Tenzo support','otainsight.com':'📊 OTA Insight support',
+      'purple.ai':'📶 Purple Wi-Fi support','meraki.com':'📶 Cisco Meraki support',
+      'revinate.com':'💬 Revinate support','guestrevu.com':'💬 GuestRevu support',
+      'hibob.com':'👤 HiBob support','personio.de':'👤 Personio support','bamboohr.com':'👤 BambooHR support',
+      'typsy.com':'🎓 Typsy support','beekeeper.io':'🎓 Beekeeper support',
     };
     var pillLabel = (function(u) {
       try { var h = new URL(u).hostname.replace('www.',''); var ks = Object.keys(pillMap); for (var k=0;k<ks.length;k++){if(h.includes(ks[k]))return pillMap[ks[k]];} return h; } catch(e){return u;}
@@ -2168,14 +2261,14 @@ function addMessage(role, content, showTicket, video, supportUrl) {
     const lr = document.createElement('div'); lr.className = 'link-row';
     const a = document.createElement('a');
     a.className = 'link-pill'; a.href = supportUrl; a.target = '_blank'; a.rel = 'noopener';
-    a.textContent = '‚Üó ' + pillLabel;
+    a.textContent = '↗ ' + pillLabel;
     lr.appendChild(a); msgs.appendChild(lr);
   }
   if (role === 'assistant' && showTicket) {
     const tr = document.createElement('div'); tr.className = 'ticket-row';
     var tb = document.createElement('button');
     tb.className = 'ticket-btn';
-    tb.textContent = 'üé´ This didn\u2019t solve my issue \u2014 raise a ticket';
+    tb.textContent = '🎫 This didn\u2019t solve my issue \u2014 raise a ticket';
     tb.onclick = openTicket;
     tr.appendChild(tb);
     msgs.appendChild(tr);
@@ -2183,7 +2276,7 @@ function addMessage(role, content, showTicket, video, supportUrl) {
   if (role === 'assistant' && video) {
     const pr = document.createElement('div'); pr.className = 'video-pill-row';
     const pb = document.createElement('button'); pb.className = 'video-pill';
-    pb.textContent = 'üé¨ We have a video on this \‚Äî tap to watch';
+    pb.textContent = '🎬 We have a video on this \— tap to watch';
     pb.dataset.v = encodeURIComponent(JSON.stringify(video));
     pb.onclick = function() { openCvModal(this.dataset.v); };
     pr.appendChild(pb); msgs.appendChild(pr);
@@ -2237,7 +2330,7 @@ async function loadHistory() {
       const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
       const count = (row.messages || []).filter(m => m.role === 'user').length;
       const item = document.createElement('div'); item.className = 'history-item';
-      const author = (row.name && row.name !== user.name) ? ' \¬∑ ' + row.name : '';
+      const author = (row.name && row.name !== user.name) ? ' \· ' + row.name : '';
       item.innerHTML =
         '<div class="history-date">' + dateStr + author + '</div>' +
         '<div class="history-preview">' + escHtml(row.preview || 'Chat session') + '</div>' +
@@ -2273,7 +2366,7 @@ async function submitTicket() {
       body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? ' | Extra detail: ' + note : ''), conversation: messages, status: 'open' })
     });
     closeTicket();
-    showToast("‚úì Ticket raised ‚Äî we'll be in touch!", "green");
+    showToast("✓ Ticket raised — we'll be in touch!", "green");
   } catch(e) { closeTicket(); showToast('Something went wrong, please try again.'); }
 }
 
@@ -2313,12 +2406,12 @@ function closeCvModal() {
 </body>
 </html>`;
 
-// ‚îÄ‚îÄ‚îÄ OPERATOR APP SHELL ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── OPERATOR APP SHELL ────────────────────────────────────────────────────
 // Persistent shell (sidebar + topbar) for the Stacked Chat redesign.
 // Routes: triage | issues | health | runbooks | sites | widget
 // Hash-routed (#triage, #issues, ...) with localStorage['sc:route'] persistence
 // to match prototype behaviour (see shell.jsx). Content area is intentionally
-// empty ‚Äî screens are built in subsequent steps.
+// empty — screens are built in subsequent steps.
 const APP_SHELL = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2351,10 +2444,10 @@ button { font-family: inherit; cursor: pointer; }
 ::-webkit-scrollbar-track { background: var(--ink-900); }
 ::-webkit-scrollbar-thumb { background: var(--ink-700); border-radius: 5px; }
 
-/* ‚îÄ‚îÄ‚îÄ LAYOUT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── LAYOUT ─────────────────────────────────────────────────────────── */
 .app { display: grid; grid-template-columns: 240px 1fr; height: 100%; }
 
-/* ‚îÄ‚îÄ‚îÄ LEFT NAV ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── LEFT NAV ───────────────────────────────────────────────────────── */
 .nav { background: var(--ink-800); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 16px 12px; }
 .nav-top { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px 18px; }
 .nav-top img { height: 20px; }
@@ -2390,7 +2483,7 @@ button { font-family: inherit; cursor: pointer; }
 .cog { color: var(--fg-muted); background: transparent; border: 0; padding: 4px; border-radius: 6px; display: grid; place-items: center; }
 .cog:hover { color: var(--fg); background: var(--ink-700); }
 
-/* ‚îÄ‚îÄ‚îÄ MAIN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── MAIN ───────────────────────────────────────────────────────────── */
 .main { display: flex; flex-direction: column; min-width: 0; }
 .topbar { display: flex; align-items: center; gap: 16px; padding: 14px 22px; border-bottom: 1px solid var(--border); background: var(--ink-900); }
 .breadcrumbs { display: flex; align-items: center; gap: 10px; font-size: 13px; }
@@ -2412,10 +2505,10 @@ button { font-family: inherit; cursor: pointer; }
 .content-placeholder { display: grid; place-items: center; height: 100%; color: var(--fg-dim); font-family: var(--font-display); font-size: 18px; font-weight: 500; letter-spacing: -0.01em; }
 .content-placeholder span { color: var(--fg-muted); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14px; text-transform: uppercase; font-weight: 800; display: block; margin-top: 6px; text-align: center; }
 
-/* ‚îÄ‚îÄ‚îÄ SHARED PRIMITIVES ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── SHARED PRIMITIVES ──────────────────────────────────────────────── */
 @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-/* ‚îÄ‚îÄ‚îÄ TRIAGE SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── TRIAGE SCREEN ──────────────────────────────────────────────────── */
 .triage { display: grid; gap: 28px; }
 .triage-top { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: start; }
 .eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.18px; text-transform: uppercase; color: var(--fg-muted); margin-bottom: 8px; }
@@ -2496,7 +2589,7 @@ button { font-family: inherit; cursor: pointer; }
 .feed-open { background: var(--ink-900); border: 1px solid var(--border); color: var(--fg); padding: 6px 10px; border-radius: 6px; font-size: 11px; font-family: inherit; font-weight: 700; }
 .feed-open:hover { border-color: var(--fg-dim); }
 
-/* ‚îÄ‚îÄ‚îÄ ISSUE SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── ISSUE SCREEN ───────────────────────────────────────────────────── */
 .issue { display: grid; gap: 22px; }
 
 /* Header */
@@ -2515,7 +2608,7 @@ button { font-family: inherit; cursor: pointer; }
 .act-primary:hover { transform: translateY(-1px); box-shadow: 0 5px 0 0 var(--stacked-orange-700); }
 .act-primary:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
 
-/* Timeline scrubber ‚Äî novel moment #2 */
+/* Timeline scrubber — novel moment #2 */
 .tl { background: var(--ink-800); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
 .tl-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
 .tl-head-label { font-size: 11px; font-weight: 800; letter-spacing: 0.14px; text-transform: uppercase; color: var(--fg-muted); }
@@ -2594,7 +2687,7 @@ button { font-family: inherit; cursor: pointer; }
 .rail-runbook-body  { font-size: 12px; color: var(--fg-muted); line-height: 1.55; }
 .rail-runbook-open { margin-top: 10px; width: 100%; }
 
-/* ‚îÄ‚îÄ‚îÄ HANDOFF SCREEN ‚Äî novel moment #3 ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── HANDOFF SCREEN — novel moment #3 ───────────────────────────────── */
 .ho { display: grid; gap: 22px; }
 .ho-back { background: transparent; border: 1px solid var(--border); color: var(--fg-muted); padding: 8px 14px; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 700; justify-self: start; transition: border-color 120ms var(--ease), color 120ms var(--ease); }
 .ho-back:hover { border-color: var(--fg-dim); color: var(--fg); }
@@ -2639,7 +2732,7 @@ button { font-family: inherit; cursor: pointer; }
 .ho-send:active:not(.sent) { transform: translateY(2px); box-shadow: 0 3px 0 0 var(--stacked-orange-700); }
 .ho-send.sent { background: var(--stacked-green-500); color: #0F0F0F; box-shadow: 0 5px 0 0 var(--stacked-green-700); cursor: default; }
 
-/* ‚îÄ‚îÄ‚îÄ HEALTH SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── HEALTH SCREEN ──────────────────────────────────────────────────── */
 .hl { display: grid; gap: 22px; }
 .hl-head { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: start; }
 .hl-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
@@ -2700,7 +2793,7 @@ button { font-family: inherit; cursor: pointer; }
 .hl-rec-btn { background: var(--ink-900); border: 1px solid var(--border); color: var(--fg); padding: 10px 14px; border-radius: 8px; font-family: inherit; font-size: 12px; font-weight: 700; margin-top: 12px; transition: border-color 120ms var(--ease); }
 .hl-rec-btn:hover { border-color: var(--fg-dim); }
 
-/* ‚îÄ‚îÄ‚îÄ RUNBOOKS SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── RUNBOOKS SCREEN ────────────────────────────────────────────────── */
 .rb { display: grid; gap: 22px; }
 .rb-head { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; }
 .rb-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
@@ -2735,7 +2828,7 @@ button { font-family: inherit; cursor: pointer; }
 .rb-open { margin-left: auto; background: transparent; border: 0; color: var(--stacked-orange-500); font-family: inherit; font-size: 12px; font-weight: 700; }
 .rb-open:hover { text-decoration: underline; }
 
-/* ‚îÄ‚îÄ‚îÄ SITES SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── SITES SCREEN ───────────────────────────────────────────────────── */
 .st { display: grid; gap: 22px; }
 .st-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
 .st-table { background: var(--ink-800); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
@@ -2755,7 +2848,7 @@ button { font-family: inherit; cursor: pointer; }
 .st-iss.clean { color: var(--fg-muted); }
 .st-iss.open  { color: var(--stacked-red-500); }
 
-/* ‚îÄ‚îÄ‚îÄ WIDGET PREVIEW SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ */
+/* ─── WIDGET PREVIEW SCREEN ──────────────────────────────────────────── */
 .wg { display: grid; gap: 22px; align-items: start; }
 .wg-grid { display: grid; grid-template-columns: 1fr 420px; gap: 32px; align-items: start; }
 .wg-h1 { font-family: var(--font-display); font-size: 46px; letter-spacing: -0.02em; margin: 8px 0 0; font-weight: 600; }
@@ -2804,12 +2897,12 @@ button { font-family: inherit; cursor: pointer; }
       <div class="org-av">PM</div>
       <div class="org-meta">
         <div class="org-name">Pieminister Group</div>
-        <div class="org-sub">14 sites ¬∑ PRO</div>
+        <div class="org-sub">14 sites · PRO</div>
       </div>
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" style="color:var(--fg-muted)"><path d="M3 5l3 3 3-3M3 8l3-3 3 3"/></svg>
     </button>
 
-    <button class="new-issue" type="button">Ôºã New issue</button>
+    <button class="new-issue" type="button">＋ New issue</button>
 
     <nav class="nav-list" id="navList">
       <button class="nav-btn" data-route="triage" type="button">
@@ -2842,7 +2935,7 @@ button { font-family: inherit; cursor: pointer; }
     <div class="nav-foot">
       <div class="foot-row">
         <span class="livedot"></span>
-        <span class="foot-status">All systems ¬∑ normal</span>
+        <span class="foot-status">All systems · normal</span>
       </div>
       <div class="user-row">
         <div class="user-av">SJ</div>
@@ -2867,7 +2960,7 @@ button { font-family: inherit; cursor: pointer; }
       </div>
       <div class="search">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--fg-muted)"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-        <input placeholder="Search issues, sites, vendors&hellip; (‚åòK)" id="globalSearch">
+        <input placeholder="Search issues, sites, vendors&hellip; (⌘K)" id="globalSearch">
       </div>
       <div class="top-actions">
         <button class="icon-btn" type="button" aria-label="Notifications">
@@ -2921,7 +3014,7 @@ button { font-family: inherit; cursor: pointer; }
   }
 
   function render(r){
-    // Active state on nav buttons ‚Äî sub-routes (issue/handoff) collapse under "Issues"
+    // Active state on nav buttons — sub-routes (issue/handoff) collapse under "Issues"
     var navKey = SUB_ROUTES[r] ? 'issues' : r;
     var btns = document.querySelectorAll('.nav-btn');
     for (var i = 0; i < btns.length; i++) {
@@ -2966,8 +3059,8 @@ button { font-family: inherit; cursor: pointer; }
   // Expose so sub-render wiring can navigate
   window.scSetRoute = setRoute;
 
-  // ‚îÄ‚îÄ‚îÄ TRIAGE SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-  // Mock data mirrors triage.jsx exactly ‚Äî swapped for real data in step 7.
+  // ─── TRIAGE SCREEN ────────────────────────────────────────────────────
+  // Mock data mirrors triage.jsx exactly — swapped for real data in step 7.
   var SITES = [
     { id: 's1',  name: 'Soho, W1',          brand: 'The Pelican',    state: 'ok',       inc: null,                      score: 96 },
     { id: 's2',  name: 'Bristol, BS1',      brand: 'Pieminister',    state: 'critical', inc: 'Kitchen printer offline', score: 68 },
@@ -2984,11 +3077,11 @@ button { font-family: inherit; cursor: pointer; }
   ];
 
   var FEED = [
-    ['17.58', 'Mayfair ¬∑ Ottolenghi',        'Square till froze',         'Force-restart ¬∑ 28s',         'ok'],
-    ['17.24', 'Kings Cross ¬∑ Pieminister',   'Planday clock-in error',    'Token refresh ¬∑ 18s',         'ok'],
-    ['16.02', 'Peckham ¬∑ Honest Burgers',    'Deliveroo not pushing',     'Handed to Jo at Deliveroo',   'human'],
-    ['14.41', "Clerkenwell ¬∑ Carluccio's",   'SumUp reader unresponsive', 'Reset handshake ¬∑ 52s',       'ok'],
-    ['12.18', 'Fitzrovia ¬∑ Ottolenghi',      'Printer paper path',        'Guided fix ¬∑ 1m 12s',         'ok']
+    ['17.58', 'Mayfair · Ottolenghi',        'Square till froze',         'Force-restart · 28s',         'ok'],
+    ['17.24', 'Kings Cross · Pieminister',   'Planday clock-in error',    'Token refresh · 18s',         'ok'],
+    ['16.02', 'Peckham · Honest Burgers',    'Deliveroo not pushing',     'Handed to Jo at Deliveroo',   'human'],
+    ['14.41', "Clerkenwell · Carluccio's",   'SumUp reader unresponsive', 'Reset handshake · 52s',       'ok'],
+    ['12.18', 'Fitzrovia · Ottolenghi',      'Printer paper path',        'Guided fix · 1m 12s',         'ok']
   ];
 
   var PIP_LABELS = ['EPOS','Pay','Net','Print','Rota','Del'];
@@ -3015,13 +3108,13 @@ button { font-family: inherit; cursor: pointer; }
   function renderActiveCrit(s, minutes){
     return '<button class="active-card" data-site="' + esc(s.id) + '" type="button">' +
       '<div class="active-head">' +
-        '<span class="crit-badge" data-crit-timer>CRITICAL ¬∑ ' + minutes + 'm</span>' +
+        '<span class="crit-badge" data-crit-timer>CRITICAL · ' + minutes + 'm</span>' +
         '<span class="active-site">' + esc(s.name) + '</span>' +
       '</div>' +
       '<div class="active-brand">' + esc(s.brand) + '</div>' +
       '<div class="active-inc">' + esc(s.inc) + '</div>' +
       '<div class="mini-prog"><div class="mini-prog-bar"></div></div>' +
-      '<div class="active-foot"><span>Diagnosing&hellip;</span><span>Open chat ‚Üí</span></div>' +
+      '<div class="active-foot"><span>Diagnosing&hellip;</span><span>Open chat →</span></div>' +
     '</button>';
   }
 
@@ -3033,7 +3126,7 @@ button { font-family: inherit; cursor: pointer; }
       '</div>' +
       '<div class="active-brand">' + esc(s.brand) + '</div>' +
       '<div class="active-inc watch">' + esc(s.inc) + '</div>' +
-      '<div class="active-monitor">Monitoring ¬∑ no action needed yet</div>' +
+      '<div class="active-monitor">Monitoring · no action needed yet</div>' +
     '</button>';
   }
 
@@ -3093,7 +3186,7 @@ button { font-family: inherit; cursor: pointer; }
       // Header + KPI strip
       '<section class="triage-top">' +
         '<div>' +
-          '<div class="eyebrow">Thursday ¬∑ 21 April ¬∑ 18.42 BST</div>' +
+          '<div class="eyebrow">Thursday · 21 April · 18.42 BST</div>' +
           '<h1 class="triage-h1">Evening Sam. <span class="accent">2 sites need a look.</span></h1>' +
           '<div class="triage-subhead">Rest of your estate is trading normally. Here\\'s what we\\'ve sorted and what\\'s still open.</div>' +
         '</div>' +
@@ -3101,7 +3194,7 @@ button { font-family: inherit; cursor: pointer; }
           renderKpi('Open', String(openCount), 'down 2 since 18.00') +
           renderKpi('AI-resolved today', '27', '96% first-pass', 'green') +
           renderKpi('Avg TTR', '41s', 'vs. 4m industry') +
-          renderKpi('Saved to human', '¬£840', 'est. this week', 'orange') +
+          renderKpi('Saved to human', '£840', 'est. this week', 'orange') +
         '</div>' +
       '</section>' +
 
@@ -3128,10 +3221,10 @@ button { font-family: inherit; cursor: pointer; }
       '<section class="feed-wrap">' +
         '<div class="feed-head">' +
           '<div>' +
-            '<div class="eyebrow">Today ¬∑ resolved</div>' +
+            '<div class="eyebrow">Today · resolved</div>' +
             '<h2 class="triage-h2">Things we already sorted</h2>' +
           '</div>' +
-          '<button class="ghost-btn" type="button">See all 27 ‚Üí</button>' +
+          '<button class="ghost-btn" type="button">See all 27 →</button>' +
         '</div>' +
         '<div class="feed">' + feedHtml + '</div>' +
       '</section>' +
@@ -3145,11 +3238,11 @@ button { font-family: inherit; cursor: pointer; }
       tick++;
       var badges = document.querySelectorAll('[data-crit-timer]');
       for (var i = 0; i < badges.length; i++) {
-        badges[i].textContent = 'CRITICAL ¬∑ ' + (2 + (tick % 3)) + 'm';
+        badges[i].textContent = 'CRITICAL · ' + (2 + (tick % 3)) + 'm';
       }
     }, 1200);
 
-    // Click any site (active card or constellation cell) ‚Üí route to #issue.
+    // Click any site (active card or constellation cell) → route to #issue.
     // Real site id wiring lands in step 7 when we replace mock data.
     document.querySelectorAll('[data-site]').forEach(function(el){
       el.addEventListener('click', function(){ window.scSetRoute('issue'); });
@@ -3158,16 +3251,16 @@ button { font-family: inherit; cursor: pointer; }
     window._screenTeardown = function(){ clearInterval(timer); };
   }
 
-  // ‚îÄ‚îÄ‚îÄ ISSUE SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-  // Mock data mirrors issue.jsx exactly ‚Äî swapped for real data in step 7.
+  // ─── ISSUE SCREEN ─────────────────────────────────────────────────────
+  // Mock data mirrors issue.jsx exactly — swapped for real data in step 7.
   var ISSUE_STEPS = [
     { t: '18:40:12', label: 'Intake',       desc: 'Operator: "Card terminal at site 6 won\\'t connect. Dojo T2. Already rebooted."', state: 'done' },
     { t: '18:40:14', label: 'Identify',     desc: 'Matched: Dojo T2 pairing-loss (known issue KB-0412, 847 prior cases)',               state: 'done' },
-    { t: '18:40:16', label: 'Ping vendor',  desc: 'Dojo status API ‚Üí site 6 terminal registered, last seen 18:37:02',                   state: 'done' },
-    { t: '18:40:18', label: 'Check net',    desc: 'Shoreditch WiFi reachable ¬∑ 42ms ¬∑ no loss',                                          state: 'done' },
-    { t: '18:40:22', label: 'Propose fix',  desc: 'Unpair & re-pair sequence ¬∑ confidence 94%',                                          state: 'active' },
-    { t: '‚Äî',        label: 'Verify',       desc: 'Waiting for operator to confirm code entry',                                          state: 'idle' },
-    { t: '‚Äî',        label: 'Discharge',    desc: '',                                                                                    state: 'idle' }
+    { t: '18:40:16', label: 'Ping vendor',  desc: 'Dojo status API → site 6 terminal registered, last seen 18:37:02',                   state: 'done' },
+    { t: '18:40:18', label: 'Check net',    desc: 'Shoreditch WiFi reachable · 42ms · no loss',                                          state: 'done' },
+    { t: '18:40:22', label: 'Propose fix',  desc: 'Unpair & re-pair sequence · confidence 94%',                                          state: 'active' },
+    { t: '—',        label: 'Verify',       desc: 'Waiting for operator to confirm code entry',                                          state: 'idle' },
+    { t: '—',        label: 'Discharge',    desc: '',                                                                                    state: 'idle' }
   ];
 
   function renderTimelinePin(step, index, scrub){
@@ -3176,8 +3269,8 @@ button { font-family: inherit; cursor: pointer; }
     var base = done ? 'done' : cur ? 'cur' : 'idle';
     var classes = 'tl-pin ' + base + (index === scrub ? ' scrubbed' : '');
     var inner;
-    if (done)      inner = '<span class="tl-check">‚úì</span>';
-    else if (cur)  inner = '<span class="tl-bullet">‚óè</span>';
+    if (done)      inner = '<span class="tl-check">✓</span>';
+    else if (cur)  inner = '<span class="tl-bullet">●</span>';
     else           inner = '<span class="tl-num">' + (index + 1) + '</span>';
     return '<button class="tl-step" data-step="' + index + '" type="button">' +
       '<div class="' + classes + '">' + inner + '</div>' +
@@ -3205,7 +3298,7 @@ button { font-family: inherit; cursor: pointer; }
   }
 
   function renderIssue(){
-    // Default scrub = 4 (the 'active' step ‚Äî Propose fix). Matches prototype.
+    // Default scrub = 4 (the 'active' step — Propose fix). Matches prototype.
     var scrub = 4;
 
     var pins = '';
@@ -3214,19 +3307,19 @@ button { font-family: inherit; cursor: pointer; }
     }
 
     var evidenceCard =
-      '<div class="ev-label">Evidence ¬∑ Dojo status API</div>' +
+      '<div class="ev-label">Evidence · Dojo status API</div>' +
       '<div class="ev-list">' +
-        '<div class="ok">‚úì terminal.registered = true</div>' +
-        '<div class="ok">‚úì last_seen = 18:37:02 (3m ago)</div>' +
-        '<div class="warn">‚ö† paired_handset = null</div>' +
+        '<div class="ok">✓ terminal.registered = true</div>' +
+        '<div class="ok">✓ last_seen = 18:37:02 (3m ago)</div>' +
+        '<div class="warn">⚠ paired_handset = null</div>' +
       '</div>';
 
     var fixCard =
       '<div class="fix-title">Re-pair the T2</div>' +
       '<ol class="fix-steps">' +
-        '<li>On the handset: <b>Menu ‚Üí Settings ‚Üí Re-pair</b></li>' +
+        '<li>On the handset: <b>Menu → Settings → Re-pair</b></li>' +
         '<li>Enter the 4-digit code below</li>' +
-        '<li>Hold for 5 seconds ‚Äî it\\'ll beep twice</li>' +
+        '<li>Hold for 5 seconds — it\\'ll beep twice</li>' +
       '</ol>' +
       '<div class="pair-code">' +
         '<div>' +
@@ -3240,25 +3333,25 @@ button { font-family: inherit; cursor: pointer; }
     return '<div class="issue">' +
       // Header
       '<section class="iss-head">' +
-        '<button class="iss-back" id="issBack" type="button">‚Üê Back to Triage</button>' +
+        '<button class="iss-back" id="issBack" type="button">← Back to Triage</button>' +
         '<div class="iss-meta">' +
           '<div class="iss-meta-row">' +
-            '<span class="live-badge">LIVE ¬∑ 2m 14s</span>' +
+            '<span class="live-badge">LIVE · 2m 14s</span>' +
             '<h1 class="iss-h1">Dojo T2 won\\'t connect</h1>' +
           '</div>' +
-          '<div class="iss-sub">The Pelican ¬∑ Shoreditch EC2 ¬∑ case #INC-20260421-14 ¬∑ opened 18:40 BST</div>' +
+          '<div class="iss-sub">The Pelican · Shoreditch EC2 · case #INC-20260421-14 · opened 18:40 BST</div>' +
         '</div>' +
         '<div class="iss-actions">' +
           '<button class="act-ghost" type="button">Copy to WhatsApp</button>' +
           '<button class="act-ghost" type="button">Assign team member</button>' +
-          '<button class="act-primary" id="issHandoff" type="button">Hand off to human ‚Üí</button>' +
+          '<button class="act-primary" id="issHandoff" type="button">Hand off to human →</button>' +
         '</div>' +
       '</section>' +
 
       // Timeline scrubber (novel moment #2)
       '<section class="tl">' +
         '<div class="tl-head">' +
-          '<div class="tl-head-label">Diagnostic timeline ¬∑ scrub to inspect any step</div>' +
+          '<div class="tl-head-label">Diagnostic timeline · scrub to inspect any step</div>' +
           '<div class="tl-head-count" id="tlCount">step ' + (scrub + 1) + ' / ' + ISSUE_STEPS.length + '</div>' +
         '</div>' +
         '<div class="tl-track">' +
@@ -3266,7 +3359,7 @@ button { font-family: inherit; cursor: pointer; }
           '<div class="tl-line"></div>' +
         '</div>' +
         '<div class="tl-detail">' +
-          '<div class="tl-detail-eyebrow" id="tlDetailHead">' + esc(ISSUE_STEPS[scrub].t) + ' ¬∑ ' + esc(ISSUE_STEPS[scrub].label) + '</div>' +
+          '<div class="tl-detail-eyebrow" id="tlDetailHead">' + esc(ISSUE_STEPS[scrub].t) + ' · ' + esc(ISSUE_STEPS[scrub].label) + '</div>' +
           '<div class="tl-detail-body" id="tlDetailBody">' + esc(ISSUE_STEPS[scrub].desc || 'Not reached yet.') + '</div>' +
         '</div>' +
       '</section>' +
@@ -3274,15 +3367,15 @@ button { font-family: inherit; cursor: pointer; }
       // Body: conversation + context rail
       '<section class="iss-body">' +
         '<div class="conv">' +
-          renderOpMsg('Sam ¬∑ Ops', "Card terminal at site 6 won't connect. Dojo T2. Already rebooted.") +
-          renderBotMsg("Got it. Running the diagnostic ‚Äî Dojo T2 pairing, Shoreditch EC2. I\\'ll check the vendor first.", false) +
+          renderOpMsg('Sam · Ops', "Card terminal at site 6 won't connect. Dojo T2. Already rebooted.") +
+          renderBotMsg("Got it. Running the diagnostic — Dojo T2 pairing, Shoreditch EC2. I\\'ll check the vendor first.", false) +
           renderBotMsg(evidenceCard, true) +
-          renderBotMsg("Terminal\\'s online ‚Äî the handset just lost its pairing. Here\\'s the fix:", false) +
+          renderBotMsg("Terminal\\'s online — the handset just lost its pairing. Here\\'s the fix:", false) +
           renderBotMsg(fixCard, true) +
           '<div class="compose">' +
-            '<input placeholder="Type a reply or describe a new issue‚Ä¶">' +
-            '<button class="act-ghost" type="button">Mark fixed ‚úì</button>' +
-            '<button class="send-btn" type="button">Send ‚Üí</button>' +
+            '<input placeholder="Type a reply or describe a new issue…">' +
+            '<button class="act-ghost" type="button">Mark fixed ✓</button>' +
+            '<button class="send-btn" type="button">Send →</button>' +
           '</div>' +
         '</div>' +
 
@@ -3290,14 +3383,14 @@ button { font-family: inherit; cursor: pointer; }
           '<div class="rail-block">' +
             '<div class="rail-label">Site context</div>' +
             '<div class="rail-title">The Pelican</div>' +
-            '<div class="rail-sub">Shoreditch EC2 ¬∑ trading now ¬∑ 42 covers</div>' +
+            '<div class="rail-sub">Shoreditch EC2 · trading now · 42 covers</div>' +
             '<div class="rail-kv"><span>Opened</span><b>11.00</b></div>' +
             '<div class="rail-kv"><span>GM on duty</span><b>Lara K.</b></div>' +
-            '<div class="rail-kv"><span>Cover</span><b>Tonight ¬∑ 180</b></div>' +
+            '<div class="rail-kv"><span>Cover</span><b>Tonight · 180</b></div>' +
             '<div class="rail-kv"><span>Tech score</span><b class="amber">62 / 100</b></div>' +
           '</div>' +
           '<div class="rail-block">' +
-            '<div class="rail-label">Same site ¬∑ last 7 days</div>' +
+            '<div class="rail-label">Same site · last 7 days</div>' +
             '<div style="display:grid;gap:4px">' +
               '<div class="rail-iss"><span class="rail-pip ok"></span><span class="rail-day">Wed</span><span class="rail-issue-text">Square till froze</span></div>' +
               '<div class="rail-iss"><span class="rail-pip human"></span><span class="rail-day">Mon</span><span class="rail-issue-text">Deliveroo push failed</span></div>' +
@@ -3305,10 +3398,10 @@ button { font-family: inherit; cursor: pointer; }
             '</div>' +
           '</div>' +
           '<div class="rail-block">' +
-            '<div class="rail-label">Runbook ¬∑ KB-0412</div>' +
+            '<div class="rail-label">Runbook · KB-0412</div>' +
             '<div class="rail-runbook-title">Dojo T2 pairing loss</div>' +
-            '<div class="rail-runbook-body">Most common after firmware update. Re-pair usually fixes it. If third attempt fails ‚Äî it\\'s the Bluetooth module.</div>' +
-            '<button class="act-ghost rail-runbook-open" type="button">Open full runbook ‚Üí</button>' +
+            '<div class="rail-runbook-body">Most common after firmware update. Re-pair usually fixes it. If third attempt fails — it\\'s the Bluetooth module.</div>' +
+            '<button class="act-ghost rail-runbook-open" type="button">Open full runbook →</button>' +
           '</div>' +
         '</aside>' +
       '</section>' +
@@ -3316,11 +3409,11 @@ button { font-family: inherit; cursor: pointer; }
   }
 
   function wireIssue(){
-    // Back ‚Üí triage
+    // Back → triage
     var back = document.getElementById('issBack');
     if (back) back.addEventListener('click', function(){ window.scSetRoute('triage'); });
 
-    // Hand off ‚Üí handoff screen (step 5 placeholder for now)
+    // Hand off → handoff screen (step 5 placeholder for now)
     var ho = document.getElementById('issHandoff');
     if (ho) ho.addEventListener('click', function(){ window.scSetRoute('handoff'); });
 
@@ -3333,16 +3426,16 @@ button { font-family: inherit; cursor: pointer; }
         if (!btn) return;
         var idx = parseInt(btn.getAttribute('data-step'), 10);
         if (isNaN(idx) || idx === scrub) return;
-        // Update scrubbed class on all pins (cheap ‚Äî 7 nodes)
+        // Update scrubbed class on all pins (cheap — 7 nodes)
         var pins = track.querySelectorAll('.tl-pin');
         for (var i = 0; i < pins.length; i++) {
           pins[i].classList.toggle('scrubbed', i === idx);
-          // done pin check color swaps depending on scrub ‚Äî CSS handles it via .done.scrubbed
+          // done pin check color swaps depending on scrub — CSS handles it via .done.scrubbed
         }
         scrub = idx;
         var step = ISSUE_STEPS[idx];
         document.getElementById('tlCount').textContent = 'step ' + (idx + 1) + ' / ' + ISSUE_STEPS.length;
-        document.getElementById('tlDetailHead').textContent = step.t + ' ¬∑ ' + step.label;
+        document.getElementById('tlDetailHead').textContent = step.t + ' · ' + step.label;
         document.getElementById('tlDetailBody').textContent = step.desc || 'Not reached yet.';
       });
     }
@@ -3355,7 +3448,7 @@ button { font-family: inherit; cursor: pointer; }
         if (navigator.clipboard && code) {
           navigator.clipboard.writeText(code).then(function(){
             var orig = copyBtn.textContent;
-            copyBtn.textContent = 'Copied ‚úì';
+            copyBtn.textContent = 'Copied ✓';
             setTimeout(function(){ copyBtn.textContent = orig; }, 1400);
           });
         }
@@ -3363,20 +3456,20 @@ button { font-family: inherit; cursor: pointer; }
     }
   }
 
-  // ‚îÄ‚îÄ‚îÄ HANDOFF SCREEN ‚Äî novel moment #3 ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── HANDOFF SCREEN — novel moment #3 ─────────────────────────────────
   var HO_RECIPIENTS = [
-    { id: 'vendor', name: 'Jo Adewale ¬∑ Dojo',    role: 'Payments ¬∑ Tier-2 Support',    eta: '~ 4 min', tag: 'RECOMMENDED', kind: 'recommended', initials: 'JA' },
-    { id: 'ops',    name: 'Marcus T. ¬∑ your ops', role: 'Internal ¬∑ on-shift now',      eta: '~ 1 min', tag: 'TEAM',        kind: 'team',        initials: 'MT' },
-    { id: 'conc',   name: 'Stacked Concierge',    role: 'Chris & team ¬∑ hospitality',   eta: '~ 8 min', tag: 'PAID',        kind: 'paid',        initials: 'SC' }
+    { id: 'vendor', name: 'Jo Adewale · Dojo',    role: 'Payments · Tier-2 Support',    eta: '~ 4 min', tag: 'RECOMMENDED', kind: 'recommended', initials: 'JA' },
+    { id: 'ops',    name: 'Marcus T. · your ops', role: 'Internal · on-shift now',      eta: '~ 1 min', tag: 'TEAM',        kind: 'team',        initials: 'MT' },
+    { id: 'conc',   name: 'Stacked Concierge',    role: 'Chris & team · hospitality',   eta: '~ 8 min', tag: 'PAID',        kind: 'paid',        initials: 'SC' }
   ];
 
   var HO_STEPS = [
-    'Intake ¬∑ card terminal offline ¬∑ Dojo T2',
+    'Intake · card terminal offline · Dojo T2',
     'Matched KB-0412 (847 prior)',
-    'Dojo status API ¬∑ terminal registered',
-    'Shoreditch WiFi reachable ¬∑ 42ms',
-    'Proposed re-pair ¬∑ code 7429',
-    'Operator entered code ¬∑ terminal did not acknowledge'
+    'Dojo status API · terminal registered',
+    'Shoreditch WiFi reachable · 42ms',
+    'Proposed re-pair · code 7429',
+    'Operator entered code · terminal did not acknowledge'
   ];
 
   function renderRecipient(o, i){
@@ -3392,7 +3485,7 @@ button { font-family: inherit; cursor: pointer; }
       '</div>' +
       '<div class="ho-opt-foot">' +
         '<span>Avg response <b>' + esc(o.eta) + '</b></span>' +
-        '<span>Pick ‚Üí</span>' +
+        '<span>Pick →</span>' +
       '</div>' +
     '</button>';
   }
@@ -3403,18 +3496,18 @@ button { font-family: inherit; cursor: pointer; }
     var chartRows = '';
     for (var i = 0; i < HO_STEPS.length; i++) {
       chartRows += '<div class="ho-row">' +
-        '<span class="ho-row-glyph ok">‚úì</span>' +
+        '<span class="ho-row-glyph ok">✓</span>' +
         '<span class="ho-row-text">' + esc(HO_STEPS[i]) + '</span>' +
       '</div>';
     }
 
     return '<div class="ho">' +
-      '<button class="ho-back" id="hoBack" type="button">‚Üê Back to issue</button>' +
+      '<button class="ho-back" id="hoBack" type="button">← Back to issue</button>' +
 
       '<div>' +
-        '<div class="eyebrow">Handoff ¬∑ INC-20260421-14</div>' +
+        '<div class="eyebrow">Handoff · INC-20260421-14</div>' +
         '<h1 class="ho-h1">Pass the baton to a human.</h1>' +
-        '<div class="ho-sub">The AI\\'s attached the full chart. Pick who takes over ‚Äî the vendor\\'s on-call engineer, your own ops team, or Stacked\\'s concierge.</div>' +
+        '<div class="ho-sub">The AI\\'s attached the full chart. Pick who takes over — the vendor\\'s on-call engineer, your own ops team, or Stacked\\'s concierge.</div>' +
       '</div>' +
 
       '<div class="ho-grid">' +
@@ -3424,31 +3517,31 @@ button { font-family: inherit; cursor: pointer; }
         // Attached chart column
         '<div class="ho-chart">' +
           '<div class="ho-chart-head">' +
-            '<div class="eyebrow">Attached chart ¬∑ read-only</div>' +
+            '<div class="eyebrow">Attached chart · read-only</div>' +
             '<div class="ho-chart-title">What the AI already tried</div>' +
           '</div>' +
           chartRows +
           '<div class="ho-hypothesis">' +
             '<span class="ho-row-glyph warn">!</span>' +
-            '<span class="ho-row-text"><b>Hypothesis:</b> Bluetooth module on handset ‚Äî Dojo will need to dispatch or remote-reset.</span>' +
+            '<span class="ho-row-text"><b>Hypothesis:</b> Bluetooth module on handset — Dojo will need to dispatch or remote-reset.</span>' +
           '</div>' +
           '<div class="ho-permit">' +
             '<label class="ho-check"><input type="checkbox" checked> Include operator name &amp; contact</label>' +
             '<label class="ho-check"><input type="checkbox" checked> Include site + vendor context</label>' +
             '<label class="ho-check"><input type="checkbox"> Allow recipient to see stack health score</label>' +
           '</div>' +
-          '<button class="ho-send" id="hoSend" type="button">Send chart &amp; open thread ‚Üí</button>' +
+          '<button class="ho-send" id="hoSend" type="button">Send chart &amp; open thread →</button>' +
         '</div>' +
       '</div>' +
     '</div>';
   }
 
   function wireHandoff(){
-    // Back ‚Üí issue (not triage ‚Äî the README says Issue/Handoff are a pair)
+    // Back → issue (not triage — the README says Issue/Handoff are a pair)
     var back = document.getElementById('hoBack');
     if (back) back.addEventListener('click', function(){ window.scSetRoute('issue'); });
 
-    // Recipient click ‚Üí highlight pick, update send button label so
+    // Recipient click → highlight pick, update send button label so
     // the confirmation names the right recipient.
     var picked = HO_RECIPIENTS[0]; // default to recommended
     document.querySelectorAll('[data-recipient]').forEach(function(el){
@@ -3461,7 +3554,7 @@ button { font-family: inherit; cursor: pointer; }
       });
     });
 
-    // Send ‚Üí confirm state
+    // Send → confirm state
     var send = document.getElementById('hoSend');
     if (send) {
       send.addEventListener('click', function(){
@@ -3469,14 +3562,14 @@ button { font-family: inherit; cursor: pointer; }
         send.classList.add('sent');
         // Use just the first name for the confirmation ("Jo", "Marcus", or
         // "Stacked Concierge" which has no separator). Matches the prototype.
-        var first = picked.name.split(' ')[0].replace(/¬∑.*$/, '');
-        send.textContent = '‚úì Sent to ' + first + ' ¬∑ awaiting reply';
+        var first = picked.name.split(' ')[0].replace(/·.*$/, '');
+        send.textContent = '✓ Sent to ' + first + ' · awaiting reply';
       });
     }
   }
 
-  // ‚îÄ‚îÄ‚îÄ HEALTH SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-  // Mock data mirrors health.jsx verbatim ‚Äî swapped for real data in step 7.
+  // ─── HEALTH SCREEN ────────────────────────────────────────────────────
+  // Mock data mirrors health.jsx verbatim — swapped for real data in step 7.
   var HEALTH_VENDORS = [
     { name: 'Dojo',       cat: 'Payments', score: 71, trend: -4,  incidents: 12 },
     { name: 'Square',     cat: 'EPOS',     score: 92, trend: 2,   incidents: 3 },
@@ -3489,14 +3582,14 @@ button { font-family: inherit; cursor: pointer; }
   ];
 
   var HEALTH_RECS = [
-    { title: 'Deliveroo is costing you ~¬£1,240/mo',
-      body:  'Push failures at Peckham + Camden are correlated with rush. Consider Uber Eats as primary there ‚Äî their grade for burger-format sites in London is 91.',
+    { title: 'Deliveroo is costing you ~£1,240/mo',
+      body:  'Push failures at Peckham + Camden are correlated with rush. Consider Uber Eats as primary there — their grade for burger-format sites in London is 91.',
       cta:   'Compare vendors' },
     { title: 'Two sites are out-of-spec on WiFi',
       body:  'Shoreditch EC2 + Borough SE1 see latency spikes when over 40 covers. Both run consumer BT Hubs. A Draytek swap would save roughly 14 incidents/mo.',
       cta:   'Open ticket with IT' },
     { title: 'Staff rota keeps breaking Planday on Mondays',
-      body:  '5 of 8 Planday incidents this month were the same error at 09.00. Our runbook KB-0299 has a permanent fix ‚Äî takes 4 minutes to apply.',
+      body:  '5 of 8 Planday incidents this month were the same error at 09.00. Our runbook KB-0299 has a permanent fix — takes 4 minutes to apply.',
       cta:   'Apply across estate' }
   ];
 
@@ -3510,7 +3603,7 @@ button { font-family: inherit; cursor: pointer; }
   }
 
   function renderHealth(){
-    // Heatmap: 14 rows √ó 30 cols
+    // Heatmap: 14 rows × 30 cols
     var heat = '';
     for (var r = 0; r < 14; r++) {
       var row = '<div class="hl-heat-row">' +
@@ -3528,7 +3621,7 @@ button { font-family: inherit; cursor: pointer; }
       var v = HEALTH_VENDORS[i];
       var tone = scoreColor(v.score);
       var trendCls = v.trend > 0 ? 'up' : 'down';
-      var trendText = v.trend > 0 ? '‚ñ≤ +' + v.trend : '‚ñº ' + v.trend;
+      var trendText = v.trend > 0 ? '▲ +' + v.trend : '▼ ' + v.trend;
       vendors += '<div class="hl-vcard">' +
         '<div class="hl-vtop">' +
           '<span class="hl-vcat">' + esc(v.cat) + '</span>' +
@@ -3541,7 +3634,7 @@ button { font-family: inherit; cursor: pointer; }
         '<div class="hl-vbar"><div class="hl-vbar-fill ' + tone + '" style="width:' + v.score + '%"></div></div>' +
         '<div class="hl-vfoot">' +
           '<span>' + v.incidents + ' incidents this month</span>' +
-          '<button class="hl-drill" type="button">Drill ‚Üí</button>' +
+          '<button class="hl-drill" type="button">Drill →</button>' +
         '</div>' +
       '</div>';
     }
@@ -3551,10 +3644,10 @@ button { font-family: inherit; cursor: pointer; }
     for (var j = 0; j < HEALTH_RECS.length; j++) {
       var rec = HEALTH_RECS[j];
       recs += '<div class="hl-rec">' +
-        '<div class="hl-rec-label">REC ¬∑ 0' + (j + 1) + '</div>' +
+        '<div class="hl-rec-label">REC · 0' + (j + 1) + '</div>' +
         '<div class="hl-rec-title">' + esc(rec.title) + '</div>' +
         '<div class="hl-rec-body">' + esc(rec.body) + '</div>' +
-        '<button class="hl-rec-btn" type="button">' + esc(rec.cta) + ' ‚Üí</button>' +
+        '<button class="hl-rec-btn" type="button">' + esc(rec.cta) + ' →</button>' +
       '</div>';
     }
 
@@ -3562,14 +3655,14 @@ button { font-family: inherit; cursor: pointer; }
       // Header + overall score
       '<section class="hl-head">' +
         '<div>' +
-          '<div class="eyebrow">Stack health ¬∑ last 30 days</div>' +
+          '<div class="eyebrow">Stack health · last 30 days</div>' +
           '<h1 class="hl-h1">Your tech stack, graded.</h1>' +
-          '<div class="hl-sub">One honest score per vendor. Based on how often they break on <b>your</b> sites ‚Äî not marketing.</div>' +
+          '<div class="hl-sub">One honest score per vendor. Based on how often they break on <b>your</b> sites — not marketing.</div>' +
         '</div>' +
         '<div class="hl-overall">' +
           '<div class="hl-overall-label">Estate health</div>' +
           '<div class="hl-overall-num">82</div>' +
-          '<div class="hl-overall-trend">‚ñ≤ +3 vs. last month</div>' +
+          '<div class="hl-overall-trend">▲ +3 vs. last month</div>' +
         '</div>' +
       '</section>' +
 
@@ -3577,18 +3670,18 @@ button { font-family: inherit; cursor: pointer; }
       '<section class="hl-panel">' +
         '<div class="hl-panel-head">' +
           '<div class="hl-panel-title">Incident heatmap</div>' +
-          '<div class="hl-panel-meta">Rows = your 14 sites ¬∑ Columns = last 30 days</div>' +
+          '<div class="hl-panel-meta">Rows = your 14 sites · Columns = last 30 days</div>' +
         '</div>' +
         '<div class="hl-heat">' + heat + '</div>' +
         '<div class="hl-heat-foot">' +
-          '<span>‚Üê 30d ago</span>' +
+          '<span>← 30d ago</span>' +
           '<div class="hl-heat-legend">Fewer' +
             '<span class="sw" style="background:rgba(59,211,111,0.18)"></span>' +
             '<span class="sw" style="background:rgba(245,165,36,0.35)"></span>' +
             '<span class="sw" style="background:rgba(245,165,36,0.75)"></span>' +
             '<span class="sw" style="background:var(--stacked-red-500)"></span>' +
           'More</div>' +
-          '<span>today ‚Üí</span>' +
+          '<span>today →</span>' +
         '</div>' +
       '</section>' +
 
@@ -3605,7 +3698,7 @@ button { font-family: inherit; cursor: pointer; }
       '<section class="hl-panel">' +
         '<div class="hl-panel-head">' +
           '<div class="hl-panel-title">What we\\'d change</div>' +
-          '<div class="hl-panel-meta">3 recommendations ¬∑ auto-generated from your incident data</div>' +
+          '<div class="hl-panel-meta">3 recommendations · auto-generated from your incident data</div>' +
         '</div>' +
         recs +
       '</section>' +
@@ -3616,13 +3709,13 @@ button { font-family: inherit; cursor: pointer; }
     // No heavy interactions in v1. Drill buttons are placeholders.
   }
 
-  // ‚îÄ‚îÄ‚îÄ RUNBOOKS SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── RUNBOOKS SCREEN ──────────────────────────────────────────────────
   var RB_CATS = ['All', 'Payments', 'EPOS', 'Delivery', 'Rota', 'Network', 'Finance'];
   var RB_BOOKS = [
     { id: 'KB-0412', title: 'Dojo T2 pairing loss',              cat: 'Payments', uses: 847,  rate: 94, desc: 'Most common after firmware update. Re-pair sequence usually fixes it.' },
     { id: 'KB-0299', title: 'Planday Monday 09.00 auth fail',    cat: 'Rota',     uses: 412,  rate: 99, desc: 'Known token-refresh race. Apply once per site, stays fixed.' },
     { id: 'KB-0503', title: 'Deliveroo push backlog',            cat: 'Delivery', uses: 318,  rate: 72, desc: 'Queue a manual sync and confirm receipt ID. Vendor ticket if three strikes.' },
-    { id: 'KB-0187', title: 'Square till frozen',                cat: 'EPOS',     uses: 1204, rate: 97, desc: 'Hard-close app, re-launch. If repeats ‚Äî SD card near-full.' },
+    { id: 'KB-0187', title: 'Square till frozen',                cat: 'EPOS',     uses: 1204, rate: 97, desc: 'Hard-close app, re-launch. If repeats — SD card near-full.' },
     { id: 'KB-0622', title: 'SumUp reader unresponsive',         cat: 'Payments', uses: 289,  rate: 88, desc: 'Reset handshake, then re-pair. Battery check at > 5 min idle.' },
     { id: 'KB-0099', title: 'WiFi latency > 120ms at cover',     cat: 'Network',  uses: 156,  rate: 64, desc: 'Usually the router. Move BT handsets off 2.4GHz.' }
   ];
@@ -3641,7 +3734,7 @@ button { font-family: inherit; cursor: pointer; }
       '<div class="rb-stats">' +
         '<div><div class="rb-st-v">' + b.uses.toLocaleString() + '</div><div class="rb-st-l">USES</div></div>' +
         '<div><div class="rb-st-v ' + tone + '">' + b.rate + '%</div><div class="rb-st-l">FIRST-PASS</div></div>' +
-        '<button class="rb-open" type="button">Open ‚Üí</button>' +
+        '<button class="rb-open" type="button">Open →</button>' +
       '</div>' +
     '</article>';
   }
@@ -3657,17 +3750,17 @@ button { font-family: inherit; cursor: pointer; }
     return '<div class="rb">' +
       '<section class="rb-head">' +
         '<div>' +
-          '<div class="eyebrow">Runbook library ¬∑ 142 entries</div>' +
+          '<div class="eyebrow">Runbook library · 142 entries</div>' +
           '<h1 class="rb-h1">Every fix we\\'ve ever learned.</h1>' +
-          '<div class="rb-sub">Your AI reads these. So can you. Add your own ‚Äî or edit ours.</div>' +
+          '<div class="rb-sub">Your AI reads these. So can you. Add your own — or edit ours.</div>' +
         '</div>' +
-        '<button class="rb-add" type="button">Ôºã New runbook</button>' +
+        '<button class="rb-add" type="button">＋ New runbook</button>' +
       '</section>' +
 
       '<div class="rb-filters">' +
         chips +
         '<div class="rb-spacer"></div>' +
-        '<div class="rb-sort">Sort: Most used ‚ñæ</div>' +
+        '<div class="rb-sort">Sort: Most used ▾</div>' +
       '</div>' +
 
       '<div class="rb-grid" id="rbGrid">' + cards + '</div>' +
@@ -3675,7 +3768,7 @@ button { font-family: inherit; cursor: pointer; }
   }
 
   function wireRunbooks(){
-    // Filter chips ‚Äî client-side filter by category
+    // Filter chips — client-side filter by category
     var filters = document.querySelectorAll('.rb-chip');
     var grid = document.getElementById('rbGrid');
     filters.forEach(function(chip){
@@ -3692,28 +3785,28 @@ button { font-family: inherit; cursor: pointer; }
     });
   }
 
-  // ‚îÄ‚îÄ‚îÄ SITES SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
-  // Mock estate mirrors extras.jsx SitesScreen ‚Äî swapped in step 7's data pass.
+  // ─── SITES SCREEN ─────────────────────────────────────────────────────
+  // Mock estate mirrors extras.jsx SitesScreen — swapped in step 7's data pass.
   var ST_ROWS = [
-    ['Soho W1',          'The Pelican',     'Lara Kane',    'Square ¬∑ Dojo ¬∑ Deliveroo', 96, 0],
-    ['Bristol BS1',      'Pieminister',     'Tom Hughes',   'Square ¬∑ Dojo ¬∑ Planday',   68, 1],
-    ['Spitalfields E1',  'Ottolenghi',      'Priya Sharma', 'Lightspeed ¬∑ SumUp',        82, 1],
-    ['Camden NW1',       'Honest Burgers',  'Omar Nassar',  'Square ¬∑ Dojo ¬∑ Uber',      94, 0],
-    ['Canary Wharf E14', "Carluccio's",     'Beth Ford',    'Lightspeed ¬∑ SumUp',        91, 0],
-    ['Shoreditch EC2',   'The Pelican',     'Lara Kane',    'Square ¬∑ Dojo ¬∑ Deliveroo', 62, 1],
-    ['Fitzrovia W1T',    'Ottolenghi',      'Priya Sharma', 'Lightspeed ¬∑ SumUp',        98, 0],
-    ['Kings Cross N1',   'Pieminister',     'Tom Hughes',   'Square ¬∑ Dojo ¬∑ Planday',   93, 0]
+    ['Soho W1',          'The Pelican',     'Lara Kane',    'Square · Dojo · Deliveroo', 96, 0],
+    ['Bristol BS1',      'Pieminister',     'Tom Hughes',   'Square · Dojo · Planday',   68, 1],
+    ['Spitalfields E1',  'Ottolenghi',      'Priya Sharma', 'Lightspeed · SumUp',        82, 1],
+    ['Camden NW1',       'Honest Burgers',  'Omar Nassar',  'Square · Dojo · Uber',      94, 0],
+    ['Canary Wharf E14', "Carluccio's",     'Beth Ford',    'Lightspeed · SumUp',        91, 0],
+    ['Shoreditch EC2',   'The Pelican',     'Lara Kane',    'Square · Dojo · Deliveroo', 62, 1],
+    ['Fitzrovia W1T',    'Ottolenghi',      'Priya Sharma', 'Lightspeed · SumUp',        98, 0],
+    ['Kings Cross N1',   'Pieminister',     'Tom Hughes',   'Square · Dojo · Planday',   93, 0]
   ];
 
   function renderSitesRow(siteName, brand, gm, stack, score, openCount){
     var tone = scoreColor(score);
     var issCls = openCount ? 'open' : 'clean';
-    var issText = openCount ? '‚óè ' + openCount + ' open' : '‚Äî';
+    var issText = openCount ? '● ' + openCount + ' open' : '—';
     return '<div class="st-row st-body">' +
       '<span class="st-site">' + esc(siteName) + '</span>' +
-      '<span class="st-brand">' + esc(brand || '‚Äî') + '</span>' +
-      '<span class="st-gm">' + esc(gm || '‚Äî') + '</span>' +
-      '<span class="st-stack">' + esc(stack || '‚Äî') + '</span>' +
+      '<span class="st-brand">' + esc(brand || '—') + '</span>' +
+      '<span class="st-gm">' + esc(gm || '—') + '</span>' +
+      '<span class="st-stack">' + esc(stack || '—') + '</span>' +
       '<span class="st-score ' + tone + '">' + score + '</span>' +
       '<span class="st-iss ' + issCls + '">' + issText + '</span>' +
     '</div>';
@@ -3778,12 +3871,12 @@ button { font-family: inherit; cursor: pointer; }
       });
 
       if (venues.length === 0) {
-        // No real data yet ‚Äî keep the mock rows and mark the eyebrow honestly.
-        if (eyebrow) eyebrow.textContent = 'Sites ¬∑ sample data (no venues yet)';
+        // No real data yet — keep the mock rows and mark the eyebrow honestly.
+        if (eyebrow) eyebrow.textContent = 'Sites · sample data (no venues yet)';
         return;
       }
 
-      if (eyebrow) eyebrow.textContent = 'Sites ¬∑ ' + venues.length + ' registered';
+      if (eyebrow) eyebrow.textContent = 'Sites · ' + venues.length + ' registered';
 
       var rowsHtml = SITES_HEAD_ROW;
       for (var j = 0; j < venues.length; j++) {
@@ -3793,19 +3886,19 @@ button { font-family: inherit; cursor: pointer; }
         // 100 baseline, -10 per open ticket, -5 per escalated ticket, floor 10.
         var escalatedCount = v.escalated || 0;
         var score = Math.max(10, 100 - (open * 10) - (escalatedCount * 5));
-        // Brand/GM/Stack aren't captured in the venues schema yet ‚Äî show
+        // Brand/GM/Stack aren't captured in the venues schema yet — show
         // em-dashes so the column shape is preserved for when they land.
-        rowsHtml += renderSitesRow(v.venue || '‚Äî', null, null, null, score, open);
+        rowsHtml += renderSitesRow(v.venue || '—', null, null, null, score, open);
       }
       table.innerHTML = rowsHtml;
     }).catch(function(err){
-      // Network / API failure ‚Äî leave the mock rows and tell the user what happened.
+      // Network / API failure — leave the mock rows and tell the user what happened.
       console.error('[sites] could not load real data, showing sample:', err);
-      if (eyebrow) eyebrow.textContent = 'Sites ¬∑ sample data (live feed unavailable)';
+      if (eyebrow) eyebrow.textContent = 'Sites · sample data (live feed unavailable)';
     });
   }
 
-  // ‚îÄ‚îÄ‚îÄ WIDGET PREVIEW SCREEN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── WIDGET PREVIEW SCREEN ────────────────────────────────────────────
   var WG_FEATURES = [
     'One line of JS on any page',
     'Auto-detects vendor context from the surrounding app',
@@ -3817,17 +3910,17 @@ button { font-family: inherit; cursor: pointer; }
     var features = '';
     for (var i = 0; i < WG_FEATURES.length; i++) {
       features += '<div class="wg-feat">' +
-        '<span class="wg-feat-check">‚úì</span>' + esc(WG_FEATURES[i]) +
+        '<span class="wg-feat-check">✓</span>' + esc(WG_FEATURES[i]) +
       '</div>';
     }
 
     return '<div class="wg">' +
       '<div class="wg-grid">' +
-        // Left column ‚Äî copy + install snippet
+        // Left column — copy + install snippet
         '<div>' +
-          '<div class="eyebrow">Widget preview ¬∑ embed anywhere</div>' +
+          '<div class="eyebrow">Widget preview · embed anywhere</div>' +
           '<h1 class="wg-h1">The chat that lives in your POS.</h1>' +
-          '<div class="wg-sub">Your team doesn\\'t need to leave what they\\'re doing. Drop Stacked Chat into Square, Lightspeed, your intranet, or a bookmark on the GM\\'s phone. Same AI, same handoff, same runbooks ‚Äî shrunk to pocket size.</div>' +
+          '<div class="wg-sub">Your team doesn\\'t need to leave what they\\'re doing. Drop Stacked Chat into Square, Lightspeed, your intranet, or a bookmark on the GM\\'s phone. Same AI, same handoff, same runbooks — shrunk to pocket size.</div>' +
           '<div class="wg-features">' + features + '</div>' +
           '<div class="wg-snippet">' +
             '<div class="wg-snippet-label">Install</div>' +
@@ -3835,26 +3928,26 @@ button { font-family: inherit; cursor: pointer; }
           '</div>' +
         '</div>' +
 
-        // Right column ‚Äî phone mockup
+        // Right column — phone mockup
         '<div class="wg-phone-wrap">' +
           '<div class="wg-phone">' +
             '<div class="wg-notch"></div>' +
             '<div class="wg-sb">' +
               '<span>18:42</span>' +
-              '<span class="wg-sb-right"><span>‚óè‚óè‚óè‚óè</span><span>5G</span></span>' +
+              '<span class="wg-sb-right"><span>●●●●</span><span>5G</span></span>' +
             '</div>' +
             '<div class="wg-hdr">' +
               '<div class="wg-hdr-av"><img src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/bowls-orange.svg" alt=""></div>' +
               '<div>' +
                 '<div class="wg-hdr-name">Stacked Chat</div>' +
-                '<div class="wg-hdr-status">‚óè online</div>' +
+                '<div class="wg-hdr-status">● online</div>' +
               '</div>' +
-              '<span class="wg-hdr-close">‚úï</span>' +
+              '<span class="wg-hdr-close">✕</span>' +
             '</div>' +
             '<div class="wg-body">' +
-              '<div class="wg-bub">Hey Lara üëã I saw the Dojo error at 18:40. Try the fix I sent ‚Äî tap here if it doesn\\'t work.</div>' +
+              '<div class="wg-bub">Hey Lara 👋 I saw the Dojo error at 18:40. Try the fix I sent — tap here if it doesn\\'t work.</div>' +
               '<div class="wg-bubU">that fix didn\\'t take, the light\\'s still red</div>' +
-              '<div class="wg-bub">Right ‚Äî I\\'m looping Jo at Dojo. Keep trading, she\\'ll buzz in 4 min. Meanwhile tell card customers to use cash or tap-to-phone.</div>' +
+              '<div class="wg-bub">Right — I\\'m looping Jo at Dojo. Keep trading, she\\'ll buzz in 4 min. Meanwhile tell card customers to use cash or tap-to-phone.</div>' +
               '<div class="wg-bub-card">' +
                 '<div class="wg-card-label">ALTERNATE</div>' +
                 '<div class="wg-card-title">Tap-to-phone fallback</div>' +
@@ -3862,8 +3955,8 @@ button { font-family: inherit; cursor: pointer; }
               '</div>' +
             '</div>' +
             '<div class="wg-comp">' +
-              '<span class="wg-comp-ph">Type a message‚Ä¶</span>' +
-              '<div class="wg-send">‚Üí</div>' +
+              '<span class="wg-comp-ph">Type a message…</span>' +
+              '<div class="wg-send">→</div>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -3881,7 +3974,7 @@ button { font-family: inherit; cursor: pointer; }
   // Hash changes (back/forward)
   window.addEventListener('hashchange', function(){ render(currentRoute()); });
 
-  // ‚åòK / Ctrl-K focuses search
+  // ⌘K / Ctrl-K focuses search
   window.addEventListener('keydown', function(e){
     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
       e.preventDefault();
@@ -3898,7 +3991,7 @@ button { font-family: inherit; cursor: pointer; }
 </body>
 </html>`;
 
-// ‚îÄ‚îÄ‚îÄ ADMIN PAGE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── ADMIN PAGE ────────────────────────────────────────────────────────────
 const ADMIN_PAGE = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -3913,7 +4006,7 @@ const ADMIN_PAGE = `<!DOCTYPE html>
 :root{
   /* Legacy admin tokens (light theme) */
   --blue:#E8573C;--bg:#EDEBE5;--surface:#ffffff;--surface2:#F5F3EF;--border:#D6D2C8;--border2:#C8C4BA;--text:#1A1A1A;--text2:#6B6867;--text3:#A8A49C;--green:#16a34a;--red:#dc2626;
-  /* Stacked design-system tokens ‚Äî see colors_and_type.css */
+  /* Stacked design-system tokens — see colors_and_type.css */
   --ink-900:#0A0A0A;--ink-800:#131313;--ink-700:#1D1D1D;
   --fg:#F4EFE6;--fg-muted:#928A7C;--fg-dim:#555048;
   --stacked-orange-500:#E87830;--stacked-orange-700:#A34F15;
@@ -4098,7 +4191,7 @@ tbody tr:hover td{background:var(--surface2)}
       <div class="card"><div class="card-header"><span class="card-title">Hot topics</span><span class="card-meta">Most frequent</span></div><div id="hotTopics"><div class="empty">No data yet</div></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Top products mentioned</span><span class="card-meta">Top 10</span></div><div id="topProducts"><div class="empty">No data yet</div></div></div>
     </div>
-    <div class="card"><div class="card-header"><span class="card-title">Product NPS scores</span><span class="card-meta">Operator ratings</span></div><div id="npsTable"><div class="empty">No ratings yet ‚Äî NPS prompts appear after vendor conversations</div></div></div>
+    <div class="card"><div class="card-header"><span class="card-title">Product NPS scores</span><span class="card-meta">Operator ratings</span></div><div id="npsTable"><div class="empty">No ratings yet — NPS prompts appear after vendor conversations</div></div></div>
     <div class="grid-2">
       <div class="card"><div class="card-header"><span class="card-title">Messages by day</span></div><div class="chart-wrap"><canvas id="actChart"></canvas></div></div>
       <div class="card"><div class="card-header"><span class="card-title">Issue categories</span></div><div class="chart-wrap"><canvas id="donutChart"></canvas></div></div>
@@ -4145,10 +4238,10 @@ tbody tr:hover td{background:var(--surface2)}
           </select>
         </div>
         <div>
-          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Logo URL <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3);font-size:11px">‚Äî must be a direct image link (.png, .svg, .jpg)</span></label>
+          <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Logo URL <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3);font-size:11px">— must be a direct image link (.png, .svg, .jpg)</span></label>
           <input id="bLogoUrl" type="url" placeholder="https://logo.clearbit.com/yourdomain.com" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
           <div id="bLogoUrlError" style="display:none;margin-top:6px;padding:8px 10px;border-radius:6px;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;font-size:12px;line-height:1.4"></div>
-          <div style="font-size:11px;color:var(--text3);margin-top:4px">Link to a PNG or SVG ‚Äî ideally on a transparent background</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Link to a PNG or SVG — ideally on a transparent background</div>
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Brand colour</label>
@@ -4159,7 +4252,7 @@ tbody tr:hover td{background:var(--surface2)}
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Bot name</label>
-          <input id="bBotName" type="text" placeholder="e.g. Roxy ‚Äî C√¥te Support" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
+          <input id="bBotName" type="text" placeholder="e.g. Roxy — Côte Support" style="width:100%;padding:9px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
         </div>
         <div>
           <label style="font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:6px">Welcome message (login screen)</label>
@@ -4198,7 +4291,7 @@ tbody tr:hover td{background:var(--surface2)}
       <button class="sub-tab" id="stDocs" onclick="showContentTab('documents')">&#x1F4DA; Knowledge Base</button>
     </div>
 
-    <!-- ‚îÄ‚îÄ VIDEOS PANEL ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ -->
+    <!-- ── VIDEOS PANEL ───────────────────────────────────────────── -->
     <div id="contentVideos">
       <div class="card" style="margin-bottom:16px">
         <div class="card-header"><span class="card-title">&#x1F4FA; Import from YouTube</span><span class="card-meta">Search by vendor name &mdash; tick &amp; bulk import</span></div>
@@ -4276,7 +4369,7 @@ tbody tr:hover td{background:var(--surface2)}
       <div id="videoGrid" class="video-grid"><div class="empty">Loading...</div></div>
     </div>
 
-    <!-- ‚îÄ‚îÄ KNOWLEDGE BASE PANEL ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ -->
+    <!-- ── KNOWLEDGE BASE PANEL ──────────────────────────────────── -->
     <div id="contentDocs" style="display:none">
     <div class="card" style="margin-bottom:16px">
       <div class="card-header"><span class="card-title">&#x1F310; Scrape vendor help centres</span><span class="card-meta">Fetch and index docs directly from vendor support sites</span></div>
@@ -4382,7 +4475,7 @@ async function doScrapeUrl() {
   const st = document.getElementById('scrapeStatus');
   btn.disabled = true; btn.textContent = 'Scraping...';
   st.style.color = 'var(--text3)';
-  st.textContent = 'Fetching ' + url + ' ‚Äî this may take up to 30 seconds...';
+  st.textContent = 'Fetching ' + url + ' — this may take up to 30 seconds...';
   try {
     const r = await fetch('/scrape', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url, vendor }) });
     const data = await r.json();
@@ -4407,7 +4500,7 @@ async function quickScrape(url, vendor, btn) {
   btn.disabled = true; btn.textContent = vendor + '...';
   const st = document.getElementById('scrapeStatus');
   st.style.color = 'var(--text3)';
-  st.textContent = 'Fetching ' + vendor + ' help centre ‚Äî this may take up to 30 seconds...';
+  st.textContent = 'Fetching ' + vendor + ' help centre — this may take up to 30 seconds...';
   try {
     const r = await fetch('/scrape', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url, vendor }) });
     const data = await r.json();
@@ -4474,7 +4567,7 @@ async function loadAnalytics() {
     // NPS table
     const npsEl = document.getElementById('npsTable');
     if (!a.npsData || !a.npsData.length) {
-      npsEl.innerHTML = '<div class="empty">No ratings yet ‚Äî NPS prompts appear after vendor conversations</div>';
+      npsEl.innerHTML = '<div class="empty">No ratings yet — NPS prompts appear after vendor conversations</div>';
     } else {
       npsEl.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
         '<thead><tr style="border-bottom:1px solid var(--border)">' +
@@ -4610,7 +4703,7 @@ function renderHealthData(a) {
   if (!sortedSystems.some(([,c]) => c > 0)) {
     sbEl.innerHTML = '<div class="empty">No issues flagged in the last 7 days &#x1F389;</div>';
   } else {
-    const sicEmoji = { epos: 'üíª', payments: 'üí≥', wifi: 'üì∂', printer: 'üñ®Ô∏è', bookings: 'üìÖ' };
+    const sicEmoji = { epos: '💻', payments: '💳', wifi: '📶', printer: '🖨️', bookings: '📅' };
     sbEl.innerHTML = sortedSystems.map(([sys, count]) => {
       const pct = maxSic > 0 ? Math.round(count / maxSic * 100) : 0;
       return '<div class="data-row">' +
@@ -4632,8 +4725,8 @@ function renderHealthData(a) {
       const d = new Date(hc.checked_at).toLocaleDateString('en-GB', {day:'numeric',month:'short'});
       const t = new Date(hc.checked_at).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
       const statusDot = allGood
-        ? '<span style="color:#16a34a;font-weight:700">\‚úÖ All good</span>'
-        : '<span style="color:#dc2626;font-weight:700">‚ö†Ô∏è Issues flagged</span>';
+        ? '<span style="color:#16a34a;font-weight:700">\✅ All good</span>'
+        : '<span style="color:#dc2626;font-weight:700">⚠️ Issues flagged</span>';
       return '<div class="conv-item">' +
         '<div class="conv-top">' +
         '<span class="conv-name">' + esc(hc.venue || 'Unknown venue') + '</span>' +
@@ -4653,9 +4746,9 @@ function renderHealthData(a) {
 
   const systemNames = { epos: 'EPOS', payments: 'Payments', wifi: 'WiFi', printer: 'Printer', bookings: 'Bookings' };
   const statusBadge = v => {
-    if (v === 'green') return '<span style="color:#16a34a;font-weight:600">\‚úÖ OK</span>';
-    if (v === 'amber') return '<span style="color:#ca8a04;font-weight:600">‚ö†Ô∏è Issue</span>';
-    if (v === 'red')   return '<span style="color:#dc2626;font-weight:600">üî¥ Down</span>';
+    if (v === 'green') return '<span style="color:#16a34a;font-weight:600">\✅ OK</span>';
+    if (v === 'amber') return '<span style="color:#ca8a04;font-weight:600">⚠️ Issue</span>';
+    if (v === 'red')   return '<span style="color:#dc2626;font-weight:600">🔴 Down</span>';
     return '&mdash;';
   };
 
@@ -4702,7 +4795,7 @@ async function searchYouTube(){
   try{
     const r=await fetch('/youtube/search?q='+encodeURIComponent(q)+'&max=12');
     const data=await r.json();
-    btn.disabled=false;btn.textContent='üîç Search';
+    btn.disabled=false;btn.textContent='🔍 Search';
     if(data.error){
       if(data.error.includes('YOUTUBE_API_KEY')){document.getElementById('ytNoKey').style.display='';document.getElementById('ytResults').style.display='none';}
       else notify('YouTube error: '+data.error,'red');
@@ -4713,7 +4806,7 @@ async function searchYouTube(){
     document.getElementById('ytResultCount').textContent=_ytResults.length+' results for "'+q+'"';
     document.getElementById('ytResults').style.display='';
     renderYtGrid(_ytResults);
-  }catch(e){btn.disabled=false;btn.textContent='üîç Search';notify('Search failed: '+e.message,'red');}
+  }catch(e){btn.disabled=false;btn.textContent='🔍 Search';notify('Search failed: '+e.message,'red');}
 }
 function renderYtGrid(items){
   const grid=document.getElementById('ytGrid');
@@ -4730,13 +4823,13 @@ function ytToggle(i,card){
   const chk=document.getElementById('ytchk'+i);
   const selected=card.dataset.selected==='1';
   if(selected){card.dataset.selected='0';card.style.outline='';chk.innerHTML='';chk.style.background='rgba(0,0,0,0.4)';}
-  else{card.dataset.selected='1';card.style.outline='2px solid var(--blue)';chk.innerHTML='‚úì';chk.style.background='var(--blue)';chk.style.color='#fff';chk.style.fontWeight='700';chk.style.fontSize='13px';}
+  else{card.dataset.selected='1';card.style.outline='2px solid var(--blue)';chk.innerHTML='✓';chk.style.background='var(--blue)';chk.style.color='#fff';chk.style.fontWeight='700';chk.style.fontSize='13px';}
   updateYtSelCount();
 }
 function ytSelectAll(){
   document.querySelectorAll('#ytGrid .video-card').forEach((card,i)=>{
     card.dataset.selected='1';card.style.outline='2px solid var(--blue)';
-    const chk=document.getElementById('ytchk'+i);if(chk){chk.innerHTML='‚úì';chk.style.background='var(--blue)';chk.style.color='#fff';chk.style.fontWeight='700';chk.style.fontSize='13px';}
+    const chk=document.getElementById('ytchk'+i);if(chk){chk.innerHTML='✓';chk.style.background='var(--blue)';chk.style.color='#fff';chk.style.fontWeight='700';chk.style.fontSize='13px';}
   });
   updateYtSelCount();
 }
@@ -4778,7 +4871,7 @@ function renderVideoGrid(vids){
   el.innerHTML='';
   if(!Array.isArray(vids)||!vids.length){var emp=document.createElement('div');emp.className='empty';emp.textContent='No videos'+(  _videoFilter?' in this category':' yet')+'.';el.appendChild(emp);return;}
   const catLabels={epos:'EPOS',payments:'Payments',wifi:'WiFi',printer:'Printers',bookings:'Bookings',workforce:'Workforce',ordering:'Ordering',loyalty:'Loyalty',general:'General'};
-  vids.forEach(function(v){var card=document.createElement('div');card.className='video-card';var thumbEl;if(v.thumbnail){thumbEl=document.createElement('img');thumbEl.className='video-thumb';thumbEl.src=v.thumbnail;}else{thumbEl=document.createElement('div');thumbEl.className='video-thumb-empty';thumbEl.textContent=v.type==='youtube'?'‚ñ∂':'üé¨';}thumbEl.dataset.v=encodeURIComponent(JSON.stringify(v));thumbEl.onclick=function(){playVideoEnc(this.dataset.v);};card.appendChild(thumbEl);var info=document.createElement('div');info.className='video-info';var titleEl=document.createElement('div');titleEl.className='video-title';titleEl.textContent=v.title||'Untitled';info.appendChild(titleEl);if(v.description){var descEl=document.createElement('div');descEl.className='video-desc';descEl.textContent=v.description;info.appendChild(descEl);}var footer=document.createElement('div');footer.className='video-footer';var badge=document.createElement('span');badge.className='vbadge '+(v.type||'mp4');badge.textContent=(v.type||'').toLowerCase()==='youtube'?'YouTube':'MP4';var catBadge='';if(v.category&&catLabels[v.category]){var cb=document.createElement('span');cb.className='vbadge';cb.style.cssText='background:var(--surface2);color:var(--text2);border:1px solid var(--border)';cb.textContent=catLabels[v.category];footer.appendChild(cb);}var delBtn=document.createElement('button');delBtn.className='btn-del';delBtn.textContent='Delete';delBtn.dataset.id=v.id;delBtn.onclick=function(){deleteVideo(this.dataset.id,this);};footer.appendChild(badge);footer.appendChild(delBtn);info.appendChild(footer);card.appendChild(info);el.appendChild(card);});
+  vids.forEach(function(v){var card=document.createElement('div');card.className='video-card';var thumbEl;if(v.thumbnail){thumbEl=document.createElement('img');thumbEl.className='video-thumb';thumbEl.src=v.thumbnail;}else{thumbEl=document.createElement('div');thumbEl.className='video-thumb-empty';thumbEl.textContent=v.type==='youtube'?'▶':'🎬';}thumbEl.dataset.v=encodeURIComponent(JSON.stringify(v));thumbEl.onclick=function(){playVideoEnc(this.dataset.v);};card.appendChild(thumbEl);var info=document.createElement('div');info.className='video-info';var titleEl=document.createElement('div');titleEl.className='video-title';titleEl.textContent=v.title||'Untitled';info.appendChild(titleEl);if(v.description){var descEl=document.createElement('div');descEl.className='video-desc';descEl.textContent=v.description;info.appendChild(descEl);}var footer=document.createElement('div');footer.className='video-footer';var badge=document.createElement('span');badge.className='vbadge '+(v.type||'mp4');badge.textContent=(v.type||'').toLowerCase()==='youtube'?'YouTube':'MP4';var catBadge='';if(v.category&&catLabels[v.category]){var cb=document.createElement('span');cb.className='vbadge';cb.style.cssText='background:var(--surface2);color:var(--text2);border:1px solid var(--border)';cb.textContent=catLabels[v.category];footer.appendChild(cb);}var delBtn=document.createElement('button');delBtn.className='btn-del';delBtn.textContent='Delete';delBtn.dataset.id=v.id;delBtn.onclick=function(){deleteVideo(this.dataset.id,this);};footer.appendChild(badge);footer.appendChild(delBtn);info.appendChild(footer);card.appendChild(info);el.appendChild(card);});
 }
 async function loadVideos(){var el=document.getElementById('videoGrid');if(!el)return;el.innerHTML='<div class="empty" style="color:var(--text3)">Loading...</div>';try{var r=await fetch('/videos');var vids=await r.json();_allVideos=Array.isArray(vids)?vids:[];renderVideoGrid(_videoFilter?_allVideos.filter(v=>(v.category||'')===_videoFilter):_allVideos);}catch(e){el.innerHTML='<div class="empty" style="color:var(--red)">Error: '+e.message+'</div>';}}
 function playVideoEnc(enc){playVideo(JSON.parse(decodeURIComponent(enc)));}
@@ -4786,7 +4879,7 @@ function playVideo(v){document.getElementById('vmodalTitle').textContent=v.title
 function closeVModal(){document.getElementById('vmodal').style.display='none';var b=document.getElementById('vmodalBody');while(b.firstChild)b.removeChild(b.firstChild);}
 async function deleteVideo(id,btn){if(!confirm('Delete this video?'))return;btn.disabled=true;try{await fetch('/videos/'+id,{method:'DELETE'});notify('Deleted','green');loadVideos();}catch(e){notify('Error: '+e.message,'red');btn.disabled=false;}}
 
-// ‚îÄ‚îÄ‚îÄ BRANDING MODAL ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── BRANDING MODAL ───────────────────────────────────────────────────────
 let _allVenues = [];
 async function showBrandingModal() {
   document.getElementById('brandingModal').style.display = 'flex';
@@ -4956,7 +5049,7 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify(data)); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ VENUE SEARCH ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── VENUE SEARCH ──────────────────────────────────────────────────────
   if (method === 'GET' && url.startsWith('/venues/search')) {
     try {
       const params = new URL(url, 'http://localhost');
@@ -4975,7 +5068,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ VENUE CREATE / JOIN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── VENUE CREATE / JOIN ───────────────────────────────────────────────
   if (method === 'POST' && url === '/venues') {
     let body = '';
     req.on('data', c => body += c);
@@ -5015,7 +5108,7 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ VENUE MEMBERS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── VENUE MEMBERS ─────────────────────────────────────────────────────
   if (method === 'POST' && url === '/venue-members') {
     let body = '';
     req.on('data', c => body += c);
@@ -5037,7 +5130,7 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ TICKET CLOSE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── TICKET CLOSE ──────────────────────────────────────────────────────
   if (method === 'POST' && url.startsWith('/ticket/') && url.endsWith('/close')) {
     const id = url.split('/')[2];
     await sbFetch(`/rest/v1/tickets?id=eq.${id}`, {method:'PATCH', body:{status:'closed'}});
@@ -5045,7 +5138,7 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ok:true})); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ DELETE DOCUMENT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── DELETE DOCUMENT ───────────────────────────────────────────────────
   if (method === 'DELETE' && url.startsWith('/documents')) {
     try {
       const params = new URL(url, 'http://localhost');
@@ -5071,7 +5164,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ UPLOAD DOCUMENT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── UPLOAD DOCUMENT ───────────────────────────────────────────────────
   if (method === 'POST' && url === '/upload') {
     let body = '';
     req.on('data', c => body += c);
@@ -5089,7 +5182,7 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ SAVE CONVERSATION ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── SAVE CONVERSATION ─────────────────────────────────────────────────
   if (method === 'POST' && url === '/save-conversation') {
     let body = '';
     req.on('data', c => body += c);
@@ -5118,7 +5211,7 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ SAVE TICKET ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── SAVE TICKET ───────────────────────────────────────────────────────
   if (method === 'POST' && url === '/save-ticket') {
     let body = '';
     req.on('data', c => body += c);
@@ -5135,7 +5228,7 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ SAVE NPS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── SAVE NPS ──────────────────────────────────────────────────────────
   if (method === 'POST' && url === '/save-nps') {
     let body = '';
     req.on('data', c => body += c);
@@ -5143,7 +5236,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const payload = JSON.parse(body);
         await sbFetch('/rest/v1/nps_scores', { method: 'POST', body: payload });
-        // Fan-out to the approved-reporting portal. Best-effort, non-blocking ‚Äî
+        // Fan-out to the approved-reporting portal. Best-effort, non-blocking —
         // a portal outage must not break the bot's own NPS capture.
         mirrorNpsToPortal(payload).catch(e => console.error('[portal] nps mirror threw', e));
         res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true}));
@@ -5153,7 +5246,7 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ SAVE LEAD ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── SAVE LEAD ─────────────────────────────────────────────────────────
   if (method === 'POST' && url === '/save-lead') {
     let body = '';
     req.on('data', c => body += c);
@@ -5166,11 +5259,12 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ CHAT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── CHAT ──────────────────────────────────────────────────────────────
   if (method === 'POST' && url === '/chat') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
+      console.log('[chat] request received');
       try {
         const { message, history = [], venue, venue_id, userName } = JSON.parse(body);
 
@@ -5193,33 +5287,8 @@ const server = http.createServer(async (req, res) => {
           : techStackContext;
 
         let docContext = '';
-        // Resolve the asker's workspace (group) so private docs stay isolated.
-        let workspaceId = null;
         try {
-          if (venue_id) {
-            const vR = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
-            if (Array.isArray(vR.data) && vR.data[0]) workspaceId = vR.data[0].workspace_id || null;
-          }
-        } catch(e) { /* venues.workspace_id may not exist yet */ }
-        try {
-          // Scope docs to shared (workspace_id IS NULL) + this workspace's own.
-          // IMPORTANT: there are thousands of shared chunks, so a single capped
-          // query can crowd out a tenant's few private docs. Fetch the
-          // workspace's OWN docs separately (always included) + the shared pool.
-          // Falls back to unscoped if the workspace_id column isn't there yet.
-          let docsR;
-          try {
-            const sharedR = await sbFetch('/rest/v1/documents?workspace_id=is.null&select=filename,content&limit=800');
-            if (!sharedR || (sharedR.status && sharedR.status >= 400) || !Array.isArray(sharedR.data)) throw new Error('scoped unavailable');
-            let merged = sharedR.data;
-            if (workspaceId) {
-              const ownR = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(workspaceId) + '&select=filename,content&limit=400');
-              if (Array.isArray(ownR.data) && ownR.data.length) merged = ownR.data.concat(sharedR.data);
-            }
-            docsR = { data: merged };
-          } catch(scopeErr) {
-            docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
-          }
+          const docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
           if (Array.isArray(docsR.data) && docsR.data.length > 0) {
             const searchText = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
             const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
@@ -5255,7 +5324,6 @@ const server = http.createServer(async (req, res) => {
         // NPS detection: only use USER messages (not bot replies which mention many vendors)
         let vendorContext = '';
         let detectedVendor = null;
-        let npsForced = false;
         try {
           const userMsgsLower = (message + ' ' + (history.slice(-4).filter(m=>m.role==='user').map(m=>m.content).join(' '))).toLowerCase();
           // Also build a broader context including bot replies for knowledge injection (not NPS)
@@ -5284,37 +5352,23 @@ const server = http.createServer(async (req, res) => {
             if (found) detectedVendor = found;
           }
           // Last resort: check the bot's most recent reply for a single clear vendor
-          // (only if user didn't name one ‚Äî avoids the multi-vendor suggestion problem)
+          // (only if user didn't name one — avoids the multi-vendor suggestion problem)
           if (!detectedVendor && history.length > 0) {
             const lastBotReply = (history.filter(m=>m.role==='assistant').slice(-1)[0]?.content || '').toLowerCase();
             const botVendors = Object.entries(VENDOR_PROFILES).filter(([key]) => lastBotReply.includes(key));
             // Only use bot reply if exactly 1 vendor is strongly referenced (not a list of suggestions)
             if (botVendors.length === 1) detectedVendor = botVendors[0][0];
           }
-          // List-free NPS: if the bot just asked which vendor to rate, the
-          // user's reply IS the vendor ‚Äî allow ANY vendor, no allow-list.
-          if (!detectedVendor && history.length > 0) {
-            const lastBot = (history.filter(m=>m.role==='assistant').slice(-1)[0]?.content || '').toLowerCase();
-            const askedToRate = /(which|what)[^.?!]{0,50}(vendor|product|tool|system|supplier)[^.?!]{0,50}(rate|rating|review|feedback|nps)/.test(lastBot)
-                              || /(rate|rating|review|feedback|nps)[^.?!]{0,50}(which|what)[^.?!]{0,30}(vendor|product|tool|system|supplier)/.test(lastBot);
-            const v = message.trim()
-              .replace(/^(the |my |it'?s? |rate |i'?(d| would)? ?(like|want)? ?to ?rate ?|let'?s ?rate ?)/i,'')
-              .replace(/[.!?,]+$/,'').trim();
-            if (askedToRate && v && v.length <= 40 && v.split(/\s+/).length <= 5) {
-              detectedVendor = v.toLowerCase();
-              npsForced = true;
-            }
-          }
         } catch(e) {}
 
-        // ‚îÄ‚îÄ Pre-fetch videos so the AI knows they exist ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+        // ── Pre-fetch videos so the AI knows they exist ───────────────────
         let videoContext = '';
         let preloadedVideos = [];
         try {
           const allVidsR = await sbFetch('/rest/v1/videos?select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200');
           if (Array.isArray(allVidsR.data) && allVidsR.data.length > 0) {
             preloadedVideos = allVidsR.data;
-            // Score against user message only ‚Äî not history or AI reply ‚Äî to stay specific
+            // Score against user message only — not history or AI reply — to stay specific
             const STOP = new Set(['this','that','with','your','have','from','they','will','what','when','about','just','been','some','more','also','into','very','can','how','its','are','was','the','and','for','not','but','you','our','get']);
             const explicitly = /\bvideo\b|\bwatch\b|\btutorial\b|\bguide\b|\bwalkthrough\b|\bdemo\b/i.test(message);
             const msgWords = [...new Set(message.toLowerCase().split(/[\s,?!.;:()\[\]]+/).filter(w => w.length >= 4 && !STOP.has(w)))];
@@ -5326,44 +5380,42 @@ const server = http.createServer(async (req, res) => {
             const threshold = explicitly ? 1 : 3;
             const topVideos = scored.filter(s => s.hits >= threshold).sort((a,b) => b.hits - a.hits).slice(0, 2).map(s => s.v);
             if (topVideos.length > 0) {
-              videoContext = '\n\nVIDEO LIBRARY ‚Äî you have a relevant video for this topic:\n' +
+              videoContext = '\n\nVIDEO LIBRARY — you have a relevant video for this topic:\n' +
                 topVideos.map(v => '- "' + v.title + '"' + (v.description ? ' (' + v.description + ')' : '')).join('\n') +
-                '\nIMPORTANT: Mention the video title naturally in one sentence (e.g. "I also have a video guide ‚Äî \\"Title\\" ‚Äî attached below"). Do NOT say "the system will attach" or use technical language.';
+                '\nIMPORTANT: Mention the video title naturally in one sentence (e.g. "I also have a video guide — \\"Title\\" — attached below"). Do NOT say "the system will attach" or use technical language.';
             } else if (preloadedVideos.length > 0) {
               videoContext = '\n\nVIDEO LIBRARY: ' + preloadedVideos.length + ' videos available but none closely match this query. Do not mention videos unless asked.';
             }
           }
         } catch(e) {}
 
-        const systemPrompt = `You are Stacked Chat ‚Äî a friendly, direct AI assistant for UK hospitality businesses. You answer ANY question about running this business using its own knowledge base: staff handbooks, SOPs, policies, supplier and delivery info, rotas, opening/closing procedures ‚Äî as well as hospitality technology troubleshooting. Tech support is one of the things you do, not the only thing.
-
-ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents don't cover the question, say so and answer from general best practice ‚Äî never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
+        const systemPrompt = `You are the Stacked Chat assistant — a friendly, direct AI support bot for hospitality operators in the UK. You specialise in hospitality technology troubleshooting.
 
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
 
-ESCALATION: If the issue clearly needs human intervention ‚Äî for example the user has tried all steps and it's still broken, there is data loss, a vendor outage, account access issues only the vendor can fix, or the user is losing significant revenue ‚Äî add [ESCALATE] on its own line at the very end of your response. Keep your reply helpful and reassuring; the system will handle alerting the team automatically.
+ESCALATION: If the issue clearly needs human intervention — for example the user has tried all steps and it's still broken, there is data loss, a vendor outage, account access issues only the vendor can fix, or the user is losing significant revenue — add [ESCALATE] on its own line at the very end of your response. Keep your reply helpful and reassuring; the system will handle alerting the team automatically.
 
 Your personality:
 - Calm under pressure (operators often message you during a crisis)
-- Straight to the point ‚Äî no waffle
+- Straight to the point — no waffle
 - Friendly but efficient
 - Use British English when responding in English
 
-PRODUCT DETECTION (only for TECH / equipment problems ‚Äî NOT for handbook, HR, policy, supplier, rota or other general questions):
-When a user reports a TECH or equipment fault but does NOT name the specific product or brand (e.g. "my till is broken" or "payments aren't working"), you MUST ask which product they are using before troubleshooting. Ask in a single short friendly question. For non-tech questions, do not ask about products ‚Äî just answer from the knowledge base.
+PRODUCT DETECTION — this is critical:
+When a user describes a problem but does NOT mention the specific product or brand (e.g. they say "my till is broken" or "payments aren't working" without naming the system), you MUST ask which product they are using before troubleshooting. Ask in a single short friendly question.
 
-EXCEPTION: If the venue's tech stack is provided above, skip asking ‚Äî you already know their system.
+EXCEPTION: If the venue's tech stack is provided above, skip asking — you already know their system.
 
 For each category, prompt like this:
-- EPOS / till issues ‚Üí "Which EPOS system are you on? For example Square, Lightspeed, Tevalis, EPOS Now, Zonal, ICRTouch, Toast, or another?"
-- Payment terminal issues ‚Üí "Which payment terminal are you using? For example Dojo, Square, SumUp, Zettle, Worldpay, Stripe, Adyen, or Elavon?"
-- Reservation / booking issues ‚Üí "Which reservation system are you using? For example OpenTable, ResDiary, SevenRooms, Collins, Resy, Quandoo, or another?"
-- Workforce / rota issues ‚Üí "Which rota or workforce system are you using? For example Fourth, Deputy, Sona, Rotaready, Bizimply, S4Labour, or another?"
-- Ordering / delivery issues ‚Üí "Which ordering platform is this? For example Deliveroo, Uber Eats, Just Eat, Deliverect, Flipdish, Slerp, or another?"
-- Loyalty / CRM issues ‚Üí "Which loyalty or CRM platform are you using? For example Airship, Stampede, SevenRooms, Eagle Eye, Yumpingo, or another?"
-- Inventory / procurement issues ‚Üí "Which inventory system are you using? For example Apicbase, Marketman, Crunchtime, Nutritics, Kitchen CUT, or another?"
-- Hotel PMS issues ‚Üí "Which property management system are you on? For example Opera, Mews, Guestline, Cloudbeds, Clock PMS, or another?"
-- WiFi / connectivity issues ‚Üí "Is this the venue's main WiFi or a specific device that won't connect?"
+- EPOS / till issues → "Which EPOS system are you on? For example Square, Lightspeed, Tevalis, EPOS Now, Zonal, ICRTouch, Toast, or another?"
+- Payment terminal issues → "Which payment terminal are you using? For example Dojo, Square, SumUp, Zettle, Worldpay, Stripe, Adyen, or Elavon?"
+- Reservation / booking issues → "Which reservation system are you using? For example OpenTable, ResDiary, SevenRooms, Collins, Resy, Quandoo, or another?"
+- Workforce / rota issues → "Which rota or workforce system are you using? For example Fourth, Deputy, Sona, Rotaready, Bizimply, S4Labour, or another?"
+- Ordering / delivery issues → "Which ordering platform is this? For example Deliveroo, Uber Eats, Just Eat, Deliverect, Flipdish, Slerp, or another?"
+- Loyalty / CRM issues → "Which loyalty or CRM platform are you using? For example Airship, Stampede, SevenRooms, Eagle Eye, Yumpingo, or another?"
+- Inventory / procurement issues → "Which inventory system are you using? For example Apicbase, Marketman, Crunchtime, Nutritics, Kitchen CUT, or another?"
+- Hotel PMS issues → "Which property management system are you on? For example Opera, Mews, Guestline, Cloudbeds, Clock PMS, or another?"
+- WiFi / connectivity issues → "Is this the venue's main WiFi or a specific device that won't connect?"
 
 Once you know the product, respond with:
 - A single bold line with the fastest fix
@@ -5374,8 +5426,8 @@ Once you know the product, respond with:
 NPS / VENDOR RATING REQUESTS:
 When a user says they want to rate their tech vendors, rate a product, give feedback, or provide an NPS score:
 1. Ask them which specific vendor/product they would like to rate. Be friendly and concise, e.g. "Sure! Which vendor would you like to rate? For example Lightspeed, Square, Tevalis, Dojo, OpenTable, Deputy, or any other product you use."
-2. Once they name the vendor ‚Äî ANY vendor or product, even one not in your support list ‚Äî reply with a short confirmation like "Great ‚Äî rating [vendor name] now." and ALWAYS add [NPS:vendorname] on its own line at the very end (use the exact name the user gave, lowercased, e.g. [NPS:tenzo]). Never skip this tag. The system displays the rating widget automatically.
-3. Do NOT ask them to rate on a scale yourself ‚Äî the system handles the rating UI.
+2. Once they name the vendor, reply with a short confirmation like "Great — rating [vendor name] now." and add [NPS:vendorname] on its own line at the very end of your response (e.g. [NPS:lightspeed] or [NPS:resdiary]). Use the lowercase vendor key. The system will display the NPS rating widget automatically.
+3. Do NOT ask them to rate on a scale yourself — the system handles the rating UI.
 
 Support URLs:
   --- POINT OF SALE ---
@@ -5504,7 +5556,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         }
         const rawReply = apiRes.content?.[0]?.text || 'Sorry, I could not get a response. Please try again.';
 
-        // Detect supportUrl BEFORE cleaning ‚Äî user message first (most accurate), then Claude's reply
+        // Detect supportUrl BEFORE cleaning — user message first (most accurate), then Claude's reply
         let supportUrl = null;
         const userMsgLower = message.toLowerCase();
         for (const [vendor, url] of Object.entries(VENDOR_SUPPORT_URLS)) {
@@ -5527,7 +5579,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         let relevantVideos = [];
         let finalReply = reply;
         try {
-          // Reuse already-fetched videos ‚Äî score against user message only (not AI reply)
+          // Reuse already-fetched videos — score against user message only (not AI reply)
           if (preloadedVideos.length > 0) {
             const STOP = new Set(['this','that','with','your','have','from','they','will','what','when','about','just','been','some','more','also','into','very','can','how','its','are','was','the','and','for','not','but','you','our','get']);
             const explicitly = /\bvideo\b|\bwatch\b|\btutorial\b|\bguide\b|\bwalkthrough\b|\bdemo\b/i.test(message);
@@ -5549,7 +5601,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
           }
         } catch(e) {}
 
-        // ‚îÄ‚îÄ‚îÄ ESCALATION DETECTION ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+        // ─── ESCALATION DETECTION ────────────────────────────────────────
         const ESCALATION_PHRASES = [
           'speak to someone','talk to someone','need a human','need a person',
           'real person','human agent','actual person','still not working',
@@ -5565,13 +5617,12 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         reply = reply.replace(/\[ESCALATE\]/g, '').trim();
         finalReply = finalReply.replace(/\[ESCALATE\]/g, '').trim();
 
-        // Handle [NPS:vendorname] tag ‚Äî AI-triggered NPS rating
-        const npsMatch = reply.match(/\[NPS:([^\]]+)\]/i);
+        // Handle [NPS:vendorname] tag — AI-triggered NPS rating
+        const npsMatch = reply.match(/\[NPS:([a-z0-9 ]+)\]/i);
         if (npsMatch) {
           detectedVendor = npsMatch[1].toLowerCase().trim();
-          npsForced = true;
-          reply = reply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
-          finalReply = finalReply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
+          reply = reply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
+          finalReply = finalReply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
         }
 
         if (shouldEscalate) {
@@ -5589,7 +5640,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         }
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: npsForced || !!npsMatch}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
@@ -5598,7 +5649,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ YOUTUBE INGEST ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── YOUTUBE INGEST ────────────────────────────────────────────────────
   if (method === 'POST' && url === '/youtube-ingest') {
     let body = ''; req.on('data', chunk => body += chunk);
     req.on('end', async () => {
@@ -5641,7 +5692,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ VIDEOS ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── VIDEOS ────────────────────────────────────────────────────────────
   if (method === 'GET' && url === '/videos') {
     try {
       const r = await sbFetch('/rest/v1/videos?select=*&order=created_at.desc&limit=100');
@@ -5683,7 +5734,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ YOUTUBE SEARCH ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── YOUTUBE SEARCH ────────────────────────────────────────────────────────
   if (method === 'GET' && url.startsWith('/youtube/search')) {
     const ytKey = process.env.YOUTUBE_API_KEY;
     if (!ytKey) {
@@ -5717,7 +5768,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ YOUTUBE BULK IMPORT ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── YOUTUBE BULK IMPORT ───────────────────────────────────────────────────
   if (method === 'POST' && url === '/youtube/import') {
     let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
@@ -5763,7 +5814,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ HEALTH CHECK SAVE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── HEALTH CHECK SAVE ─────────────────────────────────────────────────
   if (method === 'POST' && url === '/health-check') {
     let body = '';
     req.on('data', c => body += c);
@@ -5785,7 +5836,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ HEALTH CHECKS LIST ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── HEALTH CHECKS LIST ────────────────────────────────────────────────
   if (method === 'GET' && url.startsWith('/health-checks')) {
     try {
       const params = new URL(url, 'http://localhost');
@@ -5803,7 +5854,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ CRON: SHIFT CHECK REMINDER ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── CRON: SHIFT CHECK REMINDER ───────────────────────────────────────
   if (method === 'POST' && url === '/cron/remind') {
     const params = new URL(url, 'http://localhost');
     let body = ''; req.on('data', c => body += c);
@@ -5818,7 +5869,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
         if (SLACK_WEBHOOK_URL) {
           const text = [
-            `‚òÄÔ∏è *Good morning ‚Äî time for your shift check!*`,
+            `☀️ *Good morning — time for your shift check!*`,
             `It's ${day} at ${time}. Before service kicks off, make sure your tech is green across the board.`,
             ``,
             `*${venues.length} venue${venues.length !== 1 ? 's' : ''} active on Stacked Chat.*`,
@@ -5834,7 +5885,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ VENUE BRANDING SAVE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── VENUE BRANDING SAVE ──────────────────────────────────────────────
   if (method === 'POST' && url.startsWith('/venue/') && url.endsWith('/branding')) {
     let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
@@ -5854,7 +5905,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ VENUE LIST FOR ADMIN ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── VENUE LIST FOR ADMIN ──────────────────────────────────────────────
   if (method === 'GET' && url === '/venues/all') {
     try {
       const r = await sbFetch('/rest/v1/venues?select=*&order=name.asc&limit=200');
@@ -5867,7 +5918,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ WEB SCRAPER ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── WEB SCRAPER ───────────────────────────────────────────────────────────
   if (method === 'POST' && url === '/scrape') {
     let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
@@ -5910,7 +5961,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
           return { chunks: chunks.length, chars: text.length, filename };
         }
 
-        // ‚îÄ‚îÄ Zendesk Help Centre detection ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+        // ── Zendesk Help Centre detection ──────────────────────────────────
         // URLs like https://support.lightspeedhq.com/hc/en-gb
         // or https://help.deputy.com/hc/en-us
         // Zendesk exposes a public JSON API at /api/v2/help_center/<locale>/articles.json
@@ -5931,7 +5982,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
               signal: AbortSignal.timeout(20000)
             });
             if (!apiRes.ok) {
-              // 401/403 = API locked ‚Äî fall through to HTML scrape silently
+              // 401/403 = API locked — fall through to HTML scrape silently
               if (pagesFetched === 0) apiBlocked = true;
               break;
             }
@@ -5951,20 +6002,20 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
             res.end(JSON.stringify({ ok: true, ...result, method: 'zendesk-api' }));
             return;
           }
-          // API blocked or empty ‚Äî fall through to HTML scrape below
+          // API blocked or empty — fall through to HTML scrape below
         }
 
-        // ‚îÄ‚îÄ Standard HTML scrape ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+        // ── Standard HTML scrape ───────────────────────────────────────────
         const fetchRes = await fetch(scrapeUrl, {
           headers: browserHeaders,
           signal: AbortSignal.timeout(20000),
           redirect: 'follow'
         });
-        if (!fetchRes.ok) throw new Error('HTTP ' + fetchRes.status + ' ‚Äî site may block scraping or require login');
+        if (!fetchRes.ok) throw new Error('HTTP ' + fetchRes.status + ' — site may block scraping or require login');
         const html = await fetchRes.text();
         const text = stripHtml(html);
 
-        if (text.length < 100) throw new Error('Page returned too little content ‚Äî site requires JavaScript rendering. Try a direct article URL instead of the help centre homepage.');
+        if (text.length < 100) throw new Error('Page returned too little content — site requires JavaScript rendering. Try a direct article URL instead of the help centre homepage.');
 
         const result = await saveChunks(text, vendor || parsedUrl.hostname, scrapeUrl);
         res.writeHead(200, {'Content-Type':'application/json'});
@@ -5977,7 +6028,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     }); return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ BRANDED CHAT PAGE (/chat/:slug) ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── BRANDED CHAT PAGE (/chat/:slug) ──────────────────────────────────
   if (method === 'GET' && url.startsWith('/chat/')) {
     const slug = url.split('/chat/')[1].split('?')[0].toLowerCase();
     try {
@@ -6002,7 +6053,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     return;
   }
 
-  // ‚îÄ‚îÄ‚îÄ MAIN CHAT PAGE ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+  // ─── MAIN CHAT PAGE ────────────────────────────────────────────────────
   if (method === 'GET' && (url === '/' || url === '')) {
     res.writeHead(200, {'Content-Type':'text/html','Cache-Control':'no-store'});
     res.end(buildChatPage()); return;
@@ -6011,7 +6062,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
   res.writeHead(404); res.end('Not found');
 });
 
-// ‚îÄ‚îÄ‚îÄ UTILITIES ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+// ─── UTILITIES ─────────────────────────────────────────────────────────────
 function chunkText(text, filename) {
   const chunkSize = 1200;
   const chunks = [];
@@ -6101,4 +6152,8 @@ async function fetchYouTubeTranscript(videoId) {
   throw new Error('Could not fetch transcript. Try uploading a .txt transcript manually.');
 }
 
-server.listen(PORT, () => console.log(`Stacked Chat server running on port ${PORT}`));
+// Boot banner — deliberately greppable. If you don't see this exact line in
+// Railway logs after a deploy, the new build isn't live and any code changes
+// in this file haven't taken effect yet.
+const BUILD_TAG = 'chat-fix-2026-04-22';
+server.listen(PORT, () => console.log(`[boot] Stacked Chat server running on port ${PORT} — build=${BUILD_TAG}`));
