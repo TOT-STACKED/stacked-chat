@@ -715,6 +715,29 @@ async function sbFetch(path, opts = {}) {
   });
 }
 
+// ─── AUTH: validate a Supabase access token → verified email (or null) ────────
+// Used to harden admin write-actions: the caller must hold a real session
+// proving they own the email (obtained via the email-code verification flow).
+async function verifyAuthEmail(token) {
+  if (!token) return null;
+  const https = require('https');
+  const u = new URL(`${SUPABASE_URL}/auth/v1/user`);
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: u.hostname, path: u.pathname, method: 'GET',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token }
+    }, (r) => {
+      let d = ''; r.on('data', c => d += c);
+      r.on('end', () => {
+        try { const j = JSON.parse(d); resolve((r.statusCode < 400 && j && j.email) ? String(j.email).toLowerCase() : null); }
+        catch(e) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
 async function getAnalytics() {
   try {
     const [convsR, ticketsR, docsR, healthR] = await Promise.all([
@@ -1187,6 +1210,8 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .modal h3 { font-family: var(--font-display); font-size: 20px; margin-bottom: 6px; }
   .modal p { font-size: 14px; color: var(--brown-mid); margin-bottom: 20px; }
   .modal textarea { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 12px 14px; font-family: var(--font-sans); font-size: 14px; color: var(--brown); background: var(--cream); resize: none; height: 100px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
+  .verify-code { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 14px; font-family: var(--font-mono); font-size: 28px; font-weight: 600; letter-spacing: 0.4em; text-align: center; color: var(--brown); background: var(--cream); outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
+  .verify-code:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px var(--orange-glow-15); }
   .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
   .modal-actions { display: flex; gap: 10px; }
   .modal-cancel { flex: 1; padding: 13px; background: var(--cream); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 15px; font-weight: 500; cursor: pointer; color: var(--brown); }
@@ -1383,7 +1408,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     </a>
     <div class="header-actions">
       <div class="user-chip"><div class="dot"></div><span id="userLabel">You</span></div>
-      <button class="icon-btn" id="adminBtn" onclick="openAdmin()" title="Admin" style="display:none">
+      <button class="icon-btn" id="adminBtn" onclick="requireAdminVerify(openAdmin)" title="Admin" style="display:none">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
       </button>
       <button class="icon-btn" onclick="openHistory()" title="Chat history">
@@ -1411,7 +1436,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="input-bar">
     <input type="file" id="kbFile" accept=".pdf,.doc,.docx,.txt,.csv,.md" style="display:none" onchange="handleKbUpload(this.files)" multiple>
     <input type="file" id="vidFile" accept="video/*" style="display:none" onchange="handleVideoUpload(this.files)" multiple>
-    <button id="kbAdd" onclick="document.getElementById('kbFile').click()" title="Add to knowledge base" style="display:none">
+    <button id="kbAdd" onclick="requireAdminVerify(function(){document.getElementById('kbFile').click();})" title="Add to knowledge base" style="display:none">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
     <textarea id="input" placeholder="Ask anything about your business&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
@@ -1476,6 +1501,28 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     <div class="modal-actions">
       <button class="modal-cancel" onclick="closeTicket()">Cancel</button>
       <button class="modal-submit" onclick="submitTicket()">Submit ticket</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── ADMIN VERIFY MODAL (email code) ─── -->
+<div class="modal-overlay" id="verifyOverlay">
+  <div class="modal">
+    <h3>Confirm it&#39;s you</h3>
+    <div id="verifyStep1">
+      <p>Managing knowledge is admin-only. We&#39;ll email a 6-digit code to <strong id="verifyEmail"></strong> to confirm it&#39;s you.</p>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeVerify()">Cancel</button>
+        <button class="modal-submit" id="verifySendBtn" onclick="sendAuthCode()">Send code</button>
+      </div>
+    </div>
+    <div id="verifyStep2" style="display:none">
+      <p>Enter the 6-digit code we just emailed you.</p>
+      <input class="verify-code" id="verifyCodeInput" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="sendAuthCode()">Resend</button>
+        <button class="modal-submit" onclick="verifyAuthCode()">Verify</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2412,7 +2459,7 @@ async function loadTeam() {
 async function setMemberRole(email, role) {
   if (!user || !user.venue_id) return;
   try {
-    const r = await fetch(SERVER_URL + '/set-role', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, target_email: email, role: role, actor_email: user.email }) });
+    const r = await fetch(SERVER_URL + '/set-role', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, target_email: email, role: role, token: getAuthToken() }) });
     const data = await r.json();
     if (!data || !data.ok) { showToast((data && data.error) || 'Could not update role'); return; }
     showToast('Role updated', 'green');
@@ -2424,7 +2471,58 @@ async function setMemberRole(email, role) {
 function signOut() {
   if (!confirm('Sign out of Stacked Chat?')) return;
   localStorage.removeItem('stacked_user');
+  localStorage.removeItem('stacked_auth');
   location.reload();
+}
+
+// ─── ADMIN EMAIL VERIFICATION (real login for admin powers) ───────────────
+let _pendingAdminAction = null;
+function getAuthToken() {
+  try {
+    const a = JSON.parse(localStorage.getItem('stacked_auth') || 'null');
+    if (a && a.token && a.email && user && a.email.toLowerCase() === (user.email || '').toLowerCase() && (Date.now() - (a.ts || 0) < 12 * 60 * 60 * 1000)) return a.token;
+  } catch(e) {}
+  return null;
+}
+function requireAdminVerify(fn) {
+  if (getAuthToken()) { fn(); return; }
+  _pendingAdminAction = fn;
+  openVerify();
+}
+function openVerify() {
+  if (!user) return;
+  document.getElementById('verifyEmail').textContent = user.email || 'your email';
+  document.getElementById('verifyStep1').style.display = 'block';
+  document.getElementById('verifyStep2').style.display = 'none';
+  document.getElementById('verifyCodeInput').value = '';
+  const b = document.getElementById('verifySendBtn'); if (b) { b.disabled = false; b.textContent = 'Send code'; }
+  document.getElementById('verifyOverlay').classList.add('open');
+}
+function closeVerify() { document.getElementById('verifyOverlay').classList.remove('open'); }
+async function sendAuthCode() {
+  if (!user || !user.email) return;
+  const btn = document.getElementById('verifySendBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending\\u2026'; }
+  try {
+    const r = await fetch(SUPABASE_URL + '/auth/v1/otp', { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY}, body: JSON.stringify({ email: user.email, create_user: true }) });
+    if (!r.ok) { const e = await r.json().catch(function(){return {};}); showToast(e.msg || 'Could not send code'); if (btn) { btn.disabled = false; btn.textContent = 'Send code'; } return; }
+    document.getElementById('verifyStep1').style.display = 'none';
+    document.getElementById('verifyStep2').style.display = 'block';
+    document.getElementById('verifyCodeInput').focus();
+  } catch(e) { showToast('Could not send code'); if (btn) { btn.disabled = false; btn.textContent = 'Send code'; } }
+}
+async function verifyAuthCode() {
+  const code = (document.getElementById('verifyCodeInput').value || '').trim();
+  if (code.length < 6) { showToast('Enter the 6-digit code'); return; }
+  try {
+    const r = await fetch(SUPABASE_URL + '/auth/v1/verify', { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY}, body: JSON.stringify({ email: user.email, token: code, type: 'email' }) });
+    const d = await r.json();
+    if (!r.ok || !d.access_token) { showToast('That code didn\\'t work \\u2014 try again'); return; }
+    localStorage.setItem('stacked_auth', JSON.stringify({ email: user.email, token: d.access_token, ts: Date.now() }));
+    closeVerify();
+    showToast('Verified \\u2713', 'green');
+    const fn = _pendingAdminAction; _pendingAdminAction = null; if (fn) fn();
+  } catch(e) { showToast('Could not verify'); }
 }
 
 // ─── ADD KNOWLEDGE ("+", admins only) ─────────────────────────────────────
@@ -2461,7 +2559,7 @@ async function handleKbUpload(files) {
       else text = await file.text();
       text = (text || '').trim();
       if (!text || text.length < 10) { showToast('Couldn\\'t read text from ' + file.name); continue; }
-      const r = await fetch(SERVER_URL + '/kb-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: file.name, content: text, venue_id: user.venue_id, email: user.email }) });
+      const r = await fetch(SERVER_URL + '/kb-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: file.name, content: text, venue_id: user.venue_id, token: getAuthToken() }) });
       const data = await r.json();
       if (data && data.ok) {
         hideWelcome();
@@ -2492,7 +2590,7 @@ async function handleVideoUpload(files) {
       });
       if (!up.ok) { showToast('Video storage not set up yet'); continue; }
       const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
-      const r = await fetch(SERVER_URL + '/kb-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: file.name.replace(/\\.[^.]+$/, ''), venue_id: user.venue_id, email: user.email }) });
+      const r = await fetch(SERVER_URL + '/kb-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: file.name.replace(/\\.[^.]+$/, ''), venue_id: user.venue_id, token: getAuthToken() }) });
       const data = await r.json();
       if (data && data.ok) {
         hideWelcome();
@@ -2541,7 +2639,7 @@ async function loadAdmin() {
 async function kbRemove(filename) {
   if (!confirm('Remove \"' + filename + '\" from your knowledge base?')) return;
   try {
-    const r = await fetch(SERVER_URL + '/kb-remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, email: user.email, filename: filename }) });
+    const r = await fetch(SERVER_URL + '/kb-remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, filename: filename, token: getAuthToken() }) });
     const d = await r.json();
     if (!d || !d.ok) { showToast((d && d.error) || 'Could not remove'); return; }
     showToast('Removed', 'green');
@@ -5359,13 +5457,15 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { venue_id, target_email, role, actor_email } = JSON.parse(body);
+        const { venue_id, target_email, role, token } = JSON.parse(body);
         if (!venue_id || !target_email || (role !== 'admin' && role !== 'staff')) {
           res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'bad request'})); return;
         }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
         const r = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
         const members = Array.isArray(r.data) ? r.data : [];
-        const actor = members.find(m => (m.email || '').toLowerCase() === (actor_email || '').toLowerCase());
+        const actor = members.find(m => (m.email || '').toLowerCase() === vEmail);
         if (!actor || actor.role !== 'admin') {
           res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'admins only'})); return;
         }
@@ -5444,13 +5544,15 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { filename, content, venue_id, email } = JSON.parse(body);
-        if (!filename || !content || !venue_id || !email) {
+        const { filename, content, venue_id, token } = JSON.parse(body);
+        if (!filename || !content || !venue_id) {
           res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return;
         }
-        // Admin guard: only an admin of this venue may add knowledge.
+        // Verified-admin guard: caller must hold a valid session (email-code verified).
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
         const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
-        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === String(email).toLowerCase());
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
         if (!me || me.role !== 'admin') {
           res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can add knowledge'})); return;
         }
@@ -5518,10 +5620,12 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { venue_id, email, filename } = JSON.parse(body);
-        if (!venue_id || !email || !filename) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const { venue_id, filename, token } = JSON.parse(body);
+        if (!venue_id || !filename) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
         const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
-        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === String(email).toLowerCase());
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
         if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can remove knowledge'})); return; }
         const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
         const ws = (Array.isArray(vr.data) && vr.data[0]) ? (vr.data[0].workspace_id || null) : null;
@@ -5545,10 +5649,12 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { url: videoUrl, title, venue_id, email } = JSON.parse(body);
-        if (!videoUrl || !venue_id || !email) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const { url: videoUrl, title, venue_id, token } = JSON.parse(body);
+        if (!videoUrl || !venue_id) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
         const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
-        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === String(email).toLowerCase());
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
         if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can add videos'})); return; }
         const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id,slug&limit=1');
         const v = (Array.isArray(vr.data) && vr.data[0]) ? vr.data[0] : null;
