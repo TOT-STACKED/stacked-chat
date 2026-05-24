@@ -1140,6 +1140,20 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .history-preview { font-size: 14px; font-weight: 500; color: var(--brown); transition: color 0.15s; }
   .history-count { font-size: 12px; color: var(--brown-mid); margin-top: 2px; }
   .empty-history { text-align: center; padding: 32px 0; color: var(--brown-mid); font-size: 14px; }
+  /* ─── TEAM (manage-team drawer) ─── */
+  .team-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--cream-dark); }
+  .team-item:last-child { border-bottom: none; }
+  .team-av { width: 34px; height: 34px; border-radius: 50%; background: var(--cream-dark); color: var(--brown); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+  .team-meta { flex: 1; min-width: 0; }
+  .team-name { font-size: 14px; font-weight: 600; color: var(--brown); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team-email { font-size: 12px; color: var(--brown-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team-role { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 999px; flex-shrink: 0; }
+  .team-role.admin { background: var(--orange-glow-15); color: var(--peach-link); }
+  .team-role.staff { background: var(--cream); color: var(--brown-mid); }
+  .team-action { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; background: none; border: 1px solid var(--cream-dark); border-radius: 8px; padding: 6px 9px; cursor: pointer; color: var(--brown-mid); white-space: nowrap; transition: border-color 0.15s, color 0.15s; flex-shrink: 0; }
+  .team-action:hover { border-color: var(--orange); color: var(--orange); }
+  .team-you { font-family: var(--font-mono); font-size: 10px; color: var(--brown-mid); flex-shrink: 0; }
+  .team-note { font-size: 12px; color: var(--brown-mid); padding: 4px 0 12px; line-height: 1.5; }
   .topics-list { display: flex; flex-direction: column; gap: 8px; }
   .topic-chip { background: var(--cream); border: 1.5px solid var(--cream-dark); border-left: 3px solid transparent; border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 500; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: all 0.25s var(--ease); }
   .topic-chip:hover { border-color: var(--cream-dark); border-left-color: var(--orange); background: var(--white); transform: translateX(2px); }
@@ -1346,6 +1360,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     </a>
     <div class="header-actions">
       <div class="user-chip"><div class="dot"></div><span id="userLabel">You</span></div>
+      <button class="icon-btn" id="teamBtn" onclick="openTeam()" title="Manage team" style="display:none">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </button>
       <button class="icon-btn" onclick="openHistory()" title="Chat history">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/></svg>
       </button>
@@ -1403,7 +1420,14 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   </div>
 </div>
 
-<!-- ─── SHIFT CHECK DRAWER ─── -->
+<!-- ─── TEAM DRAWER (admin manage-team) ─── -->
+<div class="drawer-overlay" id="teamOverlay" onclick="closeTeam()"></div>
+<div class="drawer" id="teamDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header"><span>Your team</span><button class="drawer-close" onclick="closeTeam()">&times;</button></div>
+  <div class="drawer-body" id="teamBody"><div class="empty-history">Loading&hellip;</div></div>
+</div>
+
 <!-- ─── TICKET MODAL ─── -->
 <div class="modal-overlay" id="ticketOverlay">
   <div class="modal">
@@ -1632,6 +1656,8 @@ async function submitGate() {
 function showApp() {
   document.getElementById('gate').classList.add('hidden');
   document.getElementById('userLabel').textContent = user.name.split(' ')[0];
+  const teamBtn = document.getElementById('teamBtn');
+  if (teamBtn) teamBtn.style.display = (user && user.role === 'admin') ? 'flex' : 'none';
   personaliseWelcome();
   loadHistory();
 }
@@ -1973,6 +1999,7 @@ document.addEventListener('click', function(e) {
   const msg = btn.dataset.msg ? btn.dataset.msg.replace(/&quot;/g, '"') : null;
   if (action === 'scAnswer') scAnswer(btn.dataset.val);
   if (action === 'predictSend' || action === 'quickSend') { hideWelcome(); quickSend(msg); }
+  if (action === 'setRole') setMemberRole(btn.dataset.email, btn.dataset.role);
 });
 
 function renderScSummary() {
@@ -2283,6 +2310,55 @@ function openHistory() { loadHistory(); document.getElementById('histOverlay').c
 function closeHistory() { document.getElementById('histOverlay').classList.remove('open'); document.getElementById('histDrawer').classList.remove('open'); }
 function openTopics() { document.getElementById('topicOverlay').classList.add('open'); document.getElementById('topicDrawer').classList.add('open'); }
 function closeTopics() { document.getElementById('topicOverlay').classList.remove('open'); document.getElementById('topicDrawer').classList.remove('open'); }
+
+// ─── TEAM (admin manage-team) ─────────────────────────────────────────────
+function teamEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function openTeam() { loadTeam(); document.getElementById('teamOverlay').classList.add('open'); document.getElementById('teamDrawer').classList.add('open'); }
+function closeTeam() { document.getElementById('teamOverlay').classList.remove('open'); document.getElementById('teamDrawer').classList.remove('open'); }
+async function loadTeam() {
+  const body = document.getElementById('teamBody');
+  if (!body) return;
+  if (!user || !user.venue_id) { body.innerHTML = '<div class="empty-history">No team to manage yet.</div>'; return; }
+  body.innerHTML = '<div class="empty-history">Loading&hellip;</div>';
+  try {
+    const r = await fetch(SERVER_URL + '/team-list', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id }) });
+    const data = await r.json();
+    const members = (data && data.members) || [];
+    if (!members.length) { body.innerHTML = '<div class="empty-history">No team members yet.</div>'; return; }
+    const isAdmin = user.role === 'admin';
+    const note = isAdmin
+      ? '<div class="team-note">Admins can add knowledge and manage the team. Promote a teammate to admin below.</div>'
+      : '<div class="team-note">Only admins can manage the team or add knowledge.</div>';
+    const rows = members.map(function(m) {
+      const me = (m.email || '').toLowerCase() === (user.email || '').toLowerCase();
+      const initial = ((m.name || m.email || '?').trim()[0] || '?').toUpperCase();
+      const roleLabel = m.role === 'admin' ? 'ADMIN' : 'STAFF';
+      let action = '';
+      if (me) {
+        action = '<span class="team-you">You</span>';
+      } else if (isAdmin) {
+        action = m.role === 'admin'
+          ? '<button class="team-action" data-action="setRole" data-email="' + teamEsc(m.email) + '" data-role="staff">Make staff</button>'
+          : '<button class="team-action" data-action="setRole" data-email="' + teamEsc(m.email) + '" data-role="admin">Make admin</button>';
+      }
+      return '<div class="team-item"><div class="team-av">' + teamEsc(initial) + '</div>' +
+        '<div class="team-meta"><div class="team-name">' + teamEsc(m.name || '\\u2014') + '</div>' +
+        '<div class="team-email">' + teamEsc(m.email || '') + '</div></div>' +
+        '<span class="team-role ' + (m.role === 'admin' ? 'admin' : 'staff') + '">' + roleLabel + '</span>' + action + '</div>';
+    }).join('');
+    body.innerHTML = note + rows;
+  } catch(e) { body.innerHTML = '<div class="empty-history">Couldn\\'t load team.</div>'; }
+}
+async function setMemberRole(email, role) {
+  if (!user || !user.venue_id) return;
+  try {
+    const r = await fetch(SERVER_URL + '/set-role', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, target_email: email, role: role, actor_email: user.email }) });
+    const data = await r.json();
+    if (!data || !data.ok) { showToast((data && data.error) || 'Could not update role'); return; }
+    showToast('Role updated', 'green');
+    loadTeam();
+  } catch(e) { showToast('Could not update role'); }
+}
 function openTicket() { document.getElementById('ticketNote').value = ''; document.getElementById('ticketOverlay').classList.add('open'); }
 function closeTicket() { document.getElementById('ticketOverlay').classList.remove('open'); }
 
@@ -5067,6 +5143,56 @@ const server = http.createServer(async (req, res) => {
       } catch(e) {
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ok:false,error:e.message}));
+      }
+    }); return;
+  }
+
+  // ─── TEAM: list members of a venue (manage-team) ──────────────────────────
+  if (method === 'POST' && url === '/team-list') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id } = JSON.parse(body);
+        const r = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id || '') + '&select=name,email,role,created_at&order=created_at.asc&limit=200');
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true, members: Array.isArray(r.data) ? r.data : [] }));
+      } catch(e) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message, members:[] }));
+      }
+    }); return;
+  }
+
+  // ─── TEAM: change a member's role (admin only; protect the last admin) ────
+  if (method === 'POST' && url === '/set-role') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id, target_email, role, actor_email } = JSON.parse(body);
+        if (!venue_id || !target_email || (role !== 'admin' && role !== 'staff')) {
+          res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'bad request'})); return;
+        }
+        const r = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const members = Array.isArray(r.data) ? r.data : [];
+        const actor = members.find(m => (m.email || '').toLowerCase() === (actor_email || '').toLowerCase());
+        if (!actor || actor.role !== 'admin') {
+          res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'admins only'})); return;
+        }
+        const admins = members.filter(m => m.role === 'admin');
+        const target = members.find(m => (m.email || '').toLowerCase() === (target_email || '').toLowerCase());
+        if (role === 'staff' && target && target.role === 'admin' && admins.length <= 1) {
+          res.writeHead(409, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:"Can't remove the last admin"})); return;
+        }
+        await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&email=eq.' + encodeURIComponent(target_email), {
+          method: 'PATCH', headers: { 'Prefer':'return=minimal' }, body: { role }
+        });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true, role }));
+      } catch(e) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
       }
     }); return;
   }
