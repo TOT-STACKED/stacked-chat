@@ -831,10 +831,10 @@ async function getAnalytics() {
 // Default branding = Stacked. White-label = venue's own logo/colour/botname.
 function buildChatPage(b = {}) {
   const logoUrl = b.logo_url || 'https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg';
-  const primaryColor = b.primary_color || '#E87830';
+  const primaryColor = b.primary_color || '#e64e1a';
   const botName = b.bot_name || 'Stacked Chat';
   const welcomeMsg = b.welcome_message || 'AI support for hospitality tech — enter your details to get started.';
-  const welcomeHeading = b.welcome_heading || 'What can we fix<br>for you today?';
+  const welcomeHeading = b.welcome_heading || 'Your knowledge,<br><span class="accent">on tap.</span>';
   const poweredBy = b.white_label ? '' : '<a href="https://stackedchat.io" target="_blank" rel="noopener" style="display:block;text-align:center;padding:8px;font-size:11px;color:#A8A49C;text-decoration:none;font-family:Inter,sans-serif;">Powered by <strong style="color:#E8573C">Stacked Chat</strong></a>';
   const presetVenueId = b.venue_id || '';
   const presetVenueName = (b.venue_name || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
@@ -861,7 +861,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <title>{{BOT_NAME}}</title>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Righteous&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -873,26 +873,52 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     --cream: #EDEBE5; --cream-dark: #D6D2C8;
     --orange: {{PRIMARY_COLOR}}; --orange-light: {{PRIMARY_COLOR}}cc;
     --brown: #1A1A1A; --brown-mid: #6B6867;
-    --white: #ffffff; --green: #2a9d5c; --red: #d64545;
+    /* Answer/"solution" bubble — soft pinky-orange peach (deck chat style) */
+    --peach: #F8DBCC; --peach-border: #F0C7B4; --peach-link: #B8480F;
+    --white: #ffffff; --green: #2A9D5C; --red: #D64545;
     --purple: #9B8AC2; --purple-light: #B3A6D6;
     --green-brand: #B7D46A; --green-brand-light: #D1E58F;
-    --shadow: 0 2px 16px rgba(0,0,0,0.08);
-    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+
+    /* Accent glow — single source, derived from the live brand orange
+       (#E87830 → 230,78,26). Replaces the legacy 230,84,58 / 232,87,60
+       glows that no longer matched the button colour. */
+    --orange-glow-08: rgba(230,78,26,0.08);
+    --orange-glow-15: rgba(230,78,26,0.15);
+    --orange-glow-25: rgba(230,78,26,0.25);
+    --orange-ring:    rgba(230,78,26,0.14);
+
+    /* Elevation scale */
+    --shadow:    0 1px 2px rgba(26,21,16,0.04), 0 2px 12px rgba(26,21,16,0.06);
+    --shadow-lg: 0 4px 6px rgba(26,21,16,0.04), 0 16px 40px rgba(26,21,16,0.10);
+    --e1: 0 1px 2px rgba(26,21,16,0.05);
+    --e2: 0 2px 10px rgba(26,21,16,0.07);
+    --e3: 0 8px 28px rgba(26,21,16,0.12);
+
+    /* Radius scale */
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 999px;
+
+    /* Motion */
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --t-fast: 0.12s; --t-mid: 0.2s; --t-slow: 0.32s;
+
+    /* Brand primary-button offset shadow (carried from the /app system) */
+    --btn-offset:        0 4px 0 0 var(--stacked-orange-700);
+    --btn-offset-hover:  0 5px 0 0 var(--stacked-orange-700);
+    --btn-offset-active: 0 2px 0 0 var(--stacked-orange-700);
 
     /* Stacked design-system tokens — available for opt-in use but not
        applied as defaults on the chat widget. See colors_and_type.css. */
     --ink-900: #0A0A0A; --ink-800: #131313; --ink-700: #1D1D1D;
     --fg: #F4EFE6; --fg-muted: #928A7C; --fg-dim: #555048;
     --border: #262421;
-    --stacked-orange-500: #E87830; --stacked-orange-700: #A34F15;
+    --stacked-orange-500: #e64e1a; --stacked-orange-700: #B7351F;
     --stacked-green-500:  #3BD36F; --stacked-green-700:  #1E8A44;
     --stacked-amber-500:  #F5A524;
     --stacked-red-500:    #E5484D;
     --stacked-purple-500: #C7B3F2; --stacked-purple-700: #1D1340;
-    --font-sans:    'Geist', ui-sans-serif, system-ui, sans-serif;
-    --font-display: 'Fraunces', 'Fraunces Placeholder', ui-serif, Georgia, serif;
-    --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', monospace;
+    --font-sans:    'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Chunko Bold', 'Archivo Black', 'DM Sans', sans-serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
   }
   ::selection { background: var(--orange); color: #fff; }
   html { height: 100%; height: 100dvh; overflow-x: hidden; overflow-y: hidden; }
@@ -906,12 +932,22 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   #gate {
     position: fixed; inset: 0;
     background: #EDEBE5;
-    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(232,120,48,0.07) 0%, transparent 70%),
-                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(232,120,48,0.04) 0%, transparent 60%);
+    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(230,78,26,0.07) 0%, transparent 70%),
+                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(230,78,26,0.04) 0%, transparent 60%);
     display: flex; align-items: center; justify-content: center;
     z-index: 100; padding: 16px; overflow-y: auto;
   }
   #gate.hidden { display: none; }
+  /* Full-bleed hero photo + cream scrim (shown only when GATE_BG_URL is set;
+     otherwise the cream radial-gradient above is the graceful fallback). */
+  .gate-bg, .gate-scrim { position: absolute; inset: 0; pointer-events: none; }
+  .gate-bg { z-index: 0; background: var(--gate-bg) center/cover no-repeat; filter: saturate(0.9); }
+  .gate-scrim { z-index: 1; background:
+      linear-gradient(180deg, rgba(237,235,229,0.82) 0%, rgba(237,235,229,0.74) 42%, rgba(237,235,229,0.90) 100%),
+      radial-gradient(ellipse 60% 45% at 50% 8%, rgba(230,78,26,0.10) 0%, transparent 70%); }
+  #gate:not(.has-bg) .gate-bg, #gate:not(.has-bg) .gate-scrim { display: none; }
+  #gate .gate-card { position: relative; z-index: 2; }
+  #gate.has-bg .gate-card { box-shadow: 0 8px 10px rgba(26,21,16,0.10), 0 24px 60px rgba(26,21,16,0.22); }
   .gate-card {
     background: #ffffff;
     border: 1px solid #E0DDD5;
@@ -947,7 +983,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     margin-bottom: 10px; outline: none;
     transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(232,120,48,0.12); }
+  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.12); }
   .gate-input::placeholder { color: #A8A49C; }
   /* Gate CTA upgraded to the 4px offset-shadow button from /app (kept from rebrand) */
   .gate-btn {
@@ -956,12 +992,12 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     color: #fff; border: none; border-radius: 10px;
     font-family: var(--font-sans); font-size: 15px; font-weight: 700;
     cursor: pointer; margin-top: 6px;
-    transition: transform 0.1s, box-shadow 0.15s;
+    transition: transform var(--t-fast), box-shadow var(--t-fast);
     letter-spacing: -0.2px;
-    box-shadow: 0 4px 0 0 var(--stacked-orange-700);
+    box-shadow: var(--btn-offset);
   }
-  .gate-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 0 0 var(--stacked-orange-700); }
-  .gate-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
+  .gate-btn:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
+  .gate-btn:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
   .gate-error { font-size: 13px; color: #ff6b6b; margin-top: -4px; margin-bottom: 8px; display: none; font-family: var(--font-sans); }
 
   /* ─── VENUE AUTOCOMPLETE ─── */
@@ -1009,67 +1045,69 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   main { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px 16px 8px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; width: 100%; }
   .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 28px 20px 20px; gap: 0; text-align: center; position: relative; }
-  .welcome::before { content: ''; position: absolute; top: 25%; left: 50%; transform: translate(-50%,-50%); width: 260px; height: 260px; background: radial-gradient(circle, rgba(230,84,58,0.06) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
+  .welcome::before { content: ''; position: absolute; top: 25%; left: 50%; transform: translate(-50%,-50%); width: 260px; height: 260px; background: radial-gradient(circle, rgba(230,78,26,0.06) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
   .welcome-wordmark { height: 36px; margin-bottom: 16px; max-width: 200px; object-fit: contain; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.1s forwards; }
-  .welcome h2 { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -0.4px; color: var(--brown); margin-bottom: 6px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
-  .welcome p { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
-  /* ─── ROTATING CARDS CAROUSEL (Tinder-style portrait) ─── */
-  .carousel-wrap { width: 100%; max-width: 300px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 16px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
-  .carousel-track { position: relative; height: 320px; overflow: hidden; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
-  .carousel-card { position: absolute; inset: 0; border-radius: 24px; padding: 32px 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; opacity: 0; transform: translateX(50px) rotate(3deg); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); pointer-events: none; }
-  .carousel-card.active { opacity: 1; transform: translateX(0) rotate(0deg); pointer-events: auto; }
-  .carousel-card.exit { opacity: 0; transform: translateX(-50px) rotate(-3deg); pointer-events: none; }
-  .carousel-card.orange { background: linear-gradient(160deg, #F07A63 0%, var(--orange) 100%); color: #fff; }
-  .carousel-card.purple { background: linear-gradient(160deg, #B3A6D6 0%, var(--purple) 100%); color: #1E1E1E; }
-  .carousel-card.green { background: linear-gradient(160deg, #D1E58F 0%, var(--green-brand) 100%); color: #1E1E1E; }
-  .carousel-card .cc-emoji { font-size: 48px; margin-bottom: 20px; }
-  .carousel-card .cc-label { font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 700; line-height: 1.25; letter-spacing: -0.3px; }
-  .carousel-card .cc-sub { font-size: 14px; opacity: 0.7; font-weight: 500; margin-top: 8px; line-height: 1.5; max-width: 220px; }
-  .carousel-card .cc-tap { font-size: 12px; font-weight: 600; opacity: 0.5; margin-top: 24px; letter-spacing: 0.04em; }
-  .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
-  .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-dark); border: none; padding: 0; cursor: pointer; transition: all 0.3s var(--ease); }
-  .carousel-dot.active { width: 20px; border-radius: 3px; }
-  .carousel-dot.orange.active { background: var(--orange); }
-  .carousel-dot.purple.active { background: var(--purple); }
-  .carousel-dot.green.active { background: var(--green-brand); }
+  .welcome h2 { font-family: var(--font-display); font-size: clamp(34px, 9vw, 52px); font-weight: 400; line-height: 1.02; letter-spacing: -0.02em; color: var(--brown); margin-bottom: 10px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
+  .welcome h2 .accent { color: var(--orange); }
+  .welcome p { font-family: var(--font-sans); font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
+  /* ─── ASK ROTATOR (kinetic one-liner) ─── */
+  .ask-rotator {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; max-width: 340px; margin: 4px auto 18px;
+    padding: 15px 20px; text-align: left;
+    background: var(--white); border: 1px solid var(--cream-dark);
+    border-radius: var(--r-lg); box-shadow: var(--shadow);
+    cursor: pointer; position: relative; z-index: 1;
+    transition: border-color var(--t-mid), box-shadow var(--t-mid), transform var(--t-fast);
+    opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards;
+  }
+  .ask-rotator:hover { border-color: var(--orange); box-shadow: var(--e2); transform: translateY(-1px); }
+  .ask-rotator:active { transform: translateY(0); }
+  .ask-rotator .ar-caret { color: var(--orange); font-weight: 700; font-size: 18px; line-height: 1; flex-shrink: 0; }
+  .ask-rotator .ar-text {
+    font-family: var(--font-sans); font-size: 15px; font-weight: 500;
+    color: var(--brown); line-height: 1.4; flex: 1; min-width: 0;
+    transition: opacity 0.34s var(--ease), transform 0.34s var(--ease);
+  }
+  .ask-rotator.swapping .ar-text { opacity: 0; transform: translateY(4px); }
 
   /* Keep quick-grid as fallback / below carousel */
   .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-bottom: 12px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.6s forwards; }
-  .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: all 0.3s var(--ease); line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
-  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(230,84,58,0.12); transform: translateY(-2px); }
+  .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: all 0.3s var(--ease); line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
+  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(230,78,26,0.12); transform: translateY(-2px); }
   .quick-btn:active { transform: translateY(0); }
   .quick-btn .emoji { font-size: 20px; }
   .msg { display: flex; align-items: flex-start; gap: 10px; max-width: 100%; animation: msgIn 0.4s var(--ease); }
   .msg.user { flex-direction: row-reverse; }
   .msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: var(--cream-dark); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--brown); overflow: hidden; }
   .msg-avatar img { width: 100%; height: 100%; object-fit: contain; }
-  .msg-bubble { background: var(--white); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-size: 15px; line-height: 1.55; max-width: min(calc(100vw - 90px), 520px); box-shadow: var(--shadow); white-space: pre-wrap; word-wrap: break-word; }
-  .msg-bubble a { color: var(--orange); font-weight: 600; text-decoration: underline; }
+  .msg-bubble { background: var(--peach); color: var(--brown); border: 1px solid var(--peach-border); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-size: 15px; line-height: 1.55; max-width: min(calc(100vw - 90px), 520px); box-shadow: var(--e1); white-space: pre-wrap; word-wrap: break-word; }
+  .msg-bubble a { color: var(--peach-link); font-weight: 600; text-decoration: underline; }
   .msg-bubble strong { font-weight: 700; }
-  .msg.user .msg-bubble { background: var(--orange); color: #fff; border-radius: 18px 18px 4px 18px; box-shadow: 0 2px 12px rgba(232,87,60,0.20); }
+  .msg.user .msg-bubble { background: var(--brown); color: #fff; border: none; border-radius: 18px 18px 4px 18px; box-shadow: var(--e2); }
   .ticket-row { display: flex; justify-content: center; margin-top: -4px; }
-  .ticket-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 16px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--brown-mid); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.3s var(--ease); }
-  .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,84,58,0.1); }
+  .ticket-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 16px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--brown-mid); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.3s var(--ease); }
+  .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,78,26,0.1); }
   .link-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; padding-left: 42px; }
-  .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: all 0.15s; white-space: nowrap; box-shadow: 0 2px 8px rgba(232,87,60,0.20); }
+  .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: var(--r-pill); padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: transform var(--t-fast), box-shadow var(--t-mid); white-space: nowrap; box-shadow: 0 2px 8px var(--orange-glow-25); }
   .link-pill:hover { background: #C94A30; transform: translateY(-1px); }
   .typing-bubble { display: flex; align-items: flex-start; gap: 10px; }
-  .dots { display: flex; gap: 4px; align-items: center; background: var(--white); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow); }
+  .dots { display: flex; gap: 4px; align-items: center; background: var(--peach); border: 1px solid var(--peach-border); border-radius: 18px 18px 18px 4px; padding: 12px 16px; box-shadow: var(--e1); }
   .dot-anim { width: 8px; height: 8px; border-radius: 50%; animation: dotBounce 1.4s ease-in-out infinite; }
   .dot-anim:nth-child(1) { background: var(--orange); animation-delay: 0s; }
   .dot-anim:nth-child(2) { background: var(--purple); animation-delay: 0.15s; }
   .dot-anim:nth-child(3) { background: var(--green-brand); animation-delay: 0.3s; }
   .input-bar { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: var(--white); border-top: 1px solid var(--cream-dark); flex-shrink: 0; display: flex; gap: 8px; align-items: flex-end; min-width: 0; }
-  #input { flex: 1; min-width: 0; padding: 11px 14px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 20px; font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--brown); resize: none; outline: none; max-height: 120px; line-height: 1.4; transition: border-color 0.2s; }
-  #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,84,58,0.1); }
+  #input { flex: 1; min-width: 0; padding: 11px 14px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 20px; font-family: var(--font-sans); font-size: 15px; color: var(--brown); resize: none; outline: none; max-height: 120px; line-height: 1.4; transition: border-color 0.2s; }
+  #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
   #input::placeholder { color: var(--brown-mid); opacity: 0.6; }
   #mic { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); }
   #mic:hover { border-color: var(--orange); color: var(--orange); }
   #mic.listening { background: var(--orange); border-color: var(--orange); color: #fff; animation: pulse 1s infinite; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,87,60,0.4); } 50% { box-shadow: 0 0 0 8px rgba(232,87,60,0); } }
-  #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(230,84,58,0.30); }
-  #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(230,84,58,0.4); }
-  #send:active { transform: scale(0.93); box-shadow: 0 1px 6px rgba(230,84,58,0.2); }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(230,78,26,0.4); } 50% { box-shadow: 0 0 0 8px rgba(230,78,26,0); } }
+  #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(230,78,26,0.30); }
+  #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(230,78,26,0.4); }
+  #send:active { transform: scale(0.93); box-shadow: 0 1px 6px rgba(230,78,26,0.2); }
   #send svg { width: 18px; height: 18px; fill: #fff; }
   #send:disabled { opacity: 0.35; cursor: default; transform: none; box-shadow: none; }
   .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); backdrop-filter: blur(2px); }
@@ -1077,13 +1115,13 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .drawer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); border-radius: 24px 24px 0 0; z-index: 51; max-height: 70vh; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
   .drawer.open { transform: translateY(0); }
   .drawer-handle { width: 40px; height: 4px; background: var(--cream-dark); border-radius: 2px; margin: 12px auto 0; }
-  .drawer-header { padding: 16px 20px 12px; font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--cream-dark); display: flex; align-items: center; justify-content: space-between; }
+  .drawer-header { padding: 16px 20px 12px; font-family: var(--font-display); font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--cream-dark); display: flex; align-items: center; justify-content: space-between; }
   .drawer-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--brown-mid); padding: 4px; }
   .drawer-body { overflow-y: auto; padding: 16px 20px; flex: 1; }
   .history-item { padding: 14px 0; border-bottom: 1px solid var(--cream-dark); cursor: pointer; }
   .history-item:last-child { border-bottom: none; }
   .history-item:hover .history-preview { color: var(--orange); }
-  .history-date { font-size: 11px; color: var(--brown-mid); margin-bottom: 4px; }
+  .history-date { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--brown-mid); margin-bottom: 4px; }
   .history-preview { font-size: 14px; font-weight: 500; color: var(--brown); transition: color 0.15s; }
   .history-count { font-size: 12px; color: var(--brown-mid); margin-top: 2px; }
   .empty-history { text-align: center; padding: 32px 0; color: var(--brown-mid); font-size: 14px; }
@@ -1094,14 +1132,15 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .modal-overlay.open { opacity: 1; pointer-events: all; }
   .modal { background: var(--white); border-radius: 24px 24px 0 0; padding: 24px 24px calc(24px + env(safe-area-inset-bottom)); width: 100%; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
   .modal-overlay.open .modal { transform: translateY(0); }
-  .modal h3 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 6px; }
+  .modal h3 { font-family: var(--font-display); font-size: 20px; margin-bottom: 6px; }
   .modal p { font-size: 14px; color: var(--brown-mid); margin-bottom: 20px; }
-  .modal textarea { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 12px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--brown); background: var(--cream); resize: none; height: 100px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
-  .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,84,58,0.1); }
+  .modal textarea { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 12px 14px; font-family: var(--font-sans); font-size: 14px; color: var(--brown); background: var(--cream); resize: none; height: 100px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
+  .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
   .modal-actions { display: flex; gap: 10px; }
-  .modal-cancel { flex: 1; padding: 13px; background: var(--cream); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; color: var(--brown); }
-  .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; color: #fff; transition: background 0.15s; }
-  .modal-submit:hover { background: var(--orange-light); }
+  .modal-cancel { flex: 1; padding: 13px; background: var(--cream); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 15px; font-weight: 500; cursor: pointer; color: var(--brown); }
+  .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 15px; font-weight: 700; cursor: pointer; color: #fff; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
+  .modal-submit:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
+  .modal-submit:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
   .toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--brown); color: #fff; border-radius: 20px; padding: 10px 20px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap; }
   .reminder-banner { display: flex; align-items: center; gap: 12px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 12px 16px; margin: 8px 16px; cursor: pointer; transition: box-shadow 0.15s; }
   .reminder-banner:hover { box-shadow: 0 4px 16px rgba(34,197,94,0.15); }
@@ -1117,13 +1156,13 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .escalation-banner .esc-sub { font-family: var(--font-sans); font-size: 12px; color: #b45309; line-height: 1.4; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.green { background: var(--green); }
-  .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
+  .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: var(--font-sans); font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
   .social-proof .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse-green 2s infinite; }
   @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(42,157,92,0.4); } 50% { box-shadow: 0 0 0 5px rgba(42,157,92,0); } }
   .predict-section { width: 100%; max-width: 380px; margin-top: 4px; }
-  .predict-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.6; margin-bottom: 8px; text-align: left; padding-left: 2px; }
+  .predict-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.7; margin-bottom: 8px; text-align: left; padding-left: 2px; }
   .predict-grid { display: flex; flex-direction: column; gap: 8px; }
-  .predict-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; }
+  .predict-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 10px 14px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; }
   .predict-btn:hover { border-color: var(--orange); box-shadow: 0 2px 12px rgba(0,0,0,0.10); }
   .predict-btn .predict-icon { font-size: 16px; flex-shrink: 0; }
   .predict-tag { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--orange); color: #fff; border-radius: 8px; padding: 2px 7px; flex-shrink: 0; }
@@ -1140,9 +1179,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .logo-strip::after { right: 0; background: linear-gradient(to left, var(--white), transparent); }
   .logo-track { display: flex; align-items: center; gap: 44px; width: max-content; animation: logoScroll 60s linear infinite; }
   .logo-track:hover { animation-play-state: paused; }
-  .logo-text { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brown); opacity: 0.3; white-space: nowrap; flex-shrink: 0; user-select: none; }
+  .logo-text { font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brown); opacity: 0.32; white-space: nowrap; flex-shrink: 0; user-select: none; }
   .logo-dot { width: 4px; height: 4px; background: var(--brown); border-radius: 50%; opacity: 0.15; flex-shrink: 0; }
-  .strip-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.45; white-space: nowrap; flex-shrink: 0; }
+  .strip-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.5; white-space: nowrap; flex-shrink: 0; }
   @keyframes logoScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
   .video-row{display:flex;flex-direction:column;gap:8px;margin-top:-4px;padding-left:42px}
   .chat-video-card{background:var(--white);border:1.5px solid var(--cream-dark);border-radius:16px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s;max-width:320px}
@@ -1159,7 +1198,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .cv-modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--brown-mid);padding:4px;line-height:1}
   .cv-modal-body{background:#000}
   .cv-modal-body iframe,.cv-modal-body video{display:block;width:100%;aspect-ratio:16/9}
-  .video-pill{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;border:none;border-radius:20px;padding:10px 16px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;transition:background 0.15s;box-shadow:0 2px 12px rgba(232,87,60,0.25)}
+  .video-pill{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;border:none;border-radius:20px;padding:10px 16px;font-family:var(--font-sans);font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;transition:transform var(--t-fast),box-shadow var(--t-mid);box-shadow:var(--btn-offset)}
   .video-pill:hover{background:var(--orange-light)}
   .video-pill-row{display:flex;padding-left:42px;margin-top:-4px}
 
@@ -1168,7 +1207,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     display: flex; align-items: center; gap: 6px;
     background: none; border: 1px solid var(--cream-dark);
     border-radius: 20px; padding: 8px 16px;
-    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+    font-family: var(--font-sans); font-size: 12px; font-weight: 600;
     color: var(--brown-mid); cursor: pointer; margin-top: 4px;
     transition: border-color 0.15s, color 0.15s;
   }
@@ -1182,7 +1221,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .sc-options { display: flex; gap: 8px; }
   .sc-opt {
     flex: 1; padding: 10px 8px; border-radius: 10px; border: 2px solid var(--cream-dark);
-    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700;
+    font-family: var(--font-sans); font-size: 12px; font-weight: 700;
     cursor: pointer; text-align: center; transition: all 0.15s; background: var(--white);
   }
   .sc-opt:hover { border-color: var(--orange); }
@@ -1193,28 +1232,40 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .sc-progress-fill { height: 100%; background: var(--orange); border-radius: 2px; transition: width 0.3s ease; }
   .sc-summary { text-align: center; padding: 8px 0 4px; }
   .sc-summary-icon { font-size: 40px; margin-bottom: 8px; }
-  .sc-summary-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .sc-summary-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 6px; }
   .sc-summary-sub { font-size: 14px; color: var(--brown-mid); margin-bottom: 16px; line-height: 1.5; }
   .sc-issues-list { text-align: left; margin-bottom: 16px; }
   .sc-issue-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fee2e2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #991b1b; }
   .sc-issue-item.amber { background: #fef9c3; color: #854d0e; }
-  .sc-fix-btn { width: 100%; padding: 13px; background: var(--orange); color: #fff; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
-  .sc-done-btn { width: 100%; padding: 11px; background: var(--cream); color: var(--brown); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
+  .sc-fix-btn { width: 100%; padding: 13px; background: var(--orange); color: #fff; border: none; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 12px; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
+  .sc-fix-btn:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
+  .sc-fix-btn:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
+  .sc-done-btn { width: 100%; padding: 11px; background: var(--cream); color: var(--brown); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 14px; font-weight: 500; cursor: pointer; }
 
-  /* ─── TIP OF THE DAY ─── */
-  .tip-card {
-    width: 100%; max-width: 380px; background: var(--white);
-    border: 2px solid var(--cream-dark); border-radius: 16px;
-    padding: 14px 16px; cursor: pointer; text-align: left;
-    transition: border-color 0.2s, box-shadow 0.2s; margin-top: 8px;
-    box-shadow: var(--shadow);
+  /* ─── TIP OF THE DAY (editorial footnote) ─── */
+  .tip-note {
+    width: 100%; max-width: 420px; margin: 18px auto 0;
+    text-align: center; cursor: pointer; position: relative; z-index: 1;
+    opacity: 0; animation: staggerIn 0.6s var(--ease) 0.55s forwards;
   }
-  .tip-card:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
-  .tip-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .tip-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); background: rgba(232,87,60,0.10); border-radius: 6px; padding: 2px 7px; }
-  .tip-product { font-size: 11px; color: var(--brown-mid); font-weight: 500; }
-  .tip-text { font-size: 13px; font-weight: 600; color: var(--brown); line-height: 1.45; }
-  .tip-cta { font-size: 12px; color: var(--orange); font-weight: 600; margin-top: 6px; }
+  .tip-eyebrow { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  .tip-rule { flex: 1; height: 1px; background: var(--cream-dark); }
+  .tip-key {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--brown-mid); white-space: nowrap;
+  }
+  .tip-key .tip-product { color: var(--orange); }
+  .tip-text {
+    font-family: var(--font-sans); font-size: 14px; font-weight: 500;
+    color: var(--brown-mid); line-height: 1.55; max-width: 340px; margin: 0 auto;
+  }
+  .tip-cta {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--orange);
+    margin-top: 12px; opacity: 0.65; transition: opacity var(--t-mid);
+  }
+  .tip-note:hover .tip-cta { opacity: 1; }
 
   /* ─── NPS WIDGET ─── */
   .nps-wrap { padding-left: 42px; margin-top: -4px; }
@@ -1225,13 +1276,15 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .nps-label { font-size: 10px; color: var(--brown-mid); font-weight: 500; }
   .nps-row { display: flex; gap: 4px; margin-bottom: 10px; }
   .nps-btn { flex: 1; height: 32px; border-radius: 8px; border: 1.5px solid var(--cream-dark); background: var(--white); font-size: 12px; font-weight: 600; color: var(--brown); cursor: pointer; transition: all 0.15s; padding: 0; min-width: 0; }
-  .nps-btn:hover { border-color: var(--orange); color: var(--orange); background: rgba(232,87,60,0.06); }
+  .nps-btn:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-glow-08); }
   .nps-btn.selected { background: var(--orange); border-color: var(--orange); color: #fff; }
   .nps-comment { display: none; margin-top: 6px; }
   .nps-comment.show { display: flex; gap: 6px; }
-  .nps-input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--brown); outline: none; background: var(--cream); transition: border-color 0.15s; }
+  .nps-input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: var(--font-sans); font-size: 13px; color: var(--brown); outline: none; background: var(--cream); transition: border-color 0.15s; }
   .nps-input:focus { border-color: var(--orange); background: #fff; }
-  .nps-send { padding: 8px 14px; background: var(--orange); border: none; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .nps-send { padding: 8px 14px; background: var(--orange); border: none; border-radius: var(--r-sm); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
+  .nps-send:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
+  .nps-send:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
   .nps-done { font-size: 13px; color: var(--green); font-weight: 600; display: none; align-items: center; gap: 6px; padding-top: 4px; }
   .nps-done.show { display: flex; }
 </style>
@@ -1240,6 +1293,8 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 
 <!-- ─── GATE ─── -->
 <div id="gate">
+  <div class="gate-bg"></div>
+  <div class="gate-scrim"></div>
   <div class="gate-card">
     <img class="gate-logo" id="gateWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
     <h2>Fix it fast.</h2>
@@ -1270,7 +1325,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <header>
     <a href="https://stackedchat.io" style="display:flex;flex-direction:column;align-items:flex-start;text-decoration:none;gap:2px;">
       <img class="header-logo" id="headerIcon" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
-      <span style="font-family:'Righteous',sans-serif;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--orange);padding-left:1px;margin-top:2px;">CHAT</span>
+      <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--orange);padding-left:2px;margin-top:3px;">CHAT</span>
     </a>
     <div class="header-actions">
       <div class="user-chip"><div class="dot"></div><span id="userLabel">You</span></div>
@@ -1283,120 +1338,18 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     </div>
   </header>
 
-  <div class="logo-strip">
-    <div class="logo-track">
-      <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
-      <span class="logo-text">Square</span><span class="logo-dot"></span>
-      <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
-      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
-      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
-      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
-      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
-      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
-      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
-      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
-      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
-      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
-      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
-      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
-      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
-      <span class="logo-text">Collins</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
-      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
-      <span class="logo-text">Airship</span><span class="logo-dot"></span>
-      <span class="logo-text">Stampede</span><span class="logo-dot"></span>
-      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
-      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
-      <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
-      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
-      <span class="logo-text">Mews</span><span class="logo-dot"></span>
-      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
-      <span class="logo-text">Planday</span><span class="logo-dot"></span>
-      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
-      <span class="logo-text">Sona</span><span class="logo-dot"></span>
-      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
-      <span class="logo-text">Nory</span><span class="logo-dot"></span>
-      <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
-      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
-      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
-      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
-      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
-      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
-      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
-      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
-      <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
-      <span class="logo-text">Square</span><span class="logo-dot"></span>
-      <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
-      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
-      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
-      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
-      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
-      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
-      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
-      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
-      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
-      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
-      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
-      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
-      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
-      <span class="logo-text">Collins</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
-      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
-      <span class="logo-text">Airship</span><span class="logo-dot"></span>
-      <span class="logo-text">Stampede</span><span class="logo-dot"></span>
-      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
-      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
-      <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
-      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
-      <span class="logo-text">Mews</span><span class="logo-dot"></span>
-      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
-      <span class="logo-text">Planday</span><span class="logo-dot"></span>
-      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
-      <span class="logo-text">Sona</span><span class="logo-dot"></span>
-      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
-      <span class="logo-text">Nory</span><span class="logo-dot"></span>
-      <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
-      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
-      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
-      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
-      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
-      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
-      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
-      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
-    </div>
-  </div>
 
   <main>
-    <div id="shiftReminder" style="display:none" class="reminder-banner" onclick="dismissReminder()">
-      <div class="rem-icon">☀️</div>
-      <div class="rem-body">
-        <div class="rem-title">Good morning — time for your shift check</div>
-        <div class="rem-sub">Tap to run through your systems before service</div>
-      </div>
-      <div class="rem-cta">Start →</div>
-    </div>
     <div id="messages">
       <div class="welcome" id="welcome">
-        <img class="welcome-wordmark" id="welcomeWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
-        <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Hospitality tech support, powered by AI</span></div>
-        <h2>{{WELCOME_HEADING}}</h2>
-        <div class="carousel-wrap" id="carouselWrap">
-          <div class="carousel-track" id="carouselTrack"></div>
-          <div class="carousel-dots" id="carouselDots"></div>
-        </div>
-        <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none">
-          <div class="tip-header"><span class="tip-badge">Tip of the day</span><span class="tip-product" id="tipProduct"></span></div>
-          <div class="tip-text" id="tipText"></div>
-          <div class="tip-cta">Tap to explore &rarr;</div>
-        </div>
+        <h2 id="welcomeGreeting">Hi there.</h2>
+        <p id="welcomeSub">How can I help you today?</p>
       </div>
     </div>
   </main>
 
   <div class="input-bar">
-    <textarea id="input" placeholder="Describe your tech issue&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <textarea id="input" placeholder="Ask anything about your business&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
     <button id="mic" onclick="toggleMic()" title="Voice input">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8"/></svg>
     </button>
@@ -1434,18 +1387,6 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 </div>
 
 <!-- ─── SHIFT CHECK DRAWER ─── -->
-<div class="drawer-overlay" id="scOverlay" onclick="closeShiftCheck()"></div>
-<div class="drawer" id="scDrawer">
-  <div class="drawer-handle"></div>
-  <div class="drawer-header">
-    <span id="scDrawerTitle">Shift check</span>
-    <button class="drawer-close" onclick="closeShiftCheck()">&times;</button>
-  </div>
-  <div class="drawer-body" id="scBody">
-    <!-- injected by JS -->
-  </div>
-</div>
-
 <!-- ─── TICKET MODAL ─── -->
 <div class="modal-overlay" id="ticketOverlay">
   <div class="modal">
@@ -1475,6 +1416,11 @@ const SUPABASE_URL = 'https://yuzlfocqovwhqdpitvxj.supabase.co';
 // Preset venue — injected server-side when page is served via /chat/:slug
 const PRESET_VENUE_ID = '{{VENUE_ID}}';
 const PRESET_VENUE_NAME = '{{VENUE_NAME}}';
+// ── GATE HERO BACKGROUND ──────────────────────────────────────────────────
+// Paste a hosted image URL here for a full-bleed photo behind the gate
+// (a cream scrim keeps the card readable). Leave '' for the brand-gradient
+// fallback. Use a direct image link (.jpg/.png/.webp), e.g. a raw GitHub URL.
+const GATE_BG_URL = 'https://raw.githubusercontent.com/TOT-STACKED/stacked-chat/main/ChatGPT%20Image%20May%2018%2C%202026%2C%2002_05_23%20PM.png';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
 const ICON_URL = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iODgiIHZpZXdCb3g9IjAgMCA1NiA4OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTU1LjQxNTIgNjIuOTkzNUM1NS40MzM0IDY2LjczMTcgNTQuOTA2MSA3MC4wODA5IDUzLjg0MDcgNzMuMDMzNkM1Mi43NzE2IDc1Ljk5IDUxLjEwOTcgNzguNTI0NiA0OC44NTUyIDgwLjY0MUM0Ni41OTcgODIuNzU3NCA0My43MzUxIDg0LjM3OTIgNDAuMjYyMyA4NS40OTkyQzM2Ljc4OTYgODYuNjE5MiAzMi42NTUgODcuMTkwMiAyNy44NjIyIDg3LjIxMkMyMy4wNjk0IDg3LjIzMDIgMTguOTE2NiA4Ni42OTU2IDE1LjQxMTEgODUuNjA0N0MxMS45MDIgODQuNTEzOCA5LjAyNTYxIDgyLjkxNzQgNi43NzgzMSA4MC44MTkyQzQuNTMxMDEgNzguNzI0NiAyLjg1ODI2IDc2LjIwMDkgMS43NjczNCA3My4yNTU0QzAuNjc2NDIxIDcwLjMxIDAuMTIwMDUxIDY2Ljk2ODEgMC4xMDU1MDYgNjMuMjI5OUw0Ljk4MTQ1ZS0wNSA0OS45ODYxQy0wLjAwNzIyMyA0OC40MDQzIDAuNzgxODc3IDQ3LjYxMTUgMi4zNjAwOCA0Ny42MDQyTDExLjkwNTYgNDcuNTY0MkMxMi41MDkzIDQ4LjE2MDYgMTMuMTcxMSA0OC43MDYxIDEzLjg4MDIgNDkuMjA0M0MxNS44NjkzIDUwLjU5NyAxOC4yOTg0IDUxLjUyNzkgMjEuMTY3NiA1MS45OTdDMjQuMDMzMSA1Mi40NjI1IDI3LjM0MjIgNTIuNDI2MSAzMS4wOTEzIDUxLjg4MDdDMzQuODQ0MSA1MS4zMzUyIDM4LjAxNSA1MC40MzM0IDQwLjYxMTQgNDkuMTcxNUM0MS42ODc4IDQ4LjY0NzkgNDIuNjczMyA0OC4wNjYxIDQzLjU2NzggNDcuNDI5N0w1Mi45MzE2IDQ3LjM4OTdDNTQuNTEzNCA0Ny4zODI0IDU1LjMwNjEgNDguMTY3OSA1NS4zMTM0IDQ5Ljc0OTdMNTUuNDE1MiA2Mi45OTM1WiIgZmlsbD0iI0U2NTQzQSIvPgo8cGF0aCBkPSJNNDMuNTY5NCA0Ny40MzA3QzQyLjY3NDggNDguMDY3IDQxLjY4OTQgNDguNjQ4OSA0MC42MTMgNDkuMTcyNUMzOC4wMTY2IDUwLjQzNDMgMzQuODQ1NyA1MS4zMzYyIDMxLjA5MjkgNTEuODgxNkMyNy4zNDM4IDUyLjQyNzEgMjQuMDM0NiA1Mi40NjM0IDIxLjE2OTIgNTEuOTk4QzE4LjMgNTEuNTI4OSAxNS44NzA5IDUwLjU5OCAxMy44ODE4IDQ5LjIwNTJDMTMuMTcyNyA0OC43MDcgMTIuNTEwOSA0OC4xNjE2IDExLjkwNzIgNDcuNTY1Mkw0My41Njk0IDQ3LjQzMDdaIiBmaWxsPSIjQjczNTFGIi8+CjxwYXRoIGQ9Ik00OS44NjA5IDM3LjkxNjVDNDkuMzUxOCA0MC4zNDU3IDQ4LjMzIDQyLjUxMyA0Ni43OTkxIDQ0LjQyMjFDNDUuOTAwOSA0NS41MzQ4IDQ0LjgyNDUgNDYuNTM4NSA0My41NjYzIDQ3LjQyOTRMMTEuOTA0MSA0Ny41NjM5QzEwLjgwNTkgNDYuNDgzOSA5Ljg3ODYzIDQ1LjI0MDMgOS4xMjIyNiA0My44MzY2QzcuOTQwNDMgNDEuNjQ3NSA3LjEzNjc4IDM5LjA5NDcgNi43MTQ5NiAzNi4xNjc0TDUuMTY5NDkgMjUuODEwOUM0Ljk5MTMgMjQuNTc0NiA1LjUxODU4IDIzLjg2NTUgNi43NTQ5NiAyMy42ODczTDEyLjI2NDEgMjIuODg3M0MxMy4xMjIzIDIzLjUyMzYgMTQuMTAwNSAyNC4wODczIDE1LjE5MTQgMjQuNTc4MkMxNy4yODYgMjUuNTIgMTkuODIwNiAyNi4xNjM3IDIyLjc5ODggMjYuNTEyOEMyNS43NzM0IDI2Ljg1ODIgMjguMzgwNyAyNi44MTQ2IDMwLjYyMDcgMjYuMzgxOUMzMi44NjA3IDI1Ljk0NTUgMzQuNzU4OSAyNS4xNTY0IDM2LjMxODkgMjQuMDE0NkMzNy44NzUzIDIyLjg2OTEgMzkuMDk3MiAyMS40MjE4IDM5Ljk4NDQgMTkuNjY5MUM0MC4xMjYzIDE5LjM4NTQgNDAuMjYwOCAxOS4wOTgxIDQwLjM4MDggMTguOEw0Ni4zMjI3IDE3LjkzODFDNDcuNTU5MSAxNy43NTYzIDQ4LjI2NDUgMTguMjg3MiA0OC40NDY0IDE5LjUyMzZMNDkuOTg4MiAyOS44ODAxQzUwLjQxMzYgMzIuODAzNyA1MC4zNyAzNS40ODM4IDQ5Ljg2MDkgMzcuOTE2NVoiIGZpbGw9IiNFNjU0M0EiLz4KPHBhdGggZD0iTTQwLjM4MTMgMTguODAwOEM0MC4yNjEzIDE5LjA5OSA0MC4xMjY4IDE5LjM4NjIgMzkuOTg1IDE5LjY2OTlDMzkuMDk3NyAyMS40MjI2IDM3Ljg3NTkgMjIuODY5OSAzNi4zMTk1IDI0LjAxNTRDMzQuNzU5NSAyNS4xNTcyIDMyLjg2MTMgMjUuOTQ2MyAzMC42MjEyIDI2LjM4MjdDMjguMzgxMiAyNi44MTU0IDI1Ljc3MzkgMjYuODU5MSAyMi43OTkzIDI2LjUxMzZDMTkuODIxMSAyNi4xNjQ1IDE3LjI4NjUgMjUuNTIwOSAxNS4xOTIgMjQuNTc5QzE0LjEwMSAyNC4wODgxIDEzLjEyMjggMjMuNTI0NSAxMi4yNjQ2IDIyLjg4ODFMNDAuMzgxMyAxOC44MDA4WiIgZmlsbD0iI0I3MzUxRiIvPgo8cGF0aCBkPSJNNDIuNjUwNCA1LjMzMTI4TDQxLjcxOTQgMTMuNTU2OEM0MS40OTA0IDE1LjUwNTkgNDEuMDQ2NyAxNy4yNTUxIDQwLjM4MTIgMTguODAwNUwxMi4yNjQ2IDIyLjg4NzlDMTEuNDc5MSAyMi4zMDYgMTAuNzg4MiAyMS42NjI0IDEwLjE5NTQgMjAuOTYwNkM4Ljk1OTA3IDE5LjQ5MTQgOC4xMTE3OCAxNy44MDA1IDcuNjUzNiAxNS44OTE0QzcuMTk5MDUgMTMuOTc4NyA3LjEwODEzIDExLjg2NTkgNy4zNzcyMyA5LjU0MjI0TDguMzA4MTUgMS4zMTY2OUM4LjQyNDUxIDAuMzM0ODYyIDguOTczNjEgLTAuMDk3ODY5OSA5Ljk1MTggMC4wMTg0OTUxTDQxLjM0ODUgMy42ODc2M0M0Mi4zMzA0IDMuODAwMzYgNDIuNzYzMSA0LjM0OTQ1IDQyLjY1MDQgNS4zMzEyOFoiIGZpbGw9IiNFNjU0M0EiLz4KPC9zdmc+Cg==';
 
@@ -1494,11 +1440,10 @@ let dropdownBlurTimeout = null;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  renderCarousel();
-  renderQuickBtns();
-  loadSocialProof();
-  loadPredictiveFixes();
-  renderTipOfTheDay();
+  if (GATE_BG_URL) {
+    document.documentElement.style.setProperty('--gate-bg', 'url("' + GATE_BG_URL + '")');
+    document.getElementById('gate').classList.add('has-bg');
+  }
 
   // If this is a branded slug page, hide the venue picker and show a locked badge
   if (PRESET_VENUE_ID && PRESET_VENUE_NAME) {
@@ -1517,7 +1462,6 @@ window.addEventListener('DOMContentLoaded', () => {
     user = JSON.parse(saved);
     showApp();
   }
-  checkShiftReminder();
 });
 
 function checkShiftReminder() {
@@ -1707,8 +1651,11 @@ async function loadSocialProof() {
 
 function personaliseWelcome() {
   if (!user) return;
-  const el = document.getElementById('welcomeVenue');
-  if (el) el.textContent = user.venue ? 'Tech support for ' + user.venue + '.' : 'Ask anything about your hospitality tech.';
+  const first = ((user.name || '').trim().split(' ')[0] || 'there').replace(/[<>&]/g, '');
+  const g = document.getElementById('welcomeGreeting');
+  if (g) g.innerHTML = 'Hi <span class="accent">' + first + '</span>.';
+  const s = document.getElementById('welcomeSub');
+  if (s) s.textContent = 'How can I help you today?';
 }
 
 const TIME_ISSUES = {
@@ -1771,88 +1718,48 @@ function renderQuickBtns() {
   ).join('');
 }
 
-// ─── CAROUSEL ─────────────────────────────────────────────────────────────
-const CAROUSEL_CARDS = [
-  { color: 'orange', emoji: '💻', label: 'EPOS crashed mid-service?', sub: 'We\\'ll walk you through a fix in seconds', msg: 'My EPOS has crashed mid-service', tap: 'Tap to get help →' },
-  { color: 'purple', emoji: '💳', label: 'Payment terminal offline?', sub: 'Step-by-step troubleshooting, right now', msg: 'My payment terminal is offline', tap: 'Tap to fix it →' },
-  { color: 'green', emoji: '📶', label: 'WiFi down in your venue?', sub: 'Get your systems back online fast', msg: 'WiFi is down in my venue', tap: 'Tap to diagnose →' },
-  { color: 'orange', emoji: '🖨️', label: 'Kitchen printer not working?', sub: 'Orders not reaching the kitchen? Let\\'s fix it', msg: 'Kitchen printer not receiving orders', tap: 'Tap to troubleshoot →' },
-  { color: 'purple', emoji: '📅', label: 'Reservation system issues?', sub: 'Bookings not syncing? We can help', msg: 'My reservation system is not working', tap: 'Tap to get help →' },
-  { color: 'green', emoji: '🔒', label: 'Staff can\\'t log in?', sub: 'Access issues sorted in minutes', msg: 'Staff cannot log in to the system', tap: 'Tap to fix it →' },
-  { color: 'purple', emoji: '⭐', label: 'Rate your tech stack', sub: 'Share your NPS score to help other operators build theirs', msg: 'I\\'d like to rate my tech vendors', tap: 'Tap to rate →' },
+// ─── ASK ROTATOR (kinetic one-liner) ──────────────────────────────────────
+const ASK_PROMPTS = [
+  'How do I reset the card terminal?',
+  'My EPOS has crashed mid-service',
+  'The kitchen printer isn\\'t receiving orders',
+  'WiFi is down across the venue',
+  'What time does the wine delivery arrive?',
+  'A guest is asking about allergens',
+  'Staff can\\'t log in to the system',
+  'Contactless payments aren\\'t working',
+  'How do I run the end-of-day report?',
+  'The reservation system isn\\'t syncing',
 ];
 
-let _carouselIdx = 0;
-let _carouselTimer = null;
+let _askIdx = 0;
+let _askTimer = null;
 
 function renderCarousel() {
-  const track = document.getElementById('carouselTrack');
-  const dots = document.getElementById('carouselDots');
-  if (!track || !dots) return;
-  // Shuffle and pick 4
-  const cards = [...CAROUSEL_CARDS].sort(() => Math.random() - 0.5).slice(0, 4);
-  track.innerHTML = cards.map((c, i) =>
-    '<div class="carousel-card ' + c.color + (i === 0 ? ' active' : '') + '" data-action="quickSend" data-msg="' + c.msg.replace(/"/g,'&quot;') + '">' +
-    '<div><span class="cc-emoji">' + c.emoji + '</span><div class="cc-label">' + c.label + '</div><div class="cc-sub">' + c.sub + '</div></div>' +
-    '<div class="cc-tap">' + c.tap + '</div></div>'
-  ).join('');
-  dots.innerHTML = cards.map((c, i) =>
-    '<button class="carousel-dot ' + c.color + (i === 0 ? ' active' : '') + '" data-idx="' + i + '"></button>'
-  ).join('');
-  // Dot clicks
-  dots.querySelectorAll('.carousel-dot').forEach(d => {
-    d.addEventListener('click', function() { goToCard(parseInt(this.dataset.idx), cards); });
-  });
-  _carouselIdx = 0;
-  clearInterval(_carouselTimer);
-  _carouselTimer = setInterval(() => {
-    const next = (_carouselIdx + 1) % cards.length;
-    goToCard(next, cards);
-  }, 4000);
-  initCarouselSwipe(cards);
+  const btn = document.getElementById('askRotator');
+  const txt = document.getElementById('askRotatorText');
+  if (!btn || !txt) return;
+  const prompts = [...ASK_PROMPTS].sort(() => Math.random() - 0.5);
+  _askIdx = 0;
+  const paint = () => {
+    const q = prompts[_askIdx % prompts.length];
+    txt.textContent = '\\u201C' + q + '\\u201D';
+    btn.dataset.msg = q;
+  };
+  paint();
+  clearInterval(_askTimer);
+  _askTimer = setInterval(() => {
+    btn.classList.add('swapping');
+    setTimeout(() => {
+      _askIdx = (_askIdx + 1) % prompts.length;
+      paint();
+      btn.classList.remove('swapping');
+    }, 340);
+  }, 3400);
 }
 
-function goToCard(idx, cards) {
-  const track = document.getElementById('carouselTrack');
-  const dots = document.getElementById('carouselDots');
-  if (!track) return;
-  const allCards = track.querySelectorAll('.carousel-card');
-  const allDots = dots ? dots.querySelectorAll('.carousel-dot') : [];
-  allCards.forEach((c, i) => {
-    c.classList.remove('active', 'exit');
-    if (i === _carouselIdx) c.classList.add('exit');
-    if (i === idx) setTimeout(() => c.classList.add('active'), 50);
-  });
-  allDots.forEach((d, i) => { d.classList.toggle('active', i === idx); });
-  _carouselIdx = idx;
-}
-
-// Swipe support
-function initCarouselSwipe(cards) {
-  const track = document.getElementById('carouselTrack');
-  if (!track) return;
-  let startX = 0, startY = 0, swiping = false;
-  track.addEventListener('touchstart', function(e) {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    swiping = true;
-    clearInterval(_carouselTimer);
-  }, { passive: true });
-  track.addEventListener('touchend', function(e) {
-    if (!swiping) return;
-    swiping = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) goToCard((_carouselIdx + 1) % cards.length, cards);
-      else goToCard((_carouselIdx - 1 + cards.length) % cards.length, cards);
-    }
-    _carouselTimer = setInterval(function() { goToCard((_carouselIdx + 1) % cards.length, cards); }, 4000);
-  }, { passive: true });
-}
-
-// Stop carousel when chat starts
-function stopCarousel() { clearInterval(_carouselTimer); }
+// Stop the rotator when chat starts
+function stopCarousel() { clearInterval(_askTimer); }
 
 // ─── TIPS OF THE DAY ──────────────────────────────────────────────────────
 const ALL_TIPS = [
@@ -5264,7 +5171,6 @@ const server = http.createServer(async (req, res) => {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
-      console.log('[chat] request received');
       try {
         const { message, history = [], venue, venue_id, userName } = JSON.parse(body);
 
@@ -5287,8 +5193,33 @@ const server = http.createServer(async (req, res) => {
           : techStackContext;
 
         let docContext = '';
+        // Resolve the asker's workspace (group) so private docs stay isolated.
+        let workspaceId = null;
         try {
-          const docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
+          if (venue_id) {
+            const vR = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
+            if (Array.isArray(vR.data) && vR.data[0]) workspaceId = vR.data[0].workspace_id || null;
+          }
+        } catch(e) { /* venues.workspace_id may not exist yet */ }
+        try {
+          // Scope docs to shared (workspace_id IS NULL) + this workspace's own.
+          // IMPORTANT: there are thousands of shared chunks, so a single capped
+          // query can crowd out a tenant's few private docs. Fetch the
+          // workspace's OWN docs separately (always included) + the shared pool.
+          // Falls back to unscoped if the workspace_id column isn't there yet.
+          let docsR;
+          try {
+            const sharedR = await sbFetch('/rest/v1/documents?workspace_id=is.null&select=filename,content&limit=800');
+            if (!sharedR || (sharedR.status && sharedR.status >= 400) || !Array.isArray(sharedR.data)) throw new Error('scoped unavailable');
+            let merged = sharedR.data;
+            if (workspaceId) {
+              const ownR = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(workspaceId) + '&select=filename,content&limit=400');
+              if (Array.isArray(ownR.data) && ownR.data.length) merged = ownR.data.concat(sharedR.data);
+            }
+            docsR = { data: merged };
+          } catch(scopeErr) {
+            docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
+          }
           if (Array.isArray(docsR.data) && docsR.data.length > 0) {
             const searchText = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
             const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
@@ -5324,6 +5255,7 @@ const server = http.createServer(async (req, res) => {
         // NPS detection: only use USER messages (not bot replies which mention many vendors)
         let vendorContext = '';
         let detectedVendor = null;
+        let npsForced = false;
         try {
           const userMsgsLower = (message + ' ' + (history.slice(-4).filter(m=>m.role==='user').map(m=>m.content).join(' '))).toLowerCase();
           // Also build a broader context including bot replies for knowledge injection (not NPS)
@@ -5359,6 +5291,20 @@ const server = http.createServer(async (req, res) => {
             // Only use bot reply if exactly 1 vendor is strongly referenced (not a list of suggestions)
             if (botVendors.length === 1) detectedVendor = botVendors[0][0];
           }
+          // List-free NPS: if the bot just asked which vendor to rate, the
+          // user's reply IS the vendor — allow ANY vendor, no allow-list.
+          if (!detectedVendor && history.length > 0) {
+            const lastBot = (history.filter(m=>m.role==='assistant').slice(-1)[0]?.content || '').toLowerCase();
+            const askedToRate = /(which|what)[^.?!]{0,50}(vendor|product|tool|system|supplier)[^.?!]{0,50}(rate|rating|review|feedback|nps)/.test(lastBot)
+                              || /(rate|rating|review|feedback|nps)[^.?!]{0,50}(which|what)[^.?!]{0,30}(vendor|product|tool|system|supplier)/.test(lastBot);
+            const v = message.trim()
+              .replace(/^(the |my |it'?s? |rate |i'?(d| would)? ?(like|want)? ?to ?rate ?|let'?s ?rate ?)/i,'')
+              .replace(/[.!?,]+$/,'').trim();
+            if (askedToRate && v && v.length <= 40 && v.split(/\s+/).length <= 5) {
+              detectedVendor = v.toLowerCase();
+              npsForced = true;
+            }
+          }
         } catch(e) {}
 
         // ── Pre-fetch videos so the AI knows they exist ───────────────────
@@ -5389,7 +5335,9 @@ const server = http.createServer(async (req, res) => {
           }
         } catch(e) {}
 
-        const systemPrompt = `You are the Stacked Chat assistant — a friendly, direct AI support bot for hospitality operators in the UK. You specialise in hospitality technology troubleshooting.
+        const systemPrompt = `You are Stacked Chat — a friendly, direct AI assistant for UK hospitality businesses. You answer ANY question about running this business using its own knowledge base: staff handbooks, SOPs, policies, supplier and delivery info, rotas, opening/closing procedures — as well as hospitality technology troubleshooting. Tech support is one of the things you do, not the only thing.
+
+ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents don't cover the question, say so and answer from general best practice — never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
 
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
 
@@ -5401,8 +5349,8 @@ Your personality:
 - Friendly but efficient
 - Use British English when responding in English
 
-PRODUCT DETECTION — this is critical:
-When a user describes a problem but does NOT mention the specific product or brand (e.g. they say "my till is broken" or "payments aren't working" without naming the system), you MUST ask which product they are using before troubleshooting. Ask in a single short friendly question.
+PRODUCT DETECTION (only for TECH / equipment problems — NOT for handbook, HR, policy, supplier, rota or other general questions):
+When a user reports a TECH or equipment fault but does NOT name the specific product or brand (e.g. "my till is broken" or "payments aren't working"), you MUST ask which product they are using before troubleshooting. Ask in a single short friendly question. For non-tech questions, do not ask about products — just answer from the knowledge base.
 
 EXCEPTION: If the venue's tech stack is provided above, skip asking — you already know their system.
 
@@ -5426,7 +5374,7 @@ Once you know the product, respond with:
 NPS / VENDOR RATING REQUESTS:
 When a user says they want to rate their tech vendors, rate a product, give feedback, or provide an NPS score:
 1. Ask them which specific vendor/product they would like to rate. Be friendly and concise, e.g. "Sure! Which vendor would you like to rate? For example Lightspeed, Square, Tevalis, Dojo, OpenTable, Deputy, or any other product you use."
-2. Once they name the vendor, reply with a short confirmation like "Great — rating [vendor name] now." and add [NPS:vendorname] on its own line at the very end of your response (e.g. [NPS:lightspeed] or [NPS:resdiary]). Use the lowercase vendor key. The system will display the NPS rating widget automatically.
+2. Once they name the vendor — ANY vendor or product, even one not in your support list — reply with a short confirmation like "Great — rating [vendor name] now." and ALWAYS add [NPS:vendorname] on its own line at the very end (use the exact name the user gave, lowercased, e.g. [NPS:tenzo]). Never skip this tag. The system displays the rating widget automatically.
 3. Do NOT ask them to rate on a scale yourself — the system handles the rating UI.
 
 Support URLs:
@@ -5618,11 +5566,12 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         finalReply = finalReply.replace(/\[ESCALATE\]/g, '').trim();
 
         // Handle [NPS:vendorname] tag — AI-triggered NPS rating
-        const npsMatch = reply.match(/\[NPS:([a-z0-9 ]+)\]/i);
+        const npsMatch = reply.match(/\[NPS:([^\]]+)\]/i);
         if (npsMatch) {
           detectedVendor = npsMatch[1].toLowerCase().trim();
-          reply = reply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
-          finalReply = finalReply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
+          npsForced = true;
+          reply = reply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
+          finalReply = finalReply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
         }
 
         if (shouldEscalate) {
@@ -5640,7 +5589,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         }
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: !!npsMatch}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: npsForced || !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
@@ -6152,8 +6101,4 @@ async function fetchYouTubeTranscript(videoId) {
   throw new Error('Could not fetch transcript. Try uploading a .txt transcript manually.');
 }
 
-// Boot banner — deliberately greppable. If you don't see this exact line in
-// Railway logs after a deploy, the new build isn't live and any code changes
-// in this file haven't taken effect yet.
-const BUILD_TAG = 'chat-fix-2026-04-22';
-server.listen(PORT, () => console.log(`[boot] Stacked Chat server running on port ${PORT} — build=${BUILD_TAG}`));
+server.listen(PORT, () => console.log(`Stacked Chat server running on port ${PORT}`));
