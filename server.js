@@ -1173,8 +1173,8 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .kb-chunks { font-family: var(--font-mono); font-size: 10px; color: var(--brown-mid); flex-shrink: 0; }
   .kb-del { background: none; border: none; cursor: pointer; color: var(--brown-mid); padding: 4px; flex-shrink: 0; font-size: 16px; line-height: 1; transition: color 0.15s; }
   .kb-del:hover { color: var(--red); }
-  .admin-btn-row { display: flex; gap: 8px; margin-top: 14px; }
-  .admin-cta { flex: 1; padding: 11px; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; border: none; }
+  .admin-btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .admin-cta { flex: 1 1 30%; min-width: 100px; padding: 11px; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; border: none; }
   .admin-cta.primary { background: var(--orange); color: #fff; box-shadow: var(--btn-offset); }
   .admin-cta.ghost { background: var(--cream); color: var(--brown); border: 1px solid var(--cream-dark); }
   .topics-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1410,6 +1410,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 
   <div class="input-bar">
     <input type="file" id="kbFile" accept=".pdf,.doc,.docx,.txt,.csv,.md" style="display:none" onchange="handleKbUpload(this.files)" multiple>
+    <input type="file" id="vidFile" accept="video/*" style="display:none" onchange="handleVideoUpload(this.files)" multiple>
     <button id="kbAdd" onclick="document.getElementById('kbFile').click()" title="Add to knowledge base" style="display:none">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
@@ -2043,6 +2044,7 @@ document.addEventListener('click', function(e) {
   if (action === 'setRole') setMemberRole(btn.dataset.email, btn.dataset.role);
   if (action === 'kbRemove') kbRemove(btn.dataset.file);
   if (action === 'kbAddClick') { closeAdmin(); const f = document.getElementById('kbFile'); if (f) f.click(); }
+  if (action === 'vidAddClick') { closeAdmin(); const vf = document.getElementById('vidFile'); if (vf) vf.click(); }
   if (action === 'openTeamFromAdmin') { closeAdmin(); openTeam(); }
 });
 
@@ -2458,6 +2460,34 @@ async function handleKbUpload(files) {
   }
   const f = document.getElementById('kbFile'); if (f) f.value = '';
 }
+async function handleVideoUpload(files) {
+  if (!files || !files.length) return;
+  if (!user || user.role !== 'admin') { showToast('Only admins can add videos'); return; }
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (!file.type || file.type.indexOf('video') !== 0) { showToast('Not a video: ' + file.name); continue; }
+    if (file.size > 50 * 1024 * 1024) { showToast(file.name + ' is over 50MB \\u2014 too large'); continue; }
+    try {
+      showToast('Uploading ' + file.name + '\\u2026');
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
+      const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'video/mp4', 'x-upsert': 'true' },
+        body: file
+      });
+      if (!up.ok) { showToast('Video storage not set up yet'); continue; }
+      const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+      const r = await fetch(SERVER_URL + '/kb-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: file.name.replace(/\\.[^.]+$/, ''), venue_id: user.venue_id, email: user.email }) });
+      const data = await r.json();
+      if (data && data.ok) {
+        hideWelcome();
+        addMessage('assistant', '\\u2705 Added video **' + file.name + '** to your knowledge base.', false);
+      } else { showToast((data && data.error) || ('Could not add ' + file.name)); }
+    } catch(e) { showToast('Could not upload ' + file.name); }
+  }
+  const vf = document.getElementById('vidFile'); if (vf) vf.value = '';
+}
 
 // ─── ADMIN PANEL (scoped analytics + knowledge, admins only) ──────────────
 function openAdmin() { loadAdmin(); document.getElementById('adminOverlay').classList.add('open'); document.getElementById('adminDrawer').classList.add('open'); }
@@ -2490,7 +2520,7 @@ async function loadAdmin() {
         return '<div class="kb-row"><div class="kb-icon">' + teamEsc(ext) + '</div><div class="kb-name">' + teamEsc(doc.filename) + '</div><span class="kb-chunks">' + (doc.chunks || 0) + '</span><button class="kb-del" data-action="kbRemove" data-file="' + teamEsc(doc.filename) + '" title="Remove">\\u2715</button></div>';
       }).join('');
     }
-    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add knowledge</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
+    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="vidAddClick">+ Add video</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
     bodyEl.innerHTML = '<div class="admin-section-label">Overview</div>' + stats + kb + buttons;
   } catch(e) { bodyEl.innerHTML = '<div class="empty-history">Could not load admin.</div>'; }
 }
@@ -5493,6 +5523,40 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
+  // ─── KB VIDEO (admin registers a video, scoped to their workspace) ────────
+  // File bytes are uploaded client-side to Supabase Storage; this just records
+  // the resulting URL in the videos table tagged with the workspace (tenant).
+  if (method === 'POST' && url === '/kb-video') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { url: videoUrl, title, venue_id, email } = JSON.parse(body);
+        if (!videoUrl || !venue_id || !email) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === String(email).toLowerCase());
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can add videos'})); return; }
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id,slug&limit=1');
+        const v = (Array.isArray(vr.data) && vr.data[0]) ? vr.data[0] : null;
+        let workspaceId = (v && v.workspace_id) ? v.workspace_id : null;
+        if (!workspaceId) {
+          workspaceId = (v && v.slug) ? v.slug : venue_id;
+          await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body:{ workspace_id: workspaceId } });
+        }
+        let type = 'mp4', thumbnail = '', ytId = null;
+        const ytMatch = String(videoUrl).match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+        if (ytMatch) { ytId = ytMatch[1]; type = 'youtube'; thumbnail = 'https://img.youtube.com/vi/' + ytId + '/mqdefault.jpg'; }
+        const record = { url: videoUrl, title: title || 'Untitled video', description: '', type, thumbnail, tenant: workspaceId, yt_id: ytId || null };
+        const r = await sbFetch('/rest/v1/videos', { method:'POST', headers:{'Prefer':'return=minimal'}, body: record });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: r.status < 400, workspace_id: workspaceId }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
   // ─── SAVE CONVERSATION ─────────────────────────────────────────────────
   if (method === 'POST' && url === '/save-conversation') {
     let body = '';
@@ -5715,7 +5779,17 @@ const server = http.createServer(async (req, res) => {
         let videoContext = '';
         let preloadedVideos = [];
         try {
-          const allVidsR = await sbFetch('/rest/v1/videos?select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200');
+          // Scope videos to shared (tenant null/'stacked') + this workspace's own.
+          let allVidsR;
+          try {
+            const vq = workspaceId
+              ? '/rest/v1/videos?or=(tenant.is.null,tenant.eq.stacked,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200'
+              : '/rest/v1/videos?or=(tenant.is.null,tenant.eq.stacked)&select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200';
+            allVidsR = await sbFetch(vq);
+            if (!allVidsR || (allVidsR.status && allVidsR.status >= 400) || !Array.isArray(allVidsR.data)) throw new Error('scoped videos unavailable');
+          } catch(ve) {
+            allVidsR = await sbFetch('/rest/v1/videos?select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200');
+          }
           if (Array.isArray(allVidsR.data) && allVidsR.data.length > 0) {
             preloadedVideos = allVidsR.data;
             // Score against user message only — not history or AI reply — to stay specific
