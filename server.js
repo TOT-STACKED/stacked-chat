@@ -1739,13 +1739,27 @@ async function loadSocialProof() {
   }
 }
 
+const WELCOME_LINES = [
+  'How can I help you today?',
+  'What do you need to know?',
+  'Ask me anything about your business.',
+  'What can I dig up for you?',
+  'Need a hand? Just ask.',
+  'Your knowledge, on tap.',
+  "What's the question?",
+  'Ready when you are.',
+  "Let's get you sorted.",
+  'Handbooks, suppliers, tech \\u2014 fire away.',
+  'What\\'s playing up today?',
+  'Go on, ask me something.'
+];
 function personaliseWelcome() {
   if (!user) return;
   const first = ((user.name || '').trim().split(' ')[0] || 'there').replace(/[<>&]/g, '');
   const g = document.getElementById('welcomeGreeting');
   if (g) g.innerHTML = 'Hi <span class="accent">' + first + '</span>.';
   const s = document.getElementById('welcomeSub');
-  if (s) s.textContent = 'How can I help you today?';
+  if (s) s.textContent = WELCOME_LINES[Math.floor(Math.random() * WELCOME_LINES.length)];
 }
 
 const TIME_ISSUES = {
