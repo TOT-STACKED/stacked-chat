@@ -831,7 +831,7 @@ async function getAnalytics() {
 // Default branding = Stacked. White-label = venue's own logo/colour/botname.
 function buildChatPage(b = {}) {
   const logoUrl = b.logo_url || 'https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg';
-  const primaryColor = b.primary_color || '#E87830';
+  const primaryColor = b.primary_color || '#e64e1a';
   const botName = b.bot_name || 'Stacked Chat';
   const welcomeMsg = b.welcome_message || 'AI support for hospitality tech — enter your details to get started.';
   const welcomeHeading = b.welcome_heading || 'Your knowledge,<br><span class="accent">on tap.</span>';
@@ -873,17 +873,19 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     --cream: #EDEBE5; --cream-dark: #D6D2C8;
     --orange: {{PRIMARY_COLOR}}; --orange-light: {{PRIMARY_COLOR}}cc;
     --brown: #1A1A1A; --brown-mid: #6B6867;
+    /* Answer/"solution" bubble — soft pinky-orange peach (deck chat style) */
+    --peach: #F8DBCC; --peach-border: #F0C7B4; --peach-link: #B8480F;
     --white: #ffffff; --green: #2A9D5C; --red: #D64545;
     --purple: #9B8AC2; --purple-light: #B3A6D6;
     --green-brand: #B7D46A; --green-brand-light: #D1E58F;
 
     /* Accent glow — single source, derived from the live brand orange
-       (#E87830 → 232,120,48). Replaces the legacy 230,84,58 / 232,87,60
+       (#E87830 → 230,78,26). Replaces the legacy 230,84,58 / 232,87,60
        glows that no longer matched the button colour. */
-    --orange-glow-08: rgba(232,120,48,0.08);
-    --orange-glow-15: rgba(232,120,48,0.15);
-    --orange-glow-25: rgba(232,120,48,0.25);
-    --orange-ring:    rgba(232,120,48,0.14);
+    --orange-glow-08: rgba(230,78,26,0.08);
+    --orange-glow-15: rgba(230,78,26,0.15);
+    --orange-glow-25: rgba(230,78,26,0.25);
+    --orange-ring:    rgba(230,78,26,0.14);
 
     /* Elevation scale */
     --shadow:    0 1px 2px rgba(26,21,16,0.04), 0 2px 12px rgba(26,21,16,0.06);
@@ -909,7 +911,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     --ink-900: #0A0A0A; --ink-800: #131313; --ink-700: #1D1D1D;
     --fg: #F4EFE6; --fg-muted: #928A7C; --fg-dim: #555048;
     --border: #262421;
-    --stacked-orange-500: #E87830; --stacked-orange-700: #A34F15;
+    --stacked-orange-500: #e64e1a; --stacked-orange-700: #B7351F;
     --stacked-green-500:  #3BD36F; --stacked-green-700:  #1E8A44;
     --stacked-amber-500:  #F5A524;
     --stacked-red-500:    #E5484D;
@@ -930,8 +932,8 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   #gate {
     position: fixed; inset: 0;
     background: #EDEBE5;
-    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(232,120,48,0.07) 0%, transparent 70%),
-                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(232,120,48,0.04) 0%, transparent 60%);
+    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(230,78,26,0.07) 0%, transparent 70%),
+                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(230,78,26,0.04) 0%, transparent 60%);
     display: flex; align-items: center; justify-content: center;
     z-index: 100; padding: 16px; overflow-y: auto;
   }
@@ -942,7 +944,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .gate-bg { z-index: 0; background: var(--gate-bg) center/cover no-repeat; filter: saturate(0.9); }
   .gate-scrim { z-index: 1; background:
       linear-gradient(180deg, rgba(237,235,229,0.82) 0%, rgba(237,235,229,0.74) 42%, rgba(237,235,229,0.90) 100%),
-      radial-gradient(ellipse 60% 45% at 50% 8%, rgba(232,120,48,0.10) 0%, transparent 70%); }
+      radial-gradient(ellipse 60% 45% at 50% 8%, rgba(230,78,26,0.10) 0%, transparent 70%); }
   #gate:not(.has-bg) .gate-bg, #gate:not(.has-bg) .gate-scrim { display: none; }
   #gate .gate-card { position: relative; z-index: 2; }
   #gate.has-bg .gate-card { box-shadow: 0 8px 10px rgba(26,21,16,0.10), 0 24px 60px rgba(26,21,16,0.22); }
@@ -981,7 +983,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     margin-bottom: 10px; outline: none;
     transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(232,120,48,0.12); }
+  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.12); }
   .gate-input::placeholder { color: #A8A49C; }
   /* Gate CTA upgraded to the 4px offset-shadow button from /app (kept from rebrand) */
   .gate-btn {
@@ -1043,7 +1045,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   main { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px 16px 8px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; width: 100%; }
   .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 28px 20px 20px; gap: 0; text-align: center; position: relative; }
-  .welcome::before { content: ''; position: absolute; top: 25%; left: 50%; transform: translate(-50%,-50%); width: 260px; height: 260px; background: radial-gradient(circle, rgba(232,120,48,0.06) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
+  .welcome::before { content: ''; position: absolute; top: 25%; left: 50%; transform: translate(-50%,-50%); width: 260px; height: 260px; background: radial-gradient(circle, rgba(230,78,26,0.06) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
   .welcome-wordmark { height: 36px; margin-bottom: 16px; max-width: 200px; object-fit: contain; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.1s forwards; }
   .welcome h2 { font-family: var(--font-display); font-size: clamp(34px, 9vw, 52px); font-weight: 400; line-height: 1.02; letter-spacing: -0.02em; color: var(--brown); margin-bottom: 10px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
   .welcome h2 .accent { color: var(--orange); }
@@ -1072,40 +1074,40 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   /* Keep quick-grid as fallback / below carousel */
   .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-bottom: 12px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.6s forwards; }
   .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: all 0.3s var(--ease); line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
-  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(232,120,48,0.12); transform: translateY(-2px); }
+  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(230,78,26,0.12); transform: translateY(-2px); }
   .quick-btn:active { transform: translateY(0); }
   .quick-btn .emoji { font-size: 20px; }
   .msg { display: flex; align-items: flex-start; gap: 10px; max-width: 100%; animation: msgIn 0.4s var(--ease); }
   .msg.user { flex-direction: row-reverse; }
   .msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: var(--cream-dark); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--brown); overflow: hidden; }
   .msg-avatar img { width: 100%; height: 100%; object-fit: contain; }
-  .msg-bubble { background: var(--white); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-size: 15px; line-height: 1.55; max-width: min(calc(100vw - 90px), 520px); box-shadow: var(--shadow); white-space: pre-wrap; word-wrap: break-word; }
-  .msg-bubble a { color: var(--orange); font-weight: 600; text-decoration: underline; }
+  .msg-bubble { background: var(--peach); color: var(--brown); border: 1px solid var(--peach-border); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-size: 15px; line-height: 1.55; max-width: min(calc(100vw - 90px), 520px); box-shadow: var(--e1); white-space: pre-wrap; word-wrap: break-word; }
+  .msg-bubble a { color: var(--peach-link); font-weight: 600; text-decoration: underline; }
   .msg-bubble strong { font-weight: 700; }
-  .msg.user .msg-bubble { background: var(--orange); color: #fff; border-radius: 18px 18px 4px 18px; box-shadow: 0 2px 12px var(--orange-glow-25); }
+  .msg.user .msg-bubble { background: var(--brown); color: #fff; border: none; border-radius: 18px 18px 4px 18px; box-shadow: var(--e2); }
   .ticket-row { display: flex; justify-content: center; margin-top: -4px; }
   .ticket-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 16px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--brown-mid); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.3s var(--ease); }
-  .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(232,120,48,0.1); }
+  .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,78,26,0.1); }
   .link-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; padding-left: 42px; }
   .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: var(--r-pill); padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: transform var(--t-fast), box-shadow var(--t-mid); white-space: nowrap; box-shadow: 0 2px 8px var(--orange-glow-25); }
   .link-pill:hover { background: #C94A30; transform: translateY(-1px); }
   .typing-bubble { display: flex; align-items: flex-start; gap: 10px; }
-  .dots { display: flex; gap: 4px; align-items: center; background: var(--white); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow); }
+  .dots { display: flex; gap: 4px; align-items: center; background: var(--peach); border: 1px solid var(--peach-border); border-radius: 18px 18px 18px 4px; padding: 12px 16px; box-shadow: var(--e1); }
   .dot-anim { width: 8px; height: 8px; border-radius: 50%; animation: dotBounce 1.4s ease-in-out infinite; }
   .dot-anim:nth-child(1) { background: var(--orange); animation-delay: 0s; }
   .dot-anim:nth-child(2) { background: var(--purple); animation-delay: 0.15s; }
   .dot-anim:nth-child(3) { background: var(--green-brand); animation-delay: 0.3s; }
   .input-bar { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: var(--white); border-top: 1px solid var(--cream-dark); flex-shrink: 0; display: flex; gap: 8px; align-items: flex-end; min-width: 0; }
   #input { flex: 1; min-width: 0; padding: 11px 14px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 20px; font-family: var(--font-sans); font-size: 15px; color: var(--brown); resize: none; outline: none; max-height: 120px; line-height: 1.4; transition: border-color 0.2s; }
-  #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(232,120,48,0.1); }
+  #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
   #input::placeholder { color: var(--brown-mid); opacity: 0.6; }
   #mic { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); }
   #mic:hover { border-color: var(--orange); color: var(--orange); }
   #mic.listening { background: var(--orange); border-color: var(--orange); color: #fff; animation: pulse 1s infinite; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,120,48,0.4); } 50% { box-shadow: 0 0 0 8px rgba(232,120,48,0); } }
-  #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(232,120,48,0.30); }
-  #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(232,120,48,0.4); }
-  #send:active { transform: scale(0.93); box-shadow: 0 1px 6px rgba(232,120,48,0.2); }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(230,78,26,0.4); } 50% { box-shadow: 0 0 0 8px rgba(230,78,26,0); } }
+  #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(230,78,26,0.30); }
+  #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(230,78,26,0.4); }
+  #send:active { transform: scale(0.93); box-shadow: 0 1px 6px rgba(230,78,26,0.2); }
   #send svg { width: 18px; height: 18px; fill: #fff; }
   #send:disabled { opacity: 0.35; cursor: default; transform: none; box-shadow: none; }
   .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); backdrop-filter: blur(2px); }
@@ -1133,7 +1135,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .modal h3 { font-family: var(--font-display); font-size: 20px; margin-bottom: 6px; }
   .modal p { font-size: 14px; color: var(--brown-mid); margin-bottom: 20px; }
   .modal textarea { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 12px 14px; font-family: var(--font-sans); font-size: 14px; color: var(--brown); background: var(--cream); resize: none; height: 100px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
-  .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(232,120,48,0.1); }
+  .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
   .modal-actions { display: flex; gap: 10px; }
   .modal-cancel { flex: 1; padding: 13px; background: var(--cream); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 15px; font-weight: 500; cursor: pointer; color: var(--brown); }
   .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 15px; font-weight: 700; cursor: pointer; color: #fff; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
@@ -1336,124 +1338,18 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     </div>
   </header>
 
-  <div class="logo-strip">
-    <div class="logo-track">
-      <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
-      <span class="logo-text">Square</span><span class="logo-dot"></span>
-      <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
-      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
-      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
-      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
-      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
-      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
-      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
-      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
-      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
-      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
-      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
-      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
-      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
-      <span class="logo-text">Collins</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
-      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
-      <span class="logo-text">Airship</span><span class="logo-dot"></span>
-      <span class="logo-text">Stampede</span><span class="logo-dot"></span>
-      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
-      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
-      <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
-      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
-      <span class="logo-text">Mews</span><span class="logo-dot"></span>
-      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
-      <span class="logo-text">Planday</span><span class="logo-dot"></span>
-      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
-      <span class="logo-text">Sona</span><span class="logo-dot"></span>
-      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
-      <span class="logo-text">Nory</span><span class="logo-dot"></span>
-      <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
-      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
-      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
-      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
-      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
-      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
-      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
-      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
-      <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
-      <span class="logo-text">Square</span><span class="logo-dot"></span>
-      <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
-      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
-      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
-      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
-      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
-      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
-      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
-      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
-      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
-      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
-      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
-      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
-      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
-      <span class="logo-text">Collins</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
-      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
-      <span class="logo-text">Airship</span><span class="logo-dot"></span>
-      <span class="logo-text">Stampede</span><span class="logo-dot"></span>
-      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
-      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
-      <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
-      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
-      <span class="logo-text">Mews</span><span class="logo-dot"></span>
-      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
-      <span class="logo-text">Planday</span><span class="logo-dot"></span>
-      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
-      <span class="logo-text">Sona</span><span class="logo-dot"></span>
-      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
-      <span class="logo-text">Nory</span><span class="logo-dot"></span>
-      <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
-      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
-      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
-      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
-      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
-      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
-      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
-      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
-    </div>
-  </div>
 
   <main>
-    <div id="shiftReminder" style="display:none" class="reminder-banner" onclick="dismissReminder()">
-      <div class="rem-icon">☀️</div>
-      <div class="rem-body">
-        <div class="rem-title">Good morning — time for your shift check</div>
-        <div class="rem-sub">Tap to run through your systems before service</div>
-      </div>
-      <div class="rem-cta">Start →</div>
-    </div>
     <div id="messages">
       <div class="welcome" id="welcome">
-        <img class="welcome-wordmark" id="welcomeWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
-        <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Hospitality tech support, powered by AI</span></div>
-        <h2>{{WELCOME_HEADING}}</h2>
-        <button class="ask-rotator" id="askRotator" type="button" data-action="quickSend" data-msg="" aria-label="Ask this question">
-          <span class="ar-caret">&rsaquo;</span>
-          <span class="ar-text" id="askRotatorText"></span>
-        </button>
-        <div class="tip-note" id="tipCard" onclick="fireTip()" style="display:none">
-          <div class="tip-eyebrow">
-            <span class="tip-rule"></span>
-            <span class="tip-key">TIP &middot; <span class="tip-product" id="tipProduct"></span></span>
-            <span class="tip-rule"></span>
-          </div>
-          <div class="tip-text" id="tipText"></div>
-          <div class="tip-cta">explore &rarr;</div>
-        </div>
+        <h2 id="welcomeGreeting">Hi there.</h2>
+        <p id="welcomeSub">How can I help you today?</p>
       </div>
     </div>
   </main>
 
   <div class="input-bar">
-    <textarea id="input" placeholder="Describe your tech issue&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <textarea id="input" placeholder="Ask anything about your business&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
     <button id="mic" onclick="toggleMic()" title="Voice input">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8"/></svg>
     </button>
@@ -1491,18 +1387,6 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 </div>
 
 <!-- ─── SHIFT CHECK DRAWER ─── -->
-<div class="drawer-overlay" id="scOverlay" onclick="closeShiftCheck()"></div>
-<div class="drawer" id="scDrawer">
-  <div class="drawer-handle"></div>
-  <div class="drawer-header">
-    <span id="scDrawerTitle">Shift check</span>
-    <button class="drawer-close" onclick="closeShiftCheck()">&times;</button>
-  </div>
-  <div class="drawer-body" id="scBody">
-    <!-- injected by JS -->
-  </div>
-</div>
-
 <!-- ─── TICKET MODAL ─── -->
 <div class="modal-overlay" id="ticketOverlay">
   <div class="modal">
@@ -1560,11 +1444,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.documentElement.style.setProperty('--gate-bg', 'url("' + GATE_BG_URL + '")');
     document.getElementById('gate').classList.add('has-bg');
   }
-  renderCarousel();
-  renderQuickBtns();
-  loadSocialProof();
-  loadPredictiveFixes();
-  renderTipOfTheDay();
 
   // If this is a branded slug page, hide the venue picker and show a locked badge
   if (PRESET_VENUE_ID && PRESET_VENUE_NAME) {
@@ -1583,7 +1462,6 @@ window.addEventListener('DOMContentLoaded', () => {
     user = JSON.parse(saved);
     showApp();
   }
-  checkShiftReminder();
 });
 
 function checkShiftReminder() {
@@ -1773,8 +1651,11 @@ async function loadSocialProof() {
 
 function personaliseWelcome() {
   if (!user) return;
-  const el = document.getElementById('welcomeVenue');
-  if (el) el.textContent = user.venue ? 'Tech support for ' + user.venue + '.' : 'Ask anything about your hospitality tech.';
+  const first = ((user.name || '').trim().split(' ')[0] || 'there').replace(/[<>&]/g, '');
+  const g = document.getElementById('welcomeGreeting');
+  if (g) g.innerHTML = 'Hi <span class="accent">' + first + '</span>.';
+  const s = document.getElementById('welcomeSub');
+  if (s) s.textContent = 'How can I help you today?';
 }
 
 const TIME_ISSUES = {
@@ -5312,8 +5193,28 @@ const server = http.createServer(async (req, res) => {
           : techStackContext;
 
         let docContext = '';
+        // Resolve the asker's workspace (group) so private docs stay isolated.
+        let workspaceId = null;
         try {
-          const docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
+          if (venue_id) {
+            const vR = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
+            if (Array.isArray(vR.data) && vR.data[0]) workspaceId = vR.data[0].workspace_id || null;
+          }
+        } catch(e) { /* venues.workspace_id may not exist yet */ }
+        try {
+          // Scope docs to shared (workspace_id IS NULL) + this workspace's own.
+          // Falls back to unscoped if the workspace_id column isn't there yet,
+          // so deploying before the SQL migration can't break retrieval.
+          let docsR;
+          try {
+            const scopedQ = workspaceId
+              ? '/rest/v1/documents?or=(workspace_id.is.null,workspace_id.eq.' + encodeURIComponent(workspaceId) + ')&select=filename,content&limit=500'
+              : '/rest/v1/documents?workspace_id=is.null&select=filename,content&limit=500';
+            docsR = await sbFetch(scopedQ);
+            if (!docsR || (docsR.status && docsR.status >= 400) || !Array.isArray(docsR.data)) throw new Error('scoped unavailable');
+          } catch(scopeErr) {
+            docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
+          }
           if (Array.isArray(docsR.data) && docsR.data.length > 0) {
             const searchText = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
             const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
@@ -5429,7 +5330,9 @@ const server = http.createServer(async (req, res) => {
           }
         } catch(e) {}
 
-        const systemPrompt = `You are the Stacked Chat assistant — a friendly, direct AI support bot for hospitality operators in the UK. You specialise in hospitality technology troubleshooting.
+        const systemPrompt = `You are Stacked Chat — a friendly, direct AI assistant for UK hospitality businesses. You answer ANY question about running this business using its own knowledge base: staff handbooks, SOPs, policies, supplier and delivery info, rotas, opening/closing procedures — as well as hospitality technology troubleshooting. Tech support is one of the things you do, not the only thing.
+
+ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents don't cover the question, say so and answer from general best practice — never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
 
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
 
@@ -5441,8 +5344,8 @@ Your personality:
 - Friendly but efficient
 - Use British English when responding in English
 
-PRODUCT DETECTION — this is critical:
-When a user describes a problem but does NOT mention the specific product or brand (e.g. they say "my till is broken" or "payments aren't working" without naming the system), you MUST ask which product they are using before troubleshooting. Ask in a single short friendly question.
+PRODUCT DETECTION (only for TECH / equipment problems — NOT for handbook, HR, policy, supplier, rota or other general questions):
+When a user reports a TECH or equipment fault but does NOT name the specific product or brand (e.g. "my till is broken" or "payments aren't working"), you MUST ask which product they are using before troubleshooting. Ask in a single short friendly question. For non-tech questions, do not ask about products — just answer from the knowledge base.
 
 EXCEPTION: If the venue's tech stack is provided above, skip asking — you already know their system.
 
