@@ -861,6 +861,8 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <title>{{BOT_NAME}}</title>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1116,6 +1118,8 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   #input { flex: 1; min-width: 0; padding: 11px 14px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 20px; font-family: var(--font-sans); font-size: 15px; color: var(--brown); resize: none; outline: none; max-height: 120px; line-height: 1.4; transition: border-color 0.2s; }
   #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
   #input::placeholder { color: var(--brown-mid); opacity: 0.6; }
+  #kbAdd { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); padding: 0; }
+  #kbAdd:hover { border-color: var(--orange); color: var(--orange); }
   #mic { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); }
   #mic:hover { border-color: var(--orange); color: var(--orange); }
   #mic.listening { background: var(--orange); border-color: var(--orange); color: #fff; animation: pulse 1s infinite; }
@@ -1369,6 +1373,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
       <button class="icon-btn" onclick="openTopics()" title="Topics">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
+      <button class="icon-btn" onclick="signOut()" title="Sign out">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
     </div>
   </header>
 
@@ -1383,6 +1390,10 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   </main>
 
   <div class="input-bar">
+    <input type="file" id="kbFile" accept=".pdf,.doc,.docx,.txt,.csv,.md" style="display:none" onchange="handleKbUpload(this.files)" multiple>
+    <button id="kbAdd" onclick="document.getElementById('kbFile').click()" title="Add to knowledge base" style="display:none">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
     <textarea id="input" placeholder="Ask anything about your business&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
     <button id="mic" onclick="toggleMic()" title="Voice input">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8"/></svg>
@@ -1408,14 +1419,14 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="drawer-header"><span>Common topics</span><button class="drawer-close" onclick="closeTopics()">&times;</button></div>
   <div class="drawer-body">
     <div class="topics-list">
-      <button class="topic-chip" onclick="quickSend('EPOS system frozen or crashed'); closeTopics()">&#x1F4BB; EPOS frozen or crashed</button>
-      <button class="topic-chip" onclick="quickSend('Payment terminal offline or not processing'); closeTopics()">&#x1F4B3; Payment terminal issues</button>
-      <button class="topic-chip" onclick="quickSend('WiFi or network connectivity problem'); closeTopics()">&#x1F4F6; WiFi / network down</button>
-      <button class="topic-chip" onclick="quickSend('Kitchen printer not printing or offline'); closeTopics()">&#x1F5A8;&#xFE0F; Kitchen printer offline</button>
-      <button class="topic-chip" onclick="quickSend('Contactless payments not working'); closeTopics()">&#x1F4F1; Contactless not working</button>
-      <button class="topic-chip" onclick="quickSend('EPOS running slowly or lagging'); closeTopics()">&#x1F40C; EPOS slow or lagging</button>
-      <button class="topic-chip" onclick="quickSend('Staff cannot log in to the system'); closeTopics()">&#x1F512; Login / access issues</button>
-      <button class="topic-chip" onclick="quickSend('Card reader not connecting to EPOS'); closeTopics()">&#x1F517; Card reader not connecting</button>
+      <button class="topic-chip" onclick="quickSend('What is our refund and returns policy?'); closeTopics()">&#x1F4D6; Refund &amp; returns policy</button>
+      <button class="topic-chip" onclick="quickSend('When do our supplier deliveries arrive?'); closeTopics()">&#x1F377; Supplier delivery times</button>
+      <button class="topic-chip" onclick="quickSend('What allergens are in our menu items?'); closeTopics()">&#x1F957; Allergens in our menu</button>
+      <button class="topic-chip" onclick="quickSend('What is the opening and closing checklist?'); closeTopics()">&#x1F4CB; Opening &amp; closing checklist</button>
+      <button class="topic-chip" onclick="quickSend('How do I request holiday or time off?'); closeTopics()">&#x1F5D3;&#xFE0F; Request holiday / time off</button>
+      <button class="topic-chip" onclick="quickSend('What is the uniform and dress code?'); closeTopics()">&#x1F455; Uniform &amp; dress code</button>
+      <button class="topic-chip" onclick="quickSend('My payment terminal is offline'); closeTopics()">&#x1F4B3; Payment terminal offline</button>
+      <button class="topic-chip" onclick="quickSend('My EPOS system has frozen or crashed'); closeTopics()">&#x1F4BB; EPOS frozen or crashed</button>
     </div>
   </div>
 </div>
@@ -1656,8 +1667,11 @@ async function submitGate() {
 function showApp() {
   document.getElementById('gate').classList.add('hidden');
   document.getElementById('userLabel').textContent = user.name.split(' ')[0];
+  const isAdmin = user && user.role === 'admin';
   const teamBtn = document.getElementById('teamBtn');
-  if (teamBtn) teamBtn.style.display = (user && user.role === 'admin') ? 'flex' : 'none';
+  if (teamBtn) teamBtn.style.display = isAdmin ? 'flex' : 'none';
+  const kbAdd = document.getElementById('kbAdd');
+  if (kbAdd) kbAdd.style.display = isAdmin ? 'flex' : 'none';
   personaliseWelcome();
   loadHistory();
 }
@@ -2358,6 +2372,61 @@ async function setMemberRole(email, role) {
     showToast('Role updated', 'green');
     loadTeam();
   } catch(e) { showToast('Could not update role'); }
+}
+
+// ─── SIGN OUT ─────────────────────────────────────────────────────────────
+function signOut() {
+  if (!confirm('Sign out of Stacked Chat?')) return;
+  localStorage.removeItem('stacked_user');
+  location.reload();
+}
+
+// ─── ADD KNOWLEDGE ("+", admins only) ─────────────────────────────────────
+async function extractPdf(file) {
+  if (typeof pdfjsLib === 'undefined') throw new Error('PDF reader not loaded');
+  try { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } catch(e) {}
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let out = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    out += tc.items.map(function(it){ return it.str; }).join(' ') + '\\n';
+  }
+  return out;
+}
+async function extractDocx(file) {
+  if (typeof mammoth === 'undefined') throw new Error('Doc reader not loaded');
+  const buf = await file.arrayBuffer();
+  const res = await mammoth.extractRawText({ arrayBuffer: buf });
+  return res.value || '';
+}
+async function handleKbUpload(files) {
+  if (!files || !files.length) return;
+  if (!user || user.role !== 'admin') { showToast('Only admins can add knowledge'); return; }
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const nm = file.name.toLowerCase();
+    try {
+      showToast('Reading ' + file.name + '\\u2026');
+      let text = '';
+      if (nm.endsWith('.pdf')) text = await extractPdf(file);
+      else if (nm.endsWith('.docx') || nm.endsWith('.doc')) text = await extractDocx(file);
+      else text = await file.text();
+      text = (text || '').trim();
+      if (!text || text.length < 10) { showToast('Couldn\\'t read text from ' + file.name); continue; }
+      const r = await fetch(SERVER_URL + '/kb-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: file.name, content: text, venue_id: user.venue_id, email: user.email }) });
+      const data = await r.json();
+      if (data && data.ok) {
+        hideWelcome();
+        addMessage('assistant', '\\u2705 Added **' + file.name + '** to your knowledge base. I can answer questions from it now.', false);
+        messages.push({ role:'assistant', content:'Added ' + file.name + ' to the knowledge base.' });
+      } else {
+        showToast((data && data.error) || ('Could not add ' + file.name));
+      }
+    } catch(e) { showToast('Could not add ' + file.name); }
+  }
+  const f = document.getElementById('kbFile'); if (f) f.value = '';
 }
 function openTicket() { document.getElementById('ticketNote').value = ''; document.getElementById('ticketOverlay').classList.add('open'); }
 function closeTicket() { document.getElementById('ticketOverlay').classList.remove('open'); }
@@ -5245,6 +5314,43 @@ const server = http.createServer(async (req, res) => {
       } catch(e) {
         res.writeHead(500, {'Content-Type':'application/json'});
         res.end(JSON.stringify({error:e.message}));
+      }
+    }); return;
+  }
+
+  // ─── KB UPLOAD (in-chat "+" — admin-only, private to the workspace) ───────
+  if (method === 'POST' && url === '/kb-upload') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { filename, content, venue_id, email } = JSON.parse(body);
+        if (!filename || !content || !venue_id || !email) {
+          res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return;
+        }
+        // Admin guard: only an admin of this venue may add knowledge.
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === String(email).toLowerCase());
+        if (!me || me.role !== 'admin') {
+          res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can add knowledge'})); return;
+        }
+        // Resolve (or create) the venue's workspace so the doc stays private to it.
+        let workspaceId = null;
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id,slug&limit=1');
+        const v = (Array.isArray(vr.data) && vr.data[0]) ? vr.data[0] : null;
+        if (v && v.workspace_id) {
+          workspaceId = v.workspace_id;
+        } else {
+          workspaceId = (v && v.slug) ? v.slug : venue_id;
+          await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body:{ workspace_id: workspaceId } });
+        }
+        const chunks = chunkText(content, filename).map(c => Object.assign(c, { workspace_id: workspaceId }));
+        for (const chunk of chunks) await sbFetch('/rest/v1/documents', { method:'POST', headers:{'Prefer':'return=minimal'}, body: chunk });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true, chunks: chunks.length, workspace_id: workspaceId }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
       }
     }); return;
   }
