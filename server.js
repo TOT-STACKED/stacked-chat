@@ -1126,9 +1126,6 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .msg-bubble a { color: var(--peach-link); font-weight: 600; text-decoration: underline; }
   .msg-bubble strong { font-weight: 700; }
   .msg.user .msg-bubble { background: var(--brown); color: #fff; border: none; border-radius: 18px 18px 4px 18px; box-shadow: var(--e2); }
-  .ticket-row { display: flex; justify-content: center; margin-top: -4px; }
-  .ticket-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 16px; font-family: var(--font-sans); font-size: 13px; font-weight: 500; color: var(--brown-mid); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.3s var(--ease); }
-  .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,78,26,0.1); }
   .link-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; padding-left: 42px; }
   .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: var(--r-pill); padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: transform var(--t-fast), box-shadow var(--t-mid); white-space: nowrap; box-shadow: 0 2px 8px var(--orange-glow-25); }
   .link-pill:hover { background: #C94A30; transform: translateY(-1px); }
@@ -1498,18 +1495,6 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="drawer-body" id="teamBody"><div class="empty-history">Loading&hellip;</div></div>
 </div>
 
-<!-- ─── TICKET MODAL ─── -->
-<div class="modal-overlay" id="ticketOverlay">
-  <div class="modal">
-    <h3>Raise a support ticket</h3>
-    <p>We'll look into this and get back to you. Add any extra detail below.</p>
-    <textarea id="ticketNote" placeholder="Any extra context that might help&hellip;"></textarea>
-    <div class="modal-actions">
-      <button class="modal-cancel" onclick="closeTicket()">Cancel</button>
-      <button class="modal-submit" onclick="submitTicket()">Submit ticket</button>
-    </div>
-  </div>
-</div>
 
 <!-- ─── ADMIN VERIFY MODAL (email code) ─── -->
 <div class="modal-overlay" id="verifyOverlay">
@@ -2365,15 +2350,6 @@ function addMessage(role, content, showTicket, video, supportUrl) {
     a.textContent = '↗ ' + pillLabel;
     lr.appendChild(a); msgs.appendChild(lr);
   }
-  if (role === 'assistant' && showTicket) {
-    const tr = document.createElement('div'); tr.className = 'ticket-row';
-    var tb = document.createElement('button');
-    tb.className = 'ticket-btn';
-    tb.textContent = '🎫 This didn\u2019t solve my issue \u2014 raise a ticket';
-    tb.onclick = openTicket;
-    tr.appendChild(tb);
-    msgs.appendChild(tr);
-  }
   if (role === 'assistant' && video) {
     const pr = document.createElement('div'); pr.className = 'video-pill-row';
     const pb = document.createElement('button'); pb.className = 'video-pill';
@@ -2758,21 +2734,6 @@ async function kbRemove(filename) {
     showToast('Removed', 'green');
     loadAdmin();
   } catch(e) { showToast('Could not remove'); }
-}
-function openTicket() { document.getElementById('ticketNote').value = ''; document.getElementById('ticketOverlay').classList.add('open'); }
-function closeTicket() { document.getElementById('ticketOverlay').classList.remove('open'); }
-
-async function submitTicket() {
-  const note = document.getElementById('ticketNote').value.trim();
-  const issue = messages.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
-  try {
-    await fetch(SERVER_URL + '/save-ticket', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? ' | Extra detail: ' + note : ''), conversation: messages, status: 'open' })
-    });
-    closeTicket();
-    showToast("✓ Ticket raised — we'll be in touch!", "green");
-  } catch(e) { closeTicket(); showToast('Something went wrong, please try again.'); }
 }
 
 function showToast(msg, type = '') {
@@ -4568,7 +4529,6 @@ tbody tr:hover td{background:var(--surface2)}
     <nav class="header-nav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
       <div class="nav-divider"></div>
-      <button class="nav-item" onclick="showTab('tickets')">Tickets <span id="navEscBadge" style="display:none;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:4px;padding:0 5px;font-size:10px;font-weight:700;margin-left:4px"></span></button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('venues')">Venues</button>
       <div class="nav-divider"></div>
@@ -4585,11 +4545,9 @@ tbody tr:hover td{background:var(--surface2)}
 <div class="container">
   <div class="tab-panel active" id="tab-dashboard">
     <div class="page-header"><div><div class="page-title">Overview</div><div class="page-sub">All activity across Stacked Chat</div></div></div>
-    <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
       <div class="kpi"><div class="kpi-label">Conversations</div><div class="kpi-value" id="kpiConvs"><span class="shimmer"></span></div></div>
       <div class="kpi"><div class="kpi-label">Messages sent</div><div class="kpi-value" id="kpiMsgs"><span class="shimmer"></span></div></div>
-      <div class="kpi"><div class="kpi-label">Open tickets</div><div class="kpi-value" id="kpiTickets"><span class="shimmer"></span></div></div>
-      <div class="kpi" id="kpiEscCard"><div class="kpi-label">Escalated</div><div class="kpi-value" id="kpiEsc"><span class="shimmer"></span></div></div>
       <div class="kpi"><div class="kpi-label">Docs indexed</div><div class="kpi-value" id="kpiDocs"><span class="shimmer"></span></div></div>
     </div>
     <div class="grid-2">
@@ -4602,17 +4560,6 @@ tbody tr:hover td{background:var(--surface2)}
       <div class="card"><div class="card-header"><span class="card-title">Issue categories</span></div><div class="chart-wrap"><canvas id="donutChart"></canvas></div></div>
     </div>
     <div class="card"><div class="card-header"><span class="card-title">Recent conversations</span><button class="btn" onclick="showTab('conversations')">View all &rarr;</button></div><div id="recentConvs"><div class="empty">No conversations yet</div></div></div>
-  </div>
-
-  <div class="tab-panel" id="tab-tickets">
-    <div class="page-header"><div><div class="page-title">Support tickets</div><div class="page-sub" id="ticketCount">&mdash;</div></div></div>
-    <div class="filter-bar">
-      <button class="filter-btn active" onclick="filterTickets('all',this)">All</button>
-      <button class="filter-btn" onclick="filterTickets('open',this)">Open</button>
-      <button class="filter-btn red-active" onclick="filterTickets('escalated',this)">&#x26A0; Escalated</button>
-      <button class="filter-btn" onclick="filterTickets('closed',this)">Closed</button>
-    </div>
-    <div class="card"><div id="ticketsTable"><div class="empty">Loading...</div></div></div>
   </div>
 
   <div class="tab-panel" id="tab-conversations">
@@ -4858,7 +4805,7 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','tickets','conversations','venues','content','health'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','conversations','venues','content','health'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
 }
@@ -4938,15 +4885,8 @@ async function loadAnalytics() {
     if (a.error) { notify('Error: '+a.error,'red'); return; }
     document.getElementById('kpiConvs').textContent = (a.totalConvs||0).toLocaleString();
     document.getElementById('kpiMsgs').textContent = (a.totalMessages||0).toLocaleString();
-    document.getElementById('kpiTickets').textContent = (a.openTickets||0).toLocaleString();
     document.getElementById('kpiDocs').textContent = (a.totalDocs||0).toLocaleString();
-    const escCount = a.escalatedTickets || 0;
-    document.getElementById('kpiEsc').textContent = escCount.toLocaleString();
-    document.getElementById('kpiEscCard').classList.toggle('red', escCount > 0);
-    const navBadge = document.getElementById('navEscBadge');
-    if (escCount > 0) { navBadge.textContent = escCount; navBadge.style.display = ''; } else { navBadge.style.display = 'none'; }
     document.getElementById('lastUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    document.getElementById('ticketCount').textContent = a.tickets.length + ' ticket' + (a.tickets.length!==1?'s':'');
     document.getElementById('convCount').textContent = a.totalConvs + ' conversation' + (a.totalConvs!==1?'s':'');
     const ht = document.getElementById('hotTopics');
     if (!a.topTopics||!a.topTopics.length) { ht.innerHTML='<div class="empty">No data yet</div>'; }
@@ -4964,8 +4904,6 @@ async function loadAnalytics() {
     const rc=document.getElementById('recentConvs');const convs=(a.recentConvs||[]).slice(0,6);
     if(!convs.length){rc.innerHTML='<div class="empty">No conversations yet</div>';}
     else{rc.innerHTML=convs.map(c=>{const first=(c.messages||[]).find(m=>m.role==='user');const count=(c.messages||[]).filter(m=>m.role==='user').length;const d=new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'});return '<div class="conv-item"><div class="conv-top"><span class="conv-name">'+esc(c.name||'Unknown')+'</span>'+(c.venue?'<span class="conv-venue">'+esc(c.venue)+'</span>':'')+'<span class="conv-date">'+d+' &middot; '+count+' msg'+(count!==1?'s':'')+'</span></div><div class="conv-preview">'+esc((first?.content||'Chat session').substring(0,100))+'</div></div>';}).join('');}
-    window._allTickets = a.tickets;
-    renderTicketTable(a.tickets);
     const ct=document.getElementById('convsTable');
     if(!a.recentConvs.length){ct.innerHTML='<div class="empty">No conversations yet</div>';}
     else{ct.innerHTML='<div>'+a.recentConvs.map(c=>{const first=(c.messages||[]).find(m=>m.role==='user');const count=(c.messages||[]).filter(m=>m.role==='user').length;const d=new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'});const thread=(c.messages||[]).map(m=>'<div class="thread-msg"><div class="thread-role '+(m.role==='user'?'user':'')+'">'+esc(m.role==='user'?'You':'Bot')+'</div><div class="thread-content">'+esc((m.content||'').substring(0,300))+'</div></div>').join('');return '<div class="conv-item" onclick="toggleConv(this)" title="Click to expand thread"><div class="conv-top"><span class="conv-name">'+esc(c.name||'Unknown')+'</span>'+(c.venue?'<span class="conv-venue">'+esc(c.venue)+'</span>':'')+'<span class="conv-date">'+d+' &middot; '+count+' msg'+(count!==1?'s':'')+'</span></div><div class="conv-preview">'+esc((first?.content||'Chat session').substring(0,100))+'</div><div class="conv-thread">'+thread+'</div></div>';}).join('')+'</div>';}
@@ -5018,32 +4956,6 @@ async function loadAnalytics() {
 
 function toggleConv(el) { el.classList.toggle('open'); }
 function imgErr(el) { el.style.display='none'; }
-function renderTicketTable(tickets) {
-  const tt=document.getElementById('ticketsTable');
-  if(!tickets.length){tt.innerHTML='<div class="empty">No tickets found</div>';return;}
-  tt.innerHTML='<table><thead><tr><th>User</th><th>Venue</th><th>Issue</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>'+
-    tickets.map(t=>{
-      const isEsc=t.escalated;
-      const statusBadge=isEsc?'<span class="badge escalated">&#x26A0; Escalated</span>':'<span class="badge '+(t.status||'open')+'">'+esc(t.status||'open')+'</span>';
-      return '<tr'+(isEsc?' style="background:#fff5f5"':'')+'><td><div class="td-primary">'+esc(t.name||'Unknown')+'</div><div class="td-muted">'+esc(t.email||'')+'</div></td>'+
-        '<td>'+esc(t.venue||'&mdash;')+'</td>'+
-        '<td class="td-truncate">'+esc(t.issue||'&mdash;')+'</td>'+
-        '<td>'+statusBadge+'</td>'+
-        '<td>'+new Date(t.created_at).toLocaleDateString('en-GB')+'</td>'+
-        '<td>'+(t.status==='open'?'<button class="close-btn" onclick="closeTicket('+t.id+')">Close</button>':'')+'</td></tr>';
-    }).join('')+'</tbody></table>';
-}
-function filterTickets(filter, btn) {
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  const all = window._allTickets || [];
-  let filtered = all;
-  if(filter==='open') filtered = all.filter(t=>t.status==='open');
-  else if(filter==='closed') filtered = all.filter(t=>t.status==='closed');
-  else if(filter==='escalated') filtered = all.filter(t=>t.escalated);
-  document.getElementById('ticketCount').textContent = filtered.length + ' ticket' + (filtered.length!==1?'s':'') + (filter!=='all'?' ('+filter+')':'');
-  renderTicketTable(filtered);
-}
 function renderVenues(venues) {
   const el=document.getElementById('venueGrid');
   const vc=document.getElementById('venueCount');
@@ -5051,13 +4963,11 @@ function renderVenues(venues) {
   if(!venues||!venues.length){if(el)el.innerHTML='<div class="empty">No venues yet</div>';return;}
   el.innerHTML=venues.map(v=>{
     const lastD = new Date(v.lastSeen).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-    const escPart = v.escalated ? '<span style="color:var(--red);font-size:11px;font-weight:600;margin-left:4px">&#x26A0; '+v.escalated+' escalated</span>' : '';
     return '<div class="venue-card">'+
-      '<div class="venue-card-name">&#x1F3E2; '+esc(v.venue)+escPart+'</div>'+
+      '<div class="venue-card-name">&#x1F3E2; '+esc(v.venue)+'</div>'+
       '<div class="venue-stats">'+
         '<div class="venue-stat"><div class="venue-stat-num">'+v.convs+'</div><div class="venue-stat-label">Chats</div></div>'+
         '<div class="venue-stat"><div class="venue-stat-num">'+v.msgs+'</div><div class="venue-stat-label">Messages</div></div>'+
-        '<div class="venue-stat"><div class="venue-stat-num">'+(v.tickets||0)+'</div><div class="venue-stat-label">Tickets</div></div>'+
       '</div>'+
       '<div class="venue-last">Last active: '+lastD+'</div>'+
       '</div>';
@@ -5179,7 +5089,6 @@ function renderHealthData(a) {
 function renderDocList(docs){const dl=document.getElementById('docList');if(!docs||!docs.length){dl.innerHTML='<div class="empty">No documents uploaded yet</div>';return;}dl.innerHTML=docs.map(d=>{const fn=esc(d.filename),date=new Date(d.created_at).toLocaleDateString('en-GB'),jfn=JSON.stringify(d.filename);return '<div class="doc-row"><div class="doc-left"><div class="doc-icon">&#x1F4C4;</div><div><div class="doc-name">'+fn+'</div><div class="doc-date">'+date+'</div></div></div><div class="doc-right"><span class="badge-indexed">Indexed</span><button class="btn-del" onclick="deleteDoc('+jfn+',this)">Delete</button></div></div>';}).join('');}
 
 async function deleteDoc(fn,btn){if(!confirm('Delete "'+fn+'"?'))return;btn.disabled=true;btn.textContent='Deleting...';try{const r=await fetch('/documents?filename='+encodeURIComponent(fn),{method:'DELETE'});const d=await r.json();if(d.ok){notify(fn+' deleted','green');btn.closest('.doc-row').remove();setTimeout(loadAnalytics,500);}else{notify('Delete failed','red');btn.disabled=false;btn.textContent='Delete';}}catch(e){notify('Error: '+e.message,'red');btn.disabled=false;}}
-async function closeTicket(id){await fetch('/ticket/'+id+'/close',{method:'POST'});notify('Ticket closed','green');loadAnalytics();}
 function dragOver(e){e.preventDefault();document.getElementById('dropZone').classList.add('dragging');}
 function dragLeave(){document.getElementById('dropZone').classList.remove('dragging');}
 function dropFiles(e){e.preventDefault();document.getElementById('dropZone').classList.remove('dragging');handleFiles(e.dataTransfer.files);}
@@ -6204,7 +6113,6 @@ Support URLs:
   Cisco Meraki: https://documentation.meraki.com
 
 - ALWAYS include the full vendor support URL (starting with https://) when referencing a support page - never just the domain name
-- End with "If this hasn't resolved it, hit 'Raise a ticket' below" if the issue seems complex
 
 KNOWLEDGE BASE:
 ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
