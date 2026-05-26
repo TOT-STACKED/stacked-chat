@@ -886,6 +886,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1200,6 +1201,11 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .admin-cta { flex: 1 1 30%; min-width: 100px; padding: 11px; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; border: none; }
   .admin-cta.primary { background: var(--orange); color: #fff; box-shadow: var(--btn-offset); }
   .admin-cta.ghost { background: var(--cream); color: var(--brown); border: 1px solid var(--cream-dark); }
+  /* ─── DISH / MENU IMAGE CARDS (bot replies) ─── */
+  .dish-img-row { display: flex; padding-left: 42px; margin-top: -4px; }
+  .dish-img-card { max-width: 300px; border: 1px solid var(--cream-dark); border-radius: 16px; overflow: hidden; background: var(--white); box-shadow: var(--shadow); }
+  .dish-img-card img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: cover; background: var(--cream-dark); }
+  .dish-img-cap { padding: 9px 13px; font-size: 13px; font-weight: 600; color: var(--brown); }
   .topics-list { display: flex; flex-direction: column; gap: 8px; }
   .topic-chip { background: var(--cream); border: 1.5px solid var(--cream-dark); border-left: 3px solid transparent; border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 500; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: all 0.25s var(--ease); }
   .topic-chip:hover { border-color: var(--cream-dark); border-left-color: var(--orange); background: var(--white); transform: translateX(2px); }
@@ -1434,7 +1440,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   </main>
 
   <div class="input-bar">
-    <input type="file" id="kbFile" accept=".pdf,.doc,.docx,.txt,.csv,.md" style="display:none" onchange="handleKbUpload(this.files)" multiple>
+    <input type="file" id="kbFile" accept=".pdf,.doc,.docx,.txt,.csv,.md,.png,.jpg,.jpeg,.webp" style="display:none" onchange="handleKbUpload(this.files)" multiple>
     <input type="file" id="vidFile" accept="video/*" style="display:none" onchange="handleVideoUpload(this.files)" multiple>
     <button id="kbAdd" onclick="requireAdminVerify(function(){document.getElementById('kbFile').click();})" title="Add to knowledge base" style="display:none">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1523,6 +1529,21 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
         <button class="modal-cancel" onclick="sendAuthCode()">Resend</button>
         <button class="modal-submit" onclick="verifyAuthCode()">Verify</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── ADD DISH IMAGE MODAL ─── -->
+<div class="modal-overlay" id="imgAddOverlay">
+  <div class="modal">
+    <h3>Add a dish image</h3>
+    <p>Upload a photo and name it, so the team can ask the bot to show it.</p>
+    <input class="gate-input" id="imgTitle" type="text" placeholder="Name (e.g. Margherita Pizza)">
+    <input class="gate-input" id="imgDesc" type="text" placeholder="Short description (optional)">
+    <input class="gate-input" id="imgFile" type="file" accept="image/*" style="padding:9px 12px">
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeImgAdd()">Cancel</button>
+      <button class="modal-submit" onclick="submitImage()">Add image</button>
     </div>
   </div>
 </div>
@@ -2121,6 +2142,7 @@ document.addEventListener('click', function(e) {
   if (action === 'kbAddClick') { closeAdmin(); const f = document.getElementById('kbFile'); if (f) f.click(); }
   if (action === 'vidAddClick') { closeAdmin(); const vf = document.getElementById('vidFile'); if (vf) vf.click(); }
   if (action === 'vidLinkClick') { closeAdmin(); openVideoLink(); }
+  if (action === 'imgAddClick') { closeAdmin(); openImgAdd(); }
   if (action === 'openTeamFromAdmin') { closeAdmin(); openTeam(); }
 });
 
@@ -2259,6 +2281,7 @@ async function sendMessage() {
       if (vtagEnd > vtagStart) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
     }
     addMessage('assistant', displayReply, true, videoData, supportUrl);
+    if (data.images && data.images.length) renderDishImages(data.images);
     if (data.detectedVendor && !npsShown && (data.forceNPS || messages.filter(m=>m.role==='user').length >= 2)) {
       npsShown = true;
       setTimeout(() => showNPS(data.detectedVendor), 1200);
@@ -2560,6 +2583,11 @@ async function extractDocx(file) {
   const res = await mammoth.extractRawText({ arrayBuffer: buf });
   return res.value || '';
 }
+async function extractImage(file) {
+  if (typeof Tesseract === 'undefined') throw new Error('Image reader not loaded');
+  const out = await Tesseract.recognize(file, 'eng');
+  return (out && out.data && out.data.text) ? out.data.text : '';
+}
 async function handleKbUpload(files) {
   if (!files || !files.length) return;
   if (!user || user.role !== 'admin') { showToast('Only admins can add knowledge'); return; }
@@ -2571,6 +2599,7 @@ async function handleKbUpload(files) {
       let text = '';
       if (nm.endsWith('.pdf')) text = await extractPdf(file);
       else if (nm.endsWith('.docx') || nm.endsWith('.doc')) text = await extractDocx(file);
+      else if (/\\.(png|jpe?g|webp|gif|bmp)$/i.test(nm)) { showToast('Reading text from ' + file.name + ' \\u2014 this can take a few seconds\\u2026'); text = await extractImage(file); }
       else text = await file.text();
       text = (text || '').trim();
       if (!text || text.length < 10) { showToast('Couldn\\'t read text from ' + file.name); continue; }
@@ -2636,6 +2665,50 @@ async function handleVideoLink() {
   } catch(e) { showToast('Could not add video'); }
 }
 
+// ─── DISH / MENU IMAGES (admin uploads named photos; bot shows them) ──────
+function renderDishImages(imgs) {
+  const msgs = document.getElementById('messages');
+  if (!msgs) return;
+  imgs.forEach(function(im) {
+    const row = document.createElement('div');
+    row.className = 'dish-img-row';
+    row.innerHTML = '<div class="dish-img-card"><img src="' + teamEsc(im.url) + '" alt="' + teamEsc(im.title || '') + '" loading="lazy"><div class="dish-img-cap">' + teamEsc(im.title || '') + '</div></div>';
+    msgs.appendChild(row);
+  });
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function openImgAdd() {
+  document.getElementById('imgTitle').value = '';
+  document.getElementById('imgDesc').value = '';
+  const f = document.getElementById('imgFile'); if (f) f.value = '';
+  document.getElementById('imgAddOverlay').classList.add('open');
+}
+function closeImgAdd() { document.getElementById('imgAddOverlay').classList.remove('open'); }
+async function submitImage() {
+  const title = (document.getElementById('imgTitle').value || '').trim();
+  const desc = (document.getElementById('imgDesc').value || '').trim();
+  const fileEl = document.getElementById('imgFile');
+  const file = fileEl && fileEl.files && fileEl.files[0];
+  if (!title) { showToast('Give the image a name'); return; }
+  if (!file) { showToast('Choose a photo'); return; }
+  if (file.size > 10 * 1024 * 1024) { showToast('Image is over 10MB \\u2014 too large'); return; }
+  try {
+    showToast('Uploading ' + file.name + '\\u2026');
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = 'images/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
+    const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'image/jpeg', 'x-upsert':'true' }, body: file });
+    if (!up.ok) { showToast('Image storage not set up yet'); return; }
+    const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+    const r = await fetch(SERVER_URL + '/kb-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: title, description: desc, venue_id: user.venue_id, token: getAuthToken() }) });
+    const d = await r.json();
+    if (!d || !d.ok) { showToast((d && d.error) || 'Could not add image'); return; }
+    closeImgAdd();
+    showToast('Image added', 'green');
+    hideWelcome();
+    addMessage('assistant', '\\u2705 Added **' + title + '** to your menu images \\u2014 ask to see it any time.', false);
+  } catch(e) { showToast('Could not add image'); }
+}
+
 // ─── ADMIN PANEL (scoped analytics + knowledge, admins only) ──────────────
 function openAdmin() { loadAdmin(); document.getElementById('adminOverlay').classList.add('open'); document.getElementById('adminDrawer').classList.add('open'); }
 function closeAdmin() { document.getElementById('adminOverlay').classList.remove('open'); document.getElementById('adminDrawer').classList.remove('open'); }
@@ -2667,7 +2740,7 @@ async function loadAdmin() {
         return '<div class="kb-row"><div class="kb-icon">' + teamEsc(ext) + '</div><div class="kb-name">' + teamEsc(doc.filename) + '</div><span class="kb-chunks">' + (doc.chunks || 0) + '</span><button class="kb-del" data-action="kbRemove" data-file="' + teamEsc(doc.filename) + '" title="Remove">\\u2715</button></div>';
       }).join('');
     }
-    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="vidAddClick">+ Upload video</button><button class="admin-cta primary" data-action="vidLinkClick">+ Video link</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
+    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="imgAddClick">+ Add image</button><button class="admin-cta primary" data-action="vidAddClick">+ Upload video</button><button class="admin-cta primary" data-action="vidLinkClick">+ Video link</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
     bodyEl.innerHTML = '<div class="admin-section-label">Overview</div>' + stats + kb + buttons;
   } catch(e) { bodyEl.innerHTML = '<div class="empty-history">Could not load admin.</div>'; }
 }
@@ -5712,6 +5785,36 @@ const server = http.createServer(async (req, res) => {
     }); return;
   }
 
+  // ─── KB IMAGE (dish/menu photo the bot can show — admin-only, scoped) ─────
+  if (method === 'POST' && url === '/kb-image') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { url: imgUrl, title, description, venue_id, token } = JSON.parse(body);
+        if (!imgUrl || !venue_id || !title) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can add images'})); return; }
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id,slug&limit=1');
+        const v = (Array.isArray(vr.data) && vr.data[0]) ? vr.data[0] : null;
+        let workspaceId = (v && v.workspace_id) ? v.workspace_id : null;
+        if (!workspaceId) {
+          workspaceId = (v && v.slug) ? v.slug : venue_id;
+          await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body:{ workspace_id: workspaceId } });
+        }
+        const r = await sbFetch('/rest/v1/images', { method:'POST', headers:{'Prefer':'return=minimal'}, body: { url: imgUrl, title: title, description: description || '', tenant: workspaceId } });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: r.status < 400, workspace_id: workspaceId }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
   // ─── SAVE CONVERSATION ─────────────────────────────────────────────────
   if (method === 'POST' && url === '/save-conversation') {
     let body = '';
@@ -6221,8 +6324,24 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
           } catch(e) { console.error('Escalation error:', e); }
         }
 
+        // ── Dish/menu images: surface the closest match(es) to the question ──
+        let matchedImages = [];
+        try {
+          const imgQ = workspaceId
+            ? '/rest/v1/images?or=(tenant.is.null,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=url,title,description&limit=300'
+            : '/rest/v1/images?tenant=is.null&select=url,title,description&limit=300';
+          let imgR; try { imgR = await sbFetch(imgQ); if (!imgR || (imgR.status && imgR.status >= 400) || !Array.isArray(imgR.data)) throw 0; } catch(e2) { imgR = { data: [] }; }
+          const imgs = Array.isArray(imgR.data) ? imgR.data : [];
+          if (imgs.length) {
+            const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','what','does','the','and','for','our','can','of']);
+            const words = [...new Set(message.toLowerCase().split(/[\s,?!.;:()\[\]]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
+            const scored = imgs.map(im => { const t = ((im.title || '') + ' ' + (im.description || '')).toLowerCase(); return { im: im, hits: words.filter(w => t.includes(w)).length }; });
+            matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 2).map(s => ({ url: s.im.url, title: s.im.title }));
+          }
+        } catch(e) {}
+
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: npsForced || !!npsMatch}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, images: matchedImages, detectedVendor, forceNPS: npsForced || !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
