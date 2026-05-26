@@ -1510,14 +1510,14 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="modal">
     <h3>Confirm it&#39;s you</h3>
     <div id="verifyStep1">
-      <p>Managing knowledge is admin-only. We&#39;ll email a 6-digit code to <strong id="verifyEmail"></strong> to confirm it&#39;s you.</p>
+      <p>Managing knowledge is admin-only. We&#39;ll email a verification code to <strong id="verifyEmail"></strong> to confirm it&#39;s you.</p>
       <div class="modal-actions">
         <button class="modal-cancel" onclick="closeVerify()">Cancel</button>
         <button class="modal-submit" id="verifySendBtn" onclick="sendAuthCode()">Send code</button>
       </div>
     </div>
     <div id="verifyStep2" style="display:none">
-      <p>Enter the 6-digit code we just emailed you.</p>
+      <p>Enter the code we just emailed you.</p>
       <input class="verify-code" id="verifyCodeInput" inputmode="numeric" maxlength="8" placeholder="00000000" autocomplete="one-time-code">
       <div class="modal-actions">
         <button class="modal-cancel" onclick="sendAuthCode()">Resend</button>
@@ -2528,7 +2528,7 @@ async function sendAuthCode() {
 }
 async function verifyAuthCode() {
   const code = (document.getElementById('verifyCodeInput').value || '').trim();
-  if (code.length < 6) { showToast('Enter the 6-digit code'); return; }
+  if (code.length < 6) { showToast('Enter the code we emailed you'); return; }
   try {
     const r = await fetch(SUPABASE_URL + '/auth/v1/verify', { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY}, body: JSON.stringify({ email: user.email, token: code, type: 'email' }) });
     const d = await r.json();
