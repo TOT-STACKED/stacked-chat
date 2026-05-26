@@ -1518,7 +1518,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     </div>
     <div id="verifyStep2" style="display:none">
       <p>Enter the 6-digit code we just emailed you.</p>
-      <input class="verify-code" id="verifyCodeInput" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code">
+      <input class="verify-code" id="verifyCodeInput" inputmode="numeric" maxlength="8" placeholder="00000000" autocomplete="one-time-code">
       <div class="modal-actions">
         <button class="modal-cancel" onclick="sendAuthCode()">Resend</button>
         <button class="modal-submit" onclick="verifyAuthCode()">Verify</button>
