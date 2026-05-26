@@ -2552,15 +2552,20 @@ async function sendAuthCode() {
 async function verifyAuthCode() {
   const code = (document.getElementById('verifyCodeInput').value || '').trim();
   if (code.length < 6) { showToast('Enter the code we emailed you'); return; }
-  try {
-    const r = await fetch(SUPABASE_URL + '/auth/v1/verify', { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY}, body: JSON.stringify({ email: user.email, token: code, type: 'email' }) });
-    const d = await r.json();
-    if (!r.ok || !d.access_token) { showToast('That code didn\\'t work \\u2014 try again'); return; }
-    localStorage.setItem('stacked_auth', JSON.stringify({ email: user.email, token: d.access_token, ts: Date.now() }));
-    closeVerify();
-    showToast('Verified \\u2713', 'green');
-    const fn = _pendingAdminAction; _pendingAdminAction = null; if (fn) fn();
-  } catch(e) { showToast('Could not verify'); }
+  // New users verify with type 'signup', existing users with 'email' — try both.
+  let auth = null;
+  for (const t of ['email', 'signup', 'magiclink']) {
+    try {
+      const r = await fetch(SUPABASE_URL + '/auth/v1/verify', { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY}, body: JSON.stringify({ email: user.email, token: code, type: t }) });
+      const d = await r.json();
+      if (r.ok && d && d.access_token) { auth = d; break; }
+    } catch(e) {}
+  }
+  if (!auth) { showToast('That code didn\\'t work \\u2014 try again'); return; }
+  localStorage.setItem('stacked_auth', JSON.stringify({ email: user.email, token: auth.access_token, ts: Date.now() }));
+  closeVerify();
+  showToast('Verified \\u2713', 'green');
+  const fn = _pendingAdminAction; _pendingAdminAction = null; if (fn) fn();
 }
 
 // ─── ADD KNOWLEDGE ("+", admins only) ─────────────────────────────────────
