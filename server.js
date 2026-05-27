@@ -2256,7 +2256,7 @@ function toggleMic() {
 let pendingImage = null; // { dataUrl, data, media_type, name }
 function handleChatImage(files) {
   const f = files && files[0]; if (!f) return;
-  if (!/^image\//.test(f.type)) { showToast('Please choose an image file'); return; }
+  if (!f.type || f.type.indexOf('image/') !== 0) { showToast('Please choose an image file'); return; }
   const reader = new FileReader();
   reader.onload = function(e) {
     const img = new Image();
