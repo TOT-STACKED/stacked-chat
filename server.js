@@ -1212,6 +1212,11 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .dish-img-card { max-width: 300px; border: 1px solid var(--cream-dark); border-radius: 16px; overflow: hidden; background: var(--white); box-shadow: var(--shadow); }
   .dish-img-card img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: cover; background: var(--cream-dark); }
   .dish-img-cap { padding: 9px 13px; font-size: 13px; font-weight: 600; color: var(--brown); }
+  .doc-file-row { display: flex; padding-left: 42px; margin-top: -2px; }
+  .doc-file-pill { display: inline-flex; align-items: center; gap: 8px; background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 14px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); text-decoration: none; cursor: pointer; transition: all 0.2s var(--ease); max-width: min(calc(100vw - 90px), 420px); }
+  .doc-file-pill:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,78,26,0.12); }
+  .doc-file-pill svg { flex-shrink: 0; color: var(--orange); }
+  .doc-file-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .topics-list { display: flex; flex-direction: column; gap: 8px; }
   .topic-chip { background: var(--cream); border: 1.5px solid var(--cream-dark); border-left: 3px solid transparent; border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 500; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: all 0.25s var(--ease); }
   .topic-chip:hover { border-color: var(--cream-dark); border-left-color: var(--orange); background: var(--white); transform: translateX(2px); }
@@ -2318,6 +2323,7 @@ async function sendMessage() {
     }
     addMessage('assistant', displayReply, true, videoData, supportUrl);
     if (data.images && data.images.length) renderDishImages(data.images);
+    if (data.docFile && data.docFile.url) renderDocFile(data.docFile);
     if (data.detectedVendor && !npsShown && (data.forceNPS || messages.filter(m=>m.role==='user').length >= 2)) {
       npsShown = true;
       setTimeout(() => showNPS(data.detectedVendor), 1200);
@@ -2650,10 +2656,20 @@ async function handleKbUpload(files) {
         } catch(e) {}
       }
 
+      // Keep the ORIGINAL file too, so the bot can hand over a shareable
+      // download link (e.g. forward a PDF to your boss) — not just the text.
+      let fileUrl = null;
+      try {
+        const safeD = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const dpath = 'docs/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safeD;
+        const dup = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + dpath, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert':'true' }, body: file });
+        if (dup.ok) fileUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + dpath;
+      } catch(e) {}
+
       // Store the extracted text as a knowledge doc when there is enough to be useful.
       let docStored = false;
       if (text && text.length >= 10) {
-        const r = await fetch(SERVER_URL + '/kb-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: file.name, content: text, venue_id: user.venue_id, token: getAuthToken() }) });
+        const r = await fetch(SERVER_URL + '/kb-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: file.name, content: text, venue_id: user.venue_id, token: getAuthToken(), file_url: fileUrl }) });
         const data = await r.json();
         docStored = !!(data && data.ok);
       }
@@ -2732,6 +2748,19 @@ function renderDishImages(imgs) {
     row.innerHTML = '<div class="dish-img-card"><img src="' + teamEsc(im.url) + '" alt="' + teamEsc(im.title || '') + '" loading="lazy"><div class="dish-img-cap">' + teamEsc(im.title || '') + '</div></div>';
     msgs.appendChild(row);
   });
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function renderDocFile(doc) {
+  const msgs = document.getElementById('messages');
+  if (!msgs || !doc || !doc.url) return;
+  const row = document.createElement('div');
+  row.className = 'doc-file-row';
+  const a = document.createElement('a');
+  a.className = 'doc-file-pill';
+  a.href = doc.url; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('download', '');
+  a.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span>Open / share &mdash; ' + teamEsc(doc.filename || 'document') + '</span>';
+  row.appendChild(a);
+  msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
 }
 function openImgAdd() {
@@ -5642,7 +5671,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { filename, content, venue_id, token } = JSON.parse(body);
+        const { filename, content, venue_id, token, file_url } = JSON.parse(body);
         if (!filename || !content || !venue_id) {
           res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return;
         }
@@ -5665,7 +5694,18 @@ const server = http.createServer(async (req, res) => {
           await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body:{ workspace_id: workspaceId } });
         }
         const chunks = chunkText(content, filename).map(c => Object.assign(c, { workspace_id: workspaceId }));
-        for (const chunk of chunks) await sbFetch('/rest/v1/documents', { method:'POST', headers:{'Prefer':'return=minimal'}, body: chunk });
+        // Store the original file's URL on each chunk so the bot can offer it as a
+        // shareable download link. Falls back gracefully if the file_url column
+        // hasn't been added yet (run: ALTER TABLE documents ADD COLUMN file_url text;).
+        let storeFileUrl = !!file_url;
+        for (const chunk of chunks) {
+          const bodyWithUrl = storeFileUrl ? Object.assign({}, chunk, { file_url: file_url }) : chunk;
+          const ins = await sbFetch('/rest/v1/documents', { method:'POST', headers:{'Prefer':'return=minimal'}, body: bodyWithUrl });
+          if (storeFileUrl && ins && ins.status >= 400) {
+            storeFileUrl = false; // file_url column not present — keep going without it
+            await sbFetch('/rest/v1/documents', { method:'POST', headers:{'Prefer':'return=minimal'}, body: chunk });
+          }
+        }
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ ok:true, chunks: chunks.length, workspace_id: workspaceId }));
       } catch(e) {
@@ -5909,6 +5949,7 @@ const server = http.createServer(async (req, res) => {
           : techStackContext;
 
         let docContext = '';
+        let docFile = null; // top source doc's shareable file link, if it has one
         // Resolve the asker's workspace (group) so private docs stay isolated.
         let workspaceId = null;
         try {
@@ -5925,11 +5966,11 @@ const server = http.createServer(async (req, res) => {
           // Falls back to unscoped if the workspace_id column isn't there yet.
           let docsR;
           try {
-            const sharedR = await sbFetch('/rest/v1/documents?workspace_id=is.null&select=filename,content&limit=800');
+            const sharedR = await sbFetch('/rest/v1/documents?workspace_id=is.null&select=filename,content,file_url&limit=800');
             if (!sharedR || (sharedR.status && sharedR.status >= 400) || !Array.isArray(sharedR.data)) throw new Error('scoped unavailable');
             let merged = sharedR.data;
             if (workspaceId) {
-              const ownR = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(workspaceId) + '&select=filename,content&limit=400');
+              const ownR = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(workspaceId) + '&select=filename,content,file_url&limit=400');
               if (Array.isArray(ownR.data) && ownR.data.length) merged = ownR.data.concat(sharedR.data);
             }
             docsR = { data: merged };
@@ -5956,13 +5997,15 @@ const server = http.createServer(async (req, res) => {
                 }
                 bestSection = lines.slice(bestStart, bestStart+12).join('\n');
               }
-              return { filename: d.filename, section: bestSection, hits };
+              return { filename: d.filename, section: bestSection, hits, file_url: d.file_url || null };
             });
 
             const relevant = scored.filter(d => d.hits >= 1).sort((a,b) => b.hits-a.hits).slice(0, 5);
             if (relevant.length > 0) {
               docContext = '\n\n=== FROM KNOWLEDGE BASE ===\n' +
                 relevant.map(d => '[' + d.filename + ']\n' + d.section).join('\n\n');
+              const withFile = relevant.find(d => d.file_url);
+              if (withFile) docFile = { url: withFile.file_url, filename: withFile.filename };
             }
           }
         } catch(e) { /* no docs */ }
@@ -6091,6 +6134,8 @@ const server = http.createServer(async (req, res) => {
 ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents don't cover the question, say so and answer from general best practice — never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
 
 IMAGES & PHOTOS: You CAN show photos added to this venue's library — when one matches, it attaches automatically beneath your reply (see "IMAGE LIBRARY" below if present). You can also READ an image a user attaches. You CANNOT email/download files or re-send an image the user just uploaded, so never say a flat "I am just a chat assistant, I cannot send images". IMPORTANT — when the user asks to SEE or SHARE a photo: FIRST answer their question fully from the knowledge base if the topic is covered there (give the details you have). NEVER say a document or topic is missing if it appears in the KNOWLEDGE BASE / documents below — it is only the PHOTO that might be missing. ONLY if no photo is attached beneath your reply, add ONE short line that a photo of it is not in the image library yet and an admin can add one with the "+" button. Do not refuse the whole request.
+
+DOCUMENTS & FILES: When your answer is based on an uploaded document that has a shareable file, a download link to that file is attached automatically beneath your reply. If the user asks to send, share, forward or download a document (e.g. "send me the PDF"), answer their question and tell them they can open or forward it using the link below — never say you are unable to send files. If the document has no file link (older uploads stored text only), say it can be re-added by an admin via "+" to make it shareable.
 
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
 
@@ -6336,7 +6381,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${ve
         }
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: false, videos:relevantVideos, videoCount:relevantVideos.length, images: matchedImages, detectedVendor, forceNPS: npsForced || !!npsMatch}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: false, videos:relevantVideos, videoCount:relevantVideos.length, images: matchedImages, docFile, detectedVendor, forceNPS: npsForced || !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
