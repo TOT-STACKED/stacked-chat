@@ -2630,23 +2630,52 @@ async function handleKbUpload(files) {
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const nm = file.name.toLowerCase();
+    const isImage = /\\.(png|jpe?g|webp|gif|bmp)$/i.test(nm);
     try {
       showToast('Reading ' + file.name + '\\u2026');
       let text = '';
       if (nm.endsWith('.pdf')) text = await extractPdf(file);
       else if (nm.endsWith('.docx') || nm.endsWith('.doc')) text = await extractDocx(file);
-      else if (/\\.(png|jpe?g|webp|gif|bmp)$/i.test(nm)) { showToast('Reading text from ' + file.name + ' \\u2014 this can take a few seconds\\u2026'); text = await extractImage(file); }
+      else if (isImage) { showToast('Reading text from ' + file.name + ' \\u2014 this can take a few seconds\\u2026'); try { text = await extractImage(file); } catch(e) { text = ''; } }
       else text = await file.text();
       text = (text || '').trim();
-      if (!text || text.length < 10) { showToast('Couldn\\'t read text from ' + file.name); continue; }
-      const r = await fetch(SERVER_URL + '/kb-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: file.name, content: text, venue_id: user.venue_id, token: getAuthToken() }) });
-      const data = await r.json();
-      if (data && data.ok) {
+
+      // For images, store the actual picture so the bot can DISPLAY it on request
+      // (not just answer from its OCR text). Reuses the menu-image library.
+      let imageStored = false;
+      if (isImage) {
+        try {
+          showToast('Saving image\\u2026');
+          const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const path = 'images/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
+          const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'image/png', 'x-upsert':'true' }, body: file });
+          if (up.ok) {
+            const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+            const ir = await fetch(SERVER_URL + '/kb-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: file.name, description: text.slice(0, 300), venue_id: user.venue_id, token: getAuthToken() }) });
+            const id = await ir.json();
+            imageStored = !!(id && id.ok);
+          }
+        } catch(e) {}
+      }
+
+      // Store the extracted text as a knowledge doc when there is enough to be useful.
+      let docStored = false;
+      if (text && text.length >= 10) {
+        const r = await fetch(SERVER_URL + '/kb-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: file.name, content: text, venue_id: user.venue_id, token: getAuthToken() }) });
+        const data = await r.json();
+        docStored = !!(data && data.ok);
+      }
+
+      if (imageStored || docStored) {
         hideWelcome();
-        addMessage('assistant', '\\u2705 Added **' + file.name + '** to your knowledge base. I can answer questions from it now.', false);
-        messages.push({ role:'assistant', content:'Added ' + file.name + ' to the knowledge base.' });
+        let msg;
+        if (isImage && imageStored && docStored) msg = '\\u2705 Added **' + file.name + '** \\u2014 I can answer from it and show it when you ask.';
+        else if (isImage && imageStored) msg = '\\u2705 Added **' + file.name + '** \\u2014 ask to see it any time.';
+        else msg = '\\u2705 Added **' + file.name + '** to your knowledge base. I can answer questions from it now.';
+        addMessage('assistant', msg, false);
+        messages.push({ role:'assistant', content:'Added ' + file.name + '.' });
       } else {
-        showToast((data && data.error) || ('Could not add ' + file.name));
+        showToast('Could not add ' + file.name + ' \\u2014 nothing readable and image could not be saved');
       }
     } catch(e) { showToast('Could not add ' + file.name); }
   }
@@ -6050,8 +6079,11 @@ const server = http.createServer(async (req, res) => {
           let imgR; try { imgR = await sbFetch(imgQ); if (!imgR || (imgR.status && imgR.status >= 400) || !Array.isArray(imgR.data)) throw 0; } catch(e2) { imgR = { data: [] }; }
           const imgs = Array.isArray(imgR.data) ? imgR.data : [];
           if (imgs.length) {
-            const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','what','does','the','and','for','our','can','of']);
-            const words = [...new Set((message || '').toLowerCase().split(/[\s,?!.;:()\[\]]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
+            const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','images','send','what','does','the','and','for','our','can','of','me','please']);
+            // Include the last few turns so "send me that image" right after
+            // discussing it still resolves to the right picture (filename + context).
+            const imgSearch = ((message || '') + ' ' + history.slice(-3).map(m => (typeof m.content === 'string' ? m.content : '')).join(' ')).toLowerCase();
+            const words = [...new Set(imgSearch.split(/[\s,?!.;:()\[\]_]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
             const scored = imgs.map(im => { const t = ((im.title || '') + ' ' + (im.description || '')).toLowerCase(); return { im: im, hits: words.filter(w => t.includes(w)).length }; });
             matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 2).map(s => ({ url: s.im.url, title: s.im.title }));
             if (matchedImages.length) {
