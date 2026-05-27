@@ -5968,18 +5968,23 @@ const server = http.createServer(async (req, res) => {
           try {
             const sharedR = await sbFetch('/rest/v1/documents?workspace_id=is.null&select=filename,content,file_url&limit=800');
             if (!sharedR || (sharedR.status && sharedR.status >= 400) || !Array.isArray(sharedR.data)) throw new Error('scoped unavailable');
-            let merged = sharedR.data;
+            let merged = sharedR.data.map(d => Object.assign({ __own: false }, d));
             if (workspaceId) {
               const ownR = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(workspaceId) + '&select=filename,content,file_url&limit=400');
-              if (Array.isArray(ownR.data) && ownR.data.length) merged = ownR.data.concat(sharedR.data);
+              if (Array.isArray(ownR.data) && ownR.data.length) merged = ownR.data.map(d => Object.assign({ __own: true }, d)).concat(merged);
             }
             docsR = { data: merged };
           } catch(scopeErr) {
-            docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
+            const fb = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
+            docsR = { data: (Array.isArray(fb.data) ? fb.data : []).map(d => Object.assign({ __own: false }, d)) };
           }
           if (Array.isArray(docsR.data) && docsR.data.length > 0) {
             const searchText = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
-            const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
+            // Drop common/filler words so a venue's own specific doc isn't crowded
+            // out of the results by generic shared content that merely matches
+            // words like "have", "you", "our", "got".
+            const STOP = new Set(['have','has','had','you','your','yours','our','ours','the','and','for','got','get','this','that','these','those','with','can','could','are','was','were','will','would','should','about','what','when','where','which','from','they','them','please','need','want','any','all','its','but','not','how','does','did','who','why','into','out','been','being','some','more','just','than','then','there','here','your','dont','cant','wont','were','our','use','using','one','two']);
+            const searchWords = [...new Set(searchText.split(/[\s,?!.;:()\[\]]+/).filter(w => w.length > 2 && !STOP.has(w)))];
 
             // Score each doc chunk by relevance
             const scored = docsR.data.map(d => {
@@ -5997,10 +6002,16 @@ const server = http.createServer(async (req, res) => {
                 }
                 bestSection = lines.slice(bestStart, bestStart+12).join('\n');
               }
-              return { filename: d.filename, section: bestSection, hits, file_url: d.file_url || null };
+              return { filename: d.filename, section: bestSection, hits, file_url: d.file_url || null, own: !!d.__own };
             });
 
-            const relevant = scored.filter(d => d.hits >= 1).sort((a,b) => b.hits-a.hits).slice(0, 5);
+            // Always surface the venue's OWN matching docs first (up to 3), then
+            // fill the rest from the shared pool — so a tenant's private doc can
+            // never be crowded out by the much larger shared corpus.
+            const hitDocs = scored.filter(d => d.hits >= 1).sort((a,b) => b.hits-a.hits);
+            const ownTop = hitDocs.filter(d => d.own).slice(0, 3);
+            const sharedTop = hitDocs.filter(d => !d.own).slice(0, Math.max(0, 5 - ownTop.length));
+            const relevant = ownTop.concat(sharedTop);
             if (relevant.length > 0) {
               docContext = '\n\n=== FROM KNOWLEDGE BASE ===\n' +
                 relevant.map(d => '[' + d.filename + ']\n' + d.section).join('\n\n');
