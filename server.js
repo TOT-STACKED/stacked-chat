@@ -12,6 +12,15 @@ const STACKCOLLECT_SUPABASE_URL = process.env.STACKCOLLECT_SUPABASE_URL || 'http
 const STACKCOLLECT_SUPABASE_KEY = process.env.STACKCOLLECT_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmYnN3aXZraGZzZWdwdmZvY294Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzc4ODQsImV4cCI6MjA3NDgxMzg4NH0.YBuuMRXtMu2sUXBG7nJ6ue5LFgkHD8Dj1OP5Zu_J9_U';
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 const CRON_SECRET = process.env.CRON_SECRET || 'stacked-cron-secret';
+// Global dashboard (/admin) login. Set STACKED_ADMIN_PASSWORD on Render + Railway
+// to your own secret; 'stacked-admin' is only a bootstrap default.
+const ADMIN_PW = process.env.STACKED_ADMIN_PASSWORD || 'stacked-admin';
+const ADMIN_TOKEN = require('crypto').createHash('sha256').update('sa::' + ADMIN_PW).digest('hex').slice(0, 40);
+function isAdminAuthed(req) {
+  const c = req.headers.cookie || '';
+  const m = c.match(/(?:^|;\s*)sa_admin=([^;]+)/);
+  return !!(m && m[1] === ADMIN_TOKEN);
+}
 
 const KNOWLEDGE_BASE = `
 You have access to a comprehensive knowledge base of hospitality technology vendor guides.
@@ -875,9 +884,26 @@ async function getAnalytics() {
     allMessages.forEach(m => { m.split(/[^a-z0-9]+/).forEach(w => { if (w.length>=4 && !KW_STOP.has(w) && !/^\d+$/.test(w)) wordFreq[w] = (wordFreq[w]||0)+1; }); });
     const topKeywords = Object.entries(wordFreq).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([word,count])=>({word,count}));
 
+    // ── Knowledge Gaps (Phase 3): questions the bot couldn't answer well.
+    //    Derived from stored conversations — no schema change needed. ──
+    const GAP_PHRASES = ["don't have","do not have","not in the knowledge base","isn't in the","is not in the","couldn't find","could not find","not able to find","can't find","cannot find","hasn't been uploaded","not been uploaded","not been added","an admin can add","not in the library","don't have any","do not have any","i don't have that","not something that's been added"];
+    const gaps = [];
+    convs.forEach(c => {
+      const msgs = Array.isArray(c.messages) ? c.messages : [];
+      for (let i = 0; i < msgs.length; i++) {
+        if (msgs[i].role !== 'assistant') continue;
+        const reply = String(msgs[i].content || '').toLowerCase();
+        if (!GAP_PHRASES.some(p => reply.includes(p))) continue;
+        let q = null;
+        for (let j = i - 1; j >= 0; j--) { if (msgs[j].role === 'user') { q = String(msgs[j].content || '').trim(); break; } }
+        if (q && q.length > 2) gaps.push({ question: q.length > 180 ? q.slice(0,177)+'…' : q, when: c.created_at });
+      }
+    });
+    const knowledgeGaps = gaps.slice(-60).reverse();
+
     return {
       totalConvs: convs.length, totalMessages: allMessages.length,
-      vendorIntel, topKeywords,
+      vendorIntel, topKeywords, knowledgeGaps, knowledgeGapCount: gaps.length,
       openTickets: tickets.filter(t => t.status === 'open').length,
       escalatedTickets: tickets.filter(t => t.escalated).length,
       totalDocs: uniqueDocs.length,
@@ -4272,6 +4298,41 @@ button { font-family: inherit; cursor: pointer; }
 </body>
 </html>`;
 
+// ─── ADMIN LOGIN GATE ──────────────────────────────────────────────────────
+const ADMIN_LOGIN_PAGE = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stacked · Team login</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#EDEBE5;font-family:system-ui,'Segoe UI',sans-serif;color:#211D18}
+  .box{background:#fff;border:1px solid #D6D2C8;border-radius:18px;padding:34px 32px;width:340px;box-shadow:0 8px 30px rgba(0,0,0,.06);text-align:center}
+  .em{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:#E64E1A;font-weight:700;margin-bottom:6px}
+  h1{font-size:21px;margin:0 0 4px;letter-spacing:-.4px}
+  p{font-size:13px;color:#736C61;margin:0 0 20px}
+  input{width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #D6D2C8;border-radius:10px;font-size:15px;margin-bottom:12px;outline:none}
+  input:focus{border-color:#E64E1A}
+  button{width:100%;padding:12px;background:#E64E1A;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+  button:hover{background:#cf4316}
+  .err{color:#dc2626;font-size:13px;min-height:18px;margin-top:8px}
+</style></head><body>
+  <div class="box">
+    <div class="em">Stacked · Industry Intelligence</div>
+    <h1>Team login</h1>
+    <p>This dashboard is for the Stacked team only.</p>
+    <input id="pw" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')go()">
+    <button onclick="go()">Sign in</button>
+    <div class="err" id="err"></div>
+  </div>
+  <script>
+    async function go(){
+      const pw=document.getElementById('pw').value;
+      const err=document.getElementById('err'); err.textContent='';
+      try{
+        const r=await fetch('/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+        if(r.ok){ location.href='/admin'; } else { err.textContent='Incorrect password'; }
+      }catch(e){ err.textContent='Something went wrong, try again'; }
+    }
+    document.getElementById('pw').focus();
+  </script>
+</body></html>`;
+
 // ─── ADMIN PAGE ────────────────────────────────────────────────────────────
 const ADMIN_PAGE = `<!DOCTYPE html>
 <html lang="en">
@@ -4461,6 +4522,7 @@ tbody tr:hover td{background:var(--surface2)}
       <div class="nav-divider"></div>
       <button class="nav-item" onclick="showTab('vendors')">&#x1F4CA; Vendor Intelligence</button>
       <button class="nav-item" onclick="showTab('questions')">&#x1F4AC; Operator Questions</button>
+      <button class="nav-item" onclick="showTab('gaps')">&#x1F9E9; Knowledge Gaps</button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('venues')">Venues</button>
       <div class="nav-divider"></div>
@@ -4521,6 +4583,22 @@ tbody tr:hover td{background:var(--surface2)}
         <div class="card-header"><span class="card-title">Trending terms</span><span class="card-meta">Most-used words in questions</span></div>
         <div id="qKeywords"><div class="empty">Loading&hellip;</div></div>
       </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-gaps">
+    <div class="page-header">
+      <div><div class="page-title">Knowledge Gaps</div><div class="page-sub">Questions the bot couldn&rsquo;t fully answer &mdash; your content &amp; product to-do list</div></div>
+      <button class="btn" onclick="exportGapsCSV()">&#x2193; Export CSV</button>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="kpi-label">Unanswered questions</div><div class="kpi-value" id="gapTotal"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Of all questions</div><div class="kpi-value" id="gapPct"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Showing</div><div class="kpi-value" id="gapShown"><span class="shimmer"></span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Recent unanswered questions</span><span class="card-meta">Add the missing knowledge to close these</span></div>
+      <div id="gapsList"><div class="empty">Loading&hellip;</div></div>
     </div>
   </div>
 
@@ -4745,7 +4823,7 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','conversations','venues','content'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','conversations','venues','content'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
 }
@@ -4891,6 +4969,7 @@ async function loadAnalytics() {
     renderVenues(a.venueStats || []);
     renderVendorIntel(a.vendorIntel || []);
     renderOperatorQuestions(a.topTopics || [], a.topKeywords || []);
+    renderKnowledgeGaps(a.knowledgeGaps || [], a.knowledgeGapCount || 0, a.totalMessages || 0);
     renderDocs(a.docs);
   } catch(e) { notify('Failed: '+e.message,'red'); console.error(e); }
 }
@@ -4964,6 +5043,30 @@ function renderOperatorQuestions(topTopics, topKeywords){
       }).join('') + '</div>';
     }
   }
+}
+// ── Knowledge Gaps (Phase 3) ──────────────────────────────────────────────
+function renderKnowledgeGaps(gaps, total, totalQs){
+  window._gaps = gaps || [];
+  const gt = document.getElementById('gapTotal'); if(gt) gt.textContent = (total||0).toLocaleString();
+  const gp = document.getElementById('gapPct'); if(gp) gp.textContent = (totalQs>0 ? Math.round((total/totalQs)*100) : 0) + '%';
+  const gs = document.getElementById('gapShown'); if(gs) gs.textContent = (gaps?gaps.length:0).toLocaleString();
+  const el = document.getElementById('gapsList'); if(!el) return;
+  if(!gaps || !gaps.length){ el.innerHTML = '<div class="empty">No knowledge gaps detected &mdash; the bot is answering everything from the knowledge base. 🎉</div>'; return; }
+  el.innerHTML = gaps.map(function(g){
+    const d = g.when ? new Date(g.when).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
+    return '<div class="conv-item"><div class="conv-top"><span class="conv-name" style="font-weight:500">'+esc(g.question)+'</span><span class="conv-date">'+d+'</span></div></div>';
+  }).join('');
+}
+function exportGapsCSV(){
+  const gaps = window._gaps || [];
+  if(!gaps.length){ notify('No knowledge gaps to export','red'); return; }
+  const rows = [['Unanswered question','Date']];
+  gaps.forEach(function(g){ rows.push([g.question, g.when ? new Date(g.when).toLocaleDateString('en-GB') : '']); });
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'stacked-knowledge-gaps.csv'; a.click();
+  notify('Exported knowledge gaps CSV','green');
 }
 function exportQuestionsCSV(){
   const kws = window._topKeywords || [];
@@ -5291,7 +5394,22 @@ const server = http.createServer(async (req, res) => {
 
   if (url === '/admin' || url === '/admin/') {
     res.writeHead(200, {'Content-Type':'text/html'});
-    res.end(ADMIN_PAGE); return;
+    res.end(isAdminAuthed(req) ? ADMIN_PAGE : ADMIN_LOGIN_PAGE); return;
+  }
+
+  if (method === 'POST' && url === '/admin-login') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { password } = JSON.parse(body || '{}');
+        if (password === ADMIN_PW) {
+          res.writeHead(200, {'Content-Type':'application/json', 'Set-Cookie':'sa_admin=' + ADMIN_TOKEN + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000'});
+          res.end(JSON.stringify({ ok: true }));
+        } else {
+          res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false }));
+        }
+      } catch(e) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false })); }
+    }); return;
   }
 
   // Operator-facing redesign shell (sidebar + topbar, no screens yet).
@@ -5302,6 +5420,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url === '/analytics') {
+    if (!isAdminAuthed(req)) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Not authorised'})); return; }
     const data = await getAnalytics();
     res.writeHead(200, {'Content-Type':'application/json'});
     res.end(JSON.stringify(data)); return;
