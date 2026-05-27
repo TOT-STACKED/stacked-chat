@@ -740,16 +740,14 @@ async function verifyAuthEmail(token) {
 
 async function getAnalytics() {
   try {
-    const [convsR, ticketsR, docsR, healthR] = await Promise.all([
+    const [convsR, ticketsR, docsR] = await Promise.all([
       sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=200'),
       sbFetch('/rest/v1/tickets?select=*&order=created_at.desc&limit=100'),
       sbFetch('/rest/v1/documents?select=filename,created_at&order=created_at.desc&limit=1000'),
-      sbFetch('/rest/v1/health_checks?select=*&order=checked_at.desc&limit=200'),
     ]);
     const convs = Array.isArray(convsR.data) ? convsR.data : [];
     const tickets = Array.isArray(ticketsR.data) ? ticketsR.data : [];
     const docs = Array.isArray(docsR.data) ? docsR.data : [];
-    const healthChecks = Array.isArray(healthR.data) ? healthR.data : [];
     const allMessages = [];
     convs.forEach(c => {
       if (c.messages && Array.isArray(c.messages)) {
@@ -777,27 +775,6 @@ async function getAnalytics() {
     const topTopics = Object.entries(topicCounts).sort((a,b) => b[1]-a[1]).filter(([,c]) => c > 0);
     const topVendors = Object.entries(vendorCounts).sort((a,b) => b[1]-a[1]).filter(([,c]) => c > 0);
     const uniqueDocs = [...new Map(docs.map(d => [d.filename, d])).values()];
-
-    // Build per-venue latest health check summary
-    const venueHealthMap = {};
-    healthChecks.forEach(hc => {
-      const key = hc.venue_id || hc.venue || 'unknown';
-      if (!venueHealthMap[key]) venueHealthMap[key] = hc; // already sorted desc, first = latest
-    });
-    const venueHealth = Object.values(venueHealthMap);
-
-    // System-level issue counts across all recent checks (last 7 days)
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recentChecks = healthChecks.filter(hc => new Date(hc.checked_at).getTime() > sevenDaysAgo);
-    const systemIssueCounts = { epos: 0, payments: 0, wifi: 0, printer: 0, bookings: 0 };
-    recentChecks.forEach(hc => {
-      if (!hc.answers) return;
-      Object.entries(hc.answers).forEach(([sys, val]) => {
-        if ((val === 'red' || val === 'amber') && systemIssueCounts.hasOwnProperty(sys)) {
-          systemIssueCounts[sys]++;
-        }
-      });
-    });
 
     // Build venue stats
     const venueMap = {};
@@ -892,15 +869,20 @@ async function getAnalytics() {
     }).filter(v => v.mentions>0 || (v.nps && v.nps.count>0))
       .sort((a,b)=> (b.mentions-a.mentions) || ((b.nps?b.nps.count:0)-(a.nps?a.nps.count:0)));
 
+    // ── What operators ask: trending keywords across all questions (Phase 2) ──
+    const KW_STOP = new Set(['the','and','for','you','your','our','have','has','had','with','can','could','would','should','this','that','these','those','what','when','where','which','from','they','them','please','need','want','help','about','there','here','just','dont','cant','wont','been','being','some','more','than','then','will','your','into','out','not','but','how','does','did','who','why','use','using','get','got','any','all','its','was','were','are','his','her','their','them','also','like','able','make','made','still','only','very','much','many','well','good','know','say','said','one','two','our','we','i','to','a','an','of','in','on','is','it','my','me','do','if','or','as','at','be','so','up','no','yes','ok','hi','hey','thanks','thank','please','need','want']);
+    const wordFreq = {};
+    allMessages.forEach(m => { m.split(/[^a-z0-9]+/).forEach(w => { if (w.length>=4 && !KW_STOP.has(w) && !/^\d+$/.test(w)) wordFreq[w] = (wordFreq[w]||0)+1; }); });
+    const topKeywords = Object.entries(wordFreq).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([word,count])=>({word,count}));
+
     return {
       totalConvs: convs.length, totalMessages: allMessages.length,
-      vendorIntel,
+      vendorIntel, topKeywords,
       openTickets: tickets.filter(t => t.status === 'open').length,
       escalatedTickets: tickets.filter(t => t.escalated).length,
       totalDocs: uniqueDocs.length,
       topTopics, topVendors, recentConvs: convs.slice(0, 10), tickets, docs: uniqueDocs,
-      healthChecks: healthChecks.slice(0, 50), venueHealth, systemIssueCounts,
-      totalChecks: healthChecks.length, venueStats, npsData
+      venueStats, npsData
     };
   } catch(e) { console.error('Analytics error:', e); return { error: e.message }; }
 }
@@ -1352,46 +1334,6 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .video-pill:hover{background:var(--orange-light)}
   .video-pill-row{display:flex;padding-left:42px;margin-top:-4px}
 
-  /* ─── SHIFT CHECK ─── */
-  .shift-check-btn {
-    display: flex; align-items: center; gap: 6px;
-    background: none; border: 1px solid var(--cream-dark);
-    border-radius: 20px; padding: 8px 16px;
-    font-family: var(--font-sans); font-size: 12px; font-weight: 600;
-    color: var(--brown-mid); cursor: pointer; margin-top: 4px;
-    transition: border-color 0.15s, color 0.15s;
-  }
-  .shift-check-btn:hover { border-color: var(--orange); color: var(--brown); }
-  .shift-check-btn .sc-icon { font-size: 14px; }
-
-  .sc-step { padding: 16px 0; border-bottom: 1px solid var(--cream-dark); }
-  .sc-step:last-child { border-bottom: none; }
-  .sc-step-label { font-size: 15px; font-weight: 600; color: var(--brown); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-  .sc-step-label .sc-emoji { font-size: 18px; }
-  .sc-options { display: flex; gap: 8px; }
-  .sc-opt {
-    flex: 1; padding: 10px 8px; border-radius: 10px; border: 2px solid var(--cream-dark);
-    font-family: var(--font-sans); font-size: 12px; font-weight: 700;
-    cursor: pointer; text-align: center; transition: all 0.15s; background: var(--white);
-  }
-  .sc-opt:hover { border-color: var(--orange); }
-  .sc-opt.selected-green { background: #dcfce7; border-color: #16a34a; color: #166534; }
-  .sc-opt.selected-amber { background: #fef9c3; border-color: #ca8a04; color: #854d0e; }
-  .sc-opt.selected-red { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
-  .sc-progress { height: 3px; background: var(--cream-dark); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
-  .sc-progress-fill { height: 100%; background: var(--orange); border-radius: 2px; transition: width 0.3s ease; }
-  .sc-summary { text-align: center; padding: 8px 0 4px; }
-  .sc-summary-icon { font-size: 40px; margin-bottom: 8px; }
-  .sc-summary-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 6px; }
-  .sc-summary-sub { font-size: 14px; color: var(--brown-mid); margin-bottom: 16px; line-height: 1.5; }
-  .sc-issues-list { text-align: left; margin-bottom: 16px; }
-  .sc-issue-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fee2e2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #991b1b; }
-  .sc-issue-item.amber { background: #fef9c3; color: #854d0e; }
-  .sc-fix-btn { width: 100%; padding: 13px; background: var(--orange); color: #fff; border: none; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 12px; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
-  .sc-fix-btn:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
-  .sc-fix-btn:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
-  .sc-done-btn { width: 100%; padding: 11px; background: var(--cream); color: var(--brown); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 14px; font-weight: 500; cursor: pointer; }
-
   /* ─── TIP OF THE DAY (editorial footnote) ─── */
   .tip-note {
     width: 100%; max-width: 420px; margin: 18px auto 0;
@@ -1685,28 +1627,6 @@ window.addEventListener('DOMContentLoaded', () => {
     showApp();
   }
 });
-
-function checkShiftReminder() {
-  const hour = new Date().getHours();
-  if (hour < 7 || hour >= 11) return; // only show 7am–11am
-  const today = new Date().toDateString();
-  const lastCheck = localStorage.getItem('stacked_last_shift_check');
-  if (lastCheck === today) return; // already done today
-  const banner = document.getElementById('shiftReminder');
-  if (banner) banner.style.display = 'flex';
-}
-
-function dismissReminder() {
-  const banner = document.getElementById('shiftReminder');
-  if (banner) banner.style.display = 'none';
-  openShiftCheck();
-}
-
-function markShiftCheckDone() {
-  localStorage.setItem('stacked_last_shift_check', new Date().toDateString());
-  const banner = document.getElementById('shiftReminder');
-  if (banner) banner.style.display = 'none';
-}
 
 // ─── VENUE AUTOCOMPLETE ───────────────────────────────────────────────────
 async function handleVenueInput(val) {
@@ -2111,91 +2031,12 @@ function fireTip() {
   quickSend(window._currentTip.text + ' Can you tell me more about this?');
 }
 
-// ─── SHIFT CHECK ──────────────────────────────────────────────────────────
-const SC_STEPS = [
-  { id: 'epos',     emoji: '💻', label: 'EPOS / till system' },
-  { id: 'payments', emoji: '💳', label: 'Card / payment terminal' },
-  { id: 'wifi',     emoji: '📶', label: 'WiFi / internet' },
-  { id: 'printer',  emoji: '🖨️', label: 'Kitchen printer' },
-  { id: 'bookings', emoji: '📅', label: 'Booking / reservation system' },
-];
-
-let scAnswers = {};
-let scCurrentStep = 0;
-let scMode = 'steps'; // 'steps' | 'summary'
-
-function openShiftCheck() {
-  scAnswers = {};
-  scCurrentStep = 0;
-  scMode = 'steps';
-  document.getElementById('scOverlay').classList.add('open');
-  document.getElementById('scDrawer').classList.add('open');
-  renderScStep();
-}
-
-function closeShiftCheck() {
-  document.getElementById('scOverlay').classList.remove('open');
-  document.getElementById('scDrawer').classList.remove('open');
-}
-
-function renderScStep() {
-  const body = document.getElementById('scBody');
-  const title = document.getElementById('scDrawerTitle');
-  const total = SC_STEPS.length;
-
-  if (scMode === 'summary') {
-    renderScSummary();
-    return;
-  }
-
-  const step = SC_STEPS[scCurrentStep];
-  const pct = Math.round((scCurrentStep / total) * 100);
-
-  title.textContent = 'Shift check (' + (scCurrentStep + 1) + ' of ' + total + ')';
-
-  body.innerHTML =
-    '<div class="sc-progress"><div class="sc-progress-fill" style="width:' + pct + '%"></div></div>' +
-    '<div class="sc-step">' +
-    '<div class="sc-step-label"><span class="sc-emoji">' + step.emoji + '</span>' + step.label + '</div>' +
-    '<div class="sc-options">' +
-    '<button class="sc-opt" data-val="green" data-action="scAnswer">✅ All good</button>' +
-    '<button class="sc-opt" data-val="amber" data-action="scAnswer">⚠️ Slow / issue</button>' +
-    '<button class="sc-opt" data-val="red" data-action="scAnswer">🔴 Down</button>' +
-    '</div></div>';
-
-  // Highlight previously selected if user goes back (not implemented but defensive)
-  const prev = scAnswers[step.id];
-  if (prev) {
-    body.querySelectorAll('.sc-opt').forEach(btn => {
-      if (btn.dataset.val === prev) btn.classList.add('selected-' + prev);
-    });
-  }
-}
-
-function scAnswer(val) {
-  const step = SC_STEPS[scCurrentStep];
-  scAnswers[step.id] = val;
-
-  // Highlight selection briefly then advance
-  const btns = document.querySelectorAll('.sc-opt');
-  btns.forEach(b => { if (b.dataset.val === val) b.classList.add('selected-' + val); });
-
-  setTimeout(() => {
-    scCurrentStep++;
-    if (scCurrentStep >= SC_STEPS.length) {
-      scMode = 'summary';
-    }
-    renderScStep();
-  }, 280);
-}
-
 // ─── GLOBAL EVENT DELEGATION ──────────────────────────────────────────────
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const action = btn.dataset.action;
   const msg = btn.dataset.msg ? btn.dataset.msg.replace(/&quot;/g, '"') : null;
-  if (action === 'scAnswer') scAnswer(btn.dataset.val);
   if (action === 'predictSend' || action === 'quickSend') { hideWelcome(); quickSend(msg); }
   if (action === 'setRole') setMemberRole(btn.dataset.email, btn.dataset.role);
   if (action === 'kbRemove') kbRemove(btn.dataset.file);
@@ -2205,93 +2046,6 @@ document.addEventListener('click', function(e) {
   if (action === 'imgAddClick') { closeAdmin(); openImgAdd(); }
   if (action === 'openTeamFromAdmin') { closeAdmin(); openTeam(); }
 });
-
-function renderScSummary() {
-  const title = document.getElementById('scDrawerTitle');
-  title.textContent = 'Shift check complete';
-
-  const issues = SC_STEPS.filter(s => scAnswers[s.id] === 'red');
-  const warnings = SC_STEPS.filter(s => scAnswers[s.id] === 'amber');
-  const allGood = issues.length === 0 && warnings.length === 0;
-
-  let icon, headline, sub;
-  if (allGood) {
-    icon = '🟢';
-    headline = 'All systems go';
-    sub = 'Everything is looking good. Have a great service!';
-  } else if (issues.length > 0) {
-    icon = '🔴';
-    headline = issues.length + ' system' + (issues.length > 1 ? 's' : '') + ' need' + (issues.length === 1 ? 's' : '') + ' attention';
-    sub = 'Get these sorted before service starts.';
-  } else {
-    icon = '⚠️';
-    headline = warnings.length + ' thing' + (warnings.length > 1 ? 's' : '') + ' to keep an eye on';
-    sub = 'Not critical, but worth monitoring during service.';
-  }
-
-  let issueHTML = '';
-  issues.forEach(s => { issueHTML += '<div class="sc-issue-item"><span>' + s.emoji + '</span> ' + s.label + ' is down</div>'; });
-  warnings.forEach(s => { issueHTML += '<div class="sc-issue-item amber"><span>' + s.emoji + '</span> ' + s.label + ' has an issue</div>'; });
-
-  const hasProblems = issues.length > 0 || warnings.length > 0;
-
-  const body = document.getElementById('scBody');
-  body.innerHTML =
-    '<div class="sc-summary">' +
-    '<div class="sc-summary-icon">' + icon + '</div>' +
-    '<div class="sc-summary-title">' + headline + '</div>' +
-    '<div class="sc-summary-sub">' + sub + '</div>' +
-    '</div>' +
-    (hasProblems ? '<div class="sc-issues-list">' + issueHTML + '</div>' : '') +
-    (hasProblems
-      ? '<button class="sc-fix-btn" onclick="scGetHelp()">Get help with these issues &rarr;</button>'
-      : '') +
-    '<button class="sc-done-btn" onclick="scFinish()">' + (allGood ? 'Great, start service' : 'Dismiss') + '</button>';
-
-  // Save to Supabase
-  saveHealthCheck();
-}
-
-async function saveHealthCheck() {
-  if (!user) return;
-  try {
-    const payload = {
-      venue: user.venue,
-      venue_id: user.venue_id || null,
-      name: user.name,
-      email: user.email,
-      answers: scAnswers,
-      has_issues: SC_STEPS.some(s => scAnswers[s.id] === 'red' || scAnswers[s.id] === 'amber'),
-      checked_at: new Date().toISOString()
-    };
-    await fetch(SERVER_URL + '/health-check', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  } catch(e) { /* fail silently */ }
-}
-
-function scGetHelp() {
-  closeShiftCheck();
-  const issues = SC_STEPS.filter(s => scAnswers[s.id] === 'red' || scAnswers[s.id] === 'amber');
-  const issueNames = issues.map(s => s.label.toLowerCase()).join(' and ');
-  hideWelcome();
-  quickSend('I just did my shift check and I have issues with my ' + issueNames + '. Can you help me troubleshoot?');
-}
-
-function scFinish() {
-  closeShiftCheck();
-  markShiftCheckDone();
-  const btn = document.getElementById('shiftCheckBtn');
-  if (btn) {
-    btn.innerHTML = '✅ Shift check done';
-    btn.style.borderColor = '#16a34a';
-    btn.style.color = '#166534';
-    btn.onclick = null;
-    btn.style.cursor = 'default';
-  }
-}
 
 let recognition = null;
 let isListening = false;
@@ -4566,6 +4320,9 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
 .blk2{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:700;margin:15px 0 9px}
 .vbar{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}.vbar i{display:block;height:100%;border-radius:4px}
 .vq{font-size:12px;color:var(--text2);background:var(--surface2);border-radius:6px;padding:7px 10px;margin-bottom:5px;border-left:2px solid #F8DBCC;line-height:1.4}
+.kwcloud{display:flex;flex-wrap:wrap;gap:7px 9px;align-items:center;padding:6px 4px}
+.kwchip{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 11px;color:var(--text);line-height:1.2}
+.kwchip b{color:var(--blue);font-weight:700;font-size:.8em;margin-left:2px}
 .nav-divider{width:1px;height:16px;background:var(--border2);margin:0 4px}
 .sub-tab-bar{display:flex;gap:4px;margin:16px 0 20px;border-bottom:1px solid var(--border);padding-bottom:0}
 .sub-tab{padding:7px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:1px solid transparent;border-bottom:none;background:none;font-family:inherit;transition:all 0.1s;margin-bottom:-1px}
@@ -4703,11 +4460,11 @@ tbody tr:hover td{background:var(--surface2)}
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
       <div class="nav-divider"></div>
       <button class="nav-item" onclick="showTab('vendors')">&#x1F4CA; Vendor Intelligence</button>
+      <button class="nav-item" onclick="showTab('questions')">&#x1F4AC; Operator Questions</button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('venues')">Venues</button>
       <div class="nav-divider"></div>
       <button class="nav-item" onclick="showTab('content')">&#x1F4DA; Content</button>
-      <button class="nav-item" onclick="showTab('health')">&#x2705; Shift Checks</button>
     </nav>
   </div>
   <div class="header-right">
@@ -4747,6 +4504,23 @@ tbody tr:hover td{background:var(--surface2)}
         <div id="vendorTable"><div class="empty">Loading&hellip;</div></div>
       </div>
       <div class="card" style="padding:18px 20px"><div id="vendorDetail"><div class="empty">Select a vendor to drill in</div></div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-questions">
+    <div class="page-header">
+      <div><div class="page-title">Operator Questions</div><div class="page-sub">What UK hospitality is asking &mdash; themes &amp; trending terms across all venues, anonymised</div></div>
+      <button class="btn" onclick="exportQuestionsCSV()">&#x2193; Export CSV</button>
+    </div>
+    <div class="grid-2" style="grid-template-columns:1fr 1fr;align-items:start">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Question themes</span><span class="card-meta">By category</span></div>
+        <div id="qThemes"><div class="empty">Loading&hellip;</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Trending terms</span><span class="card-meta">Most-used words in questions</span></div>
+        <div id="qKeywords"><div class="empty">Loading&hellip;</div></div>
+      </div>
     </div>
   </div>
 
@@ -4958,28 +4732,6 @@ tbody tr:hover td{background:var(--surface2)}
     </div><!-- end #contentDocs -->
 
   </div><!-- end #tab-content -->
-  <div class="tab-panel" id="tab-health">
-    <div class="page-header"><div><div class="page-title">Shift Checks</div><div class="page-sub">Venue health checks logged at start of service</div></div></div>
-    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="kpi"><div class="kpi-label">Total checks logged</div><div class="kpi-value" id="hTotalChecks"><span class="shimmer"></span></div></div>
-      <div class="kpi"><div class="kpi-label">Checks with issues</div><div class="kpi-value" id="hIssueChecks"><span class="shimmer"></span></div></div>
-      <div class="kpi"><div class="kpi-label">Most flagged system</div><div class="kpi-value" style="font-size:18px;padding-top:4px" id="hTopSystem"><span class="shimmer"></span></div></div>
-    </div>
-    <div class="grid-2">
-      <div class="card">
-        <div class="card-header"><span class="card-title">System issue frequency</span><span class="card-meta">Last 7 days</span></div>
-        <div id="hSystemBars"><div class="empty">No data yet</div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">Latest check per venue</span></div>
-        <div id="hVenueLatest"><div class="empty">No checks yet</div></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Recent shift checks</span><span class="card-meta" id="hCheckCount"></span></div>
-      <div id="hChecksTable"><div class="empty">Loading...</div></div>
-    </div>
-  </div>
 
 </div>
 
@@ -4993,7 +4745,7 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','conversations','venues','content','health'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','conversations','venues','content'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
 }
@@ -5138,8 +4890,8 @@ async function loadAnalytics() {
     }
     renderVenues(a.venueStats || []);
     renderVendorIntel(a.vendorIntel || []);
+    renderOperatorQuestions(a.topTopics || [], a.topKeywords || []);
     renderDocs(a.docs);
-    renderHealthData(a);
   } catch(e) { notify('Failed: '+e.message,'red'); console.error(e); }
 }
 
@@ -5186,6 +4938,43 @@ function selectVendor(i, el){
     html += '<div class="empty" style="margin-top:14px">Mentions logged, but not enough detail yet for a breakdown.</div>';
   }
   document.getElementById('vendorDetail').innerHTML = html;
+}
+// ── Operator Questions (Phase 2) ──────────────────────────────────────────
+function renderOperatorQuestions(topTopics, topKeywords){
+  window._topKeywords = topKeywords || [];
+  const th = document.getElementById('qThemes');
+  if(th){
+    if(!topTopics || !topTopics.length){ th.innerHTML='<div class="empty">No question themes yet</div>'; }
+    else {
+      const max = topTopics[0][1] || 1;
+      th.innerHTML = topTopics.map(function(t,i){
+        const pct = Math.round(t[1]/max*100);
+        return '<div class="data-row"><span class="rank'+(i<3?' hi':'')+'">'+(i+1)+'</span><span class="data-label">'+esc(t[0])+'</span><div class="bar-outer"><div class="bar-inner alt" style="width:'+pct+'%"></div></div><span class="data-count">'+t[1]+'</span></div>';
+      }).join('');
+    }
+  }
+  const kw = document.getElementById('qKeywords');
+  if(kw){
+    if(!topKeywords || !topKeywords.length){ kw.innerHTML='<div class="empty">No terms yet &mdash; populates as operators ask questions</div>'; }
+    else {
+      const max = topKeywords[0].count || 1;
+      kw.innerHTML = '<div class="kwcloud">' + topKeywords.map(function(k){
+        const scale = 0.8 + (k.count/max)*0.9; // 0.8–1.7em
+        return '<span class="kwchip" style="font-size:'+scale.toFixed(2)+'em" title="'+k.count+' mentions">'+esc(k.word)+' <b>'+k.count+'</b></span>';
+      }).join('') + '</div>';
+    }
+  }
+}
+function exportQuestionsCSV(){
+  const kws = window._topKeywords || [];
+  if(!kws.length){ notify('No question data to export yet','red'); return; }
+  const rows = [['Term','Mentions']];
+  kws.forEach(function(k){ rows.push([k.word,k.count]); });
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'stacked-operator-questions.csv'; a.click();
+  notify('Exported operator questions CSV','green');
 }
 function exportVendorCSV(){
   const vis = window._vendorIntel || [];
@@ -5241,96 +5030,6 @@ var allDocs=[];
 function filterDocs(q){var f=q?allDocs.filter(function(d){return d.filename.toLowerCase().includes(q.toLowerCase());}):allDocs;var c=document.getElementById('docCount');if(c)c.textContent=f.length+' / '+allDocs.length+' docs';renderDocList(f);}
 function renderDocs(docs){allDocs=docs||[];var c=document.getElementById('docCount');if(c)c.textContent=allDocs.length+' docs';renderDocList(allDocs);}
 
-function renderHealthData(a) {
-  const checks = a.healthChecks || [];
-  const venueHealth = a.venueHealth || [];
-  const sic = a.systemIssueCounts || {};
-
-  // KPIs
-  const issueChecks = checks.filter(hc => hc.has_issues).length;
-  document.getElementById('hTotalChecks').textContent = (a.totalChecks || 0).toLocaleString();
-  document.getElementById('hIssueChecks').textContent = issueChecks.toLocaleString();
-
-  // Top flagged system
-  const systemLabels = { epos: 'EPOS', payments: 'Payments', wifi: 'WiFi', printer: 'Printer', bookings: 'Bookings' };
-  const sortedSystems = Object.entries(sic).sort((a,b) => b[1]-a[1]);
-  const topSys = sortedSystems[0];
-  document.getElementById('hTopSystem').textContent = topSys && topSys[1] > 0 ? systemLabels[topSys[0]] || topSys[0] : 'None';
-
-  // System bars
-  const sbEl = document.getElementById('hSystemBars');
-  const maxSic = sortedSystems[0] ? sortedSystems[0][1] : 1;
-  if (!sortedSystems.some(([,c]) => c > 0)) {
-    sbEl.innerHTML = '<div class="empty">No issues flagged in the last 7 days &#x1F389;</div>';
-  } else {
-    const sicEmoji = { epos: '💻', payments: '💳', wifi: '📶', printer: '🖨️', bookings: '📅' };
-    sbEl.innerHTML = sortedSystems.map(([sys, count]) => {
-      const pct = maxSic > 0 ? Math.round(count / maxSic * 100) : 0;
-      return '<div class="data-row">' +
-        '<span class="rank">' + (sicEmoji[sys] || '') + '</span>' +
-        '<span class="data-label">' + (systemLabels[sys] || sys) + '</span>' +
-        '<div class="bar-outer"><div class="bar-inner alt" style="width:' + pct + '%"></div></div>' +
-        '<span class="data-count">' + count + '</span>' +
-        '</div>';
-    }).join('');
-  }
-
-  // Latest per venue
-  const vlEl = document.getElementById('hVenueLatest');
-  if (!venueHealth.length) {
-    vlEl.innerHTML = '<div class="empty">No checks yet</div>';
-  } else {
-    vlEl.innerHTML = venueHealth.slice(0,8).map(hc => {
-      const allGood = !hc.has_issues;
-      const d = new Date(hc.checked_at).toLocaleDateString('en-GB', {day:'numeric',month:'short'});
-      const t = new Date(hc.checked_at).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
-      const statusDot = allGood
-        ? '<span style="color:#16a34a;font-weight:700">\✅ All good</span>'
-        : '<span style="color:#dc2626;font-weight:700">⚠️ Issues flagged</span>';
-      return '<div class="conv-item">' +
-        '<div class="conv-top">' +
-        '<span class="conv-name">' + esc(hc.venue || 'Unknown venue') + '</span>' +
-        '<span class="conv-date">' + d + ' ' + t + '</span>' +
-        '</div>' +
-        '<div class="conv-preview">' + statusDot + ' &middot; checked by ' + esc(hc.name || 'unknown') + '</div>' +
-        '</div>';
-    }).join('');
-  }
-
-  // Full checks table
-  const hCheckCount = document.getElementById('hCheckCount');
-  if (hCheckCount) hCheckCount.textContent = checks.length + ' check' + (checks.length !== 1 ? 's' : '') + ' logged';
-
-  const htEl = document.getElementById('hChecksTable');
-  if (!checks.length) { htEl.innerHTML = '<div class="empty">No shift checks yet. Operators will see the button when they open Stacked Chat.</div>'; return; }
-
-  const systemNames = { epos: 'EPOS', payments: 'Payments', wifi: 'WiFi', printer: 'Printer', bookings: 'Bookings' };
-  const statusBadge = v => {
-    if (v === 'green') return '<span style="color:#16a34a;font-weight:600">\✅ OK</span>';
-    if (v === 'amber') return '<span style="color:#ca8a04;font-weight:600">⚠️ Issue</span>';
-    if (v === 'red')   return '<span style="color:#dc2626;font-weight:600">🔴 Down</span>';
-    return '&mdash;';
-  };
-
-  htEl.innerHTML = '<table><thead><tr>' +
-    '<th>Venue</th><th>By</th><th>EPOS</th><th>Payments</th><th>WiFi</th><th>Printer</th><th>Bookings</th><th>Time</th>' +
-    '</tr></thead><tbody>' +
-    checks.slice(0,30).map(hc => {
-      const ans = hc.answers || {};
-      const d = new Date(hc.checked_at);
-      return '<tr>' +
-        '<td><div class="td-primary">' + esc(hc.venue || '&mdash;') + '</div></td>' +
-        '<td>' + esc(hc.name || '&mdash;') + '</td>' +
-        '<td>' + statusBadge(ans.epos) + '</td>' +
-        '<td>' + statusBadge(ans.payments) + '</td>' +
-        '<td>' + statusBadge(ans.wifi) + '</td>' +
-        '<td>' + statusBadge(ans.printer) + '</td>' +
-        '<td>' + statusBadge(ans.bookings) + '</td>' +
-        '<td>' + d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) + '</td>' +
-        '</tr>';
-    }).join('') +
-    '</tbody></table>';
-}
 function renderDocList(docs){const dl=document.getElementById('docList');if(!docs||!docs.length){dl.innerHTML='<div class="empty">No documents uploaded yet</div>';return;}dl.innerHTML=docs.map(d=>{const fn=esc(d.filename),date=new Date(d.created_at).toLocaleDateString('en-GB'),jfn=JSON.stringify(d.filename);return '<div class="doc-row"><div class="doc-left"><div class="doc-icon">&#x1F4C4;</div><div><div class="doc-name">'+fn+'</div><div class="doc-date">'+date+'</div></div></div><div class="doc-right"><span class="badge-indexed">Indexed</span><button class="btn-del" onclick="deleteDoc('+jfn+',this)">Delete</button></div></div>';}).join('');}
 
 async function deleteDoc(fn,btn){if(!confirm('Delete "'+fn+'"?'))return;btn.disabled=true;btn.textContent='Deleting...';try{const r=await fetch('/documents?filename='+encodeURIComponent(fn),{method:'DELETE'});const d=await r.json();if(d.ok){notify(fn+' deleted','green');btn.closest('.doc-row').remove();setTimeout(loadAnalytics,500);}else{notify('Delete failed','red');btn.disabled=false;btn.textContent='Delete';}}catch(e){notify('Error: '+e.message,'red');btn.disabled=false;}}
@@ -6727,77 +6426,6 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
       } catch(e) {
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ok:false, error:e.message}));
-      }
-    }); return;
-  }
-
-  // ─── HEALTH CHECK SAVE ─────────────────────────────────────────────────
-  if (method === 'POST' && url === '/health-check') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', async () => {
-      try {
-        const payload = JSON.parse(body);
-        await sbFetch('/rest/v1/health_checks', {
-          method: 'POST',
-          headers: { 'Prefer': 'return=minimal' },
-          body: payload
-        });
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ok:true}));
-      } catch(e) {
-        console.error('[health-check]', e.message);
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ok:false,error:e.message}));
-      }
-    }); return;
-  }
-
-  // ─── HEALTH CHECKS LIST ────────────────────────────────────────────────
-  if (method === 'GET' && url.startsWith('/health-checks')) {
-    try {
-      const params = new URL(url, 'http://localhost');
-      const venueId = params.searchParams.get('venue_id');
-      const filter = venueId
-        ? '/rest/v1/health_checks?select=*&venue_id=eq.' + encodeURIComponent(venueId) + '&order=checked_at.desc&limit=50'
-        : '/rest/v1/health_checks?select=*&order=checked_at.desc&limit=50';
-      const r = await sbFetch(filter);
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify(Array.isArray(r.data) ? r.data : []));
-    } catch(e) {
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify([]));
-    }
-    return;
-  }
-
-  // ─── CRON: SHIFT CHECK REMINDER ───────────────────────────────────────
-  if (method === 'POST' && url === '/cron/remind') {
-    const params = new URL(url, 'http://localhost');
-    let body = ''; req.on('data', c => body += c);
-    req.on('end', async () => {
-      try {
-        const { secret } = JSON.parse(body || '{}');
-        if (secret !== CRON_SECRET) { res.writeHead(401); res.end('Unauthorised'); return; }
-        // Fetch recent active venues
-        const vr = await sbFetch('/rest/v1/venues?select=name,id&order=created_at.desc&limit=100');
-        const venues = Array.isArray(vr.data) ? vr.data : [];
-        const day = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
-        const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-        if (SLACK_WEBHOOK_URL) {
-          const text = [
-            `☀️ *Good morning — time for your shift check!*`,
-            `It's ${day} at ${time}. Before service kicks off, make sure your tech is green across the board.`,
-            ``,
-            `*${venues.length} venue${venues.length !== 1 ? 's' : ''} active on Stacked Chat.*`,
-            `Open the app and hit *Start of shift check* to log your system status.`,
-          ].join('\n');
-          await sendSlackAlert({ venue: 'All venues', userName: 'Cron', email: '', issue: text, turns: 0 });
-        }
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok: true, venueCount: venues.length }));
-      } catch(e) {
-        res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
       }
     }); return;
   }
