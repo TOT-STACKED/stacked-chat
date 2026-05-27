@@ -837,8 +837,64 @@ async function getAnalytics() {
       }
     } catch(e) { /* nps_scores table may not exist yet */ }
 
+    // ── Vendor Intelligence: per-partner mentions, conversations, problems,
+    //    sample questions + NPS merge. Aggregated & anonymised across venues. ──
+    const VENDOR_CATALOG = [
+      {n:'Square',cat:'POS',kw:['square']},{n:'Toast',cat:'POS',kw:['toasttab','toast pos','toast support']},
+      {n:'Lightspeed',cat:'POS',kw:['lightspeed']},{n:'Zonal',cat:'POS',kw:['zonal']},
+      {n:'EPOS Now',cat:'POS',kw:['epos now','eposnow']},{n:'Tevalis',cat:'POS',kw:['tevalis']},
+      {n:'ICRTouch',cat:'POS',kw:['icrtouch','touchpoint']},{n:'Vita Mojo',cat:'POS',kw:['vita mojo','vitamojo']},
+      {n:'SumUp',cat:'Payments',kw:['sumup']},{n:'Zettle',cat:'Payments',kw:['zettle']},
+      {n:'Stripe',cat:'Payments',kw:['stripe']},{n:'Dojo',cat:'Payments',kw:['dojo']},
+      {n:'Worldpay',cat:'Payments',kw:['worldpay']},{n:'Adyen',cat:'Payments',kw:['adyen']},
+      {n:'Deliveroo',cat:'Delivery',kw:['deliveroo']},{n:'Uber Eats',cat:'Delivery',kw:['uber eats','ubereats']},
+      {n:'Just Eat',cat:'Delivery',kw:['just eat','justeat']},{n:'Deliverect',cat:'Delivery',kw:['deliverect']},
+      {n:'Flipdish',cat:'Delivery',kw:['flipdish']},{n:'Deputy',cat:'Rotas',kw:['deputy']},
+      {n:'Rotaready',cat:'Rotas',kw:['rotaready']},{n:'Workforce.com',cat:'Rotas',kw:['workforce']},
+      {n:'Fourth',cat:'Rotas',kw:['fourth hospitality','fourth app']},{n:'Planday',cat:'Rotas',kw:['planday']},
+      {n:'S4Labour',cat:'Rotas',kw:['s4labour']},{n:'OpenTable',cat:'Bookings',kw:['opentable']},
+      {n:'ResDiary',cat:'Bookings',kw:['resdiary']},{n:'SevenRooms',cat:'Bookings',kw:['sevenrooms']},
+      {n:'Resy',cat:'Bookings',kw:['resy']},{n:'Collins',cat:'Bookings',kw:['designmynight','collins']},
+      {n:'Crunchtime',cat:'Inventory',kw:['crunchtime']},{n:'Apicbase',cat:'Inventory',kw:['apicbase']},
+      {n:'Marketman',cat:'Inventory',kw:['marketman']},{n:'Nutritics',cat:'Inventory',kw:['nutritics']},
+      {n:'Tenzo',cat:'Analytics',kw:['tenzo']},{n:'Yumpingo',cat:'Analytics',kw:['yumpingo']},
+      {n:'Stampede',cat:'WiFi / Marketing',kw:['stampede']},{n:'Purple WiFi',cat:'WiFi',kw:['purple wifi','purple wi-fi']},
+      {n:'Airship',cat:'Loyalty',kw:['airship']}
+    ];
+    const PROBLEM_TYPES = [
+      {label:'Connection / offline',kw:["won't connect","wont connect","not connecting","can't connect","disconnect","offline","dropping","no connection"]},
+      {label:'Errors / crashing',kw:['error','crash','frozen','freezing','not working',"isn't working","won't work",'broken','glitch']},
+      {label:'Syncing',kw:['sync','out of sync','resync','re-sync']},
+      {label:'Printing',kw:['printer','not printing','print issue','kitchen ticket']},
+      {label:'Refunds / voids',kw:['refund','void','chargeback']},
+      {label:'Login / access',kw:['login','log in','password','locked out',"can't access"]},
+      {label:'Reports / end of day',kw:['report','end of day','z-report','reconcile']},
+      {label:'Payments / settlement',kw:['declined','settlement','payout','transaction failed']},
+      {label:'Menu / setup',kw:['menu','set up','setup','configure','pricing']},
+      {label:'Missing orders',kw:['missing order','order not','lost order','orders not']}
+    ];
+    const convUserMsgs = convs.map(c => (Array.isArray(c.messages)?c.messages:[]).filter(m=>m.role==='user').map(m=>String(m.content||'').toLowerCase()));
+    const vendorIntel = VENDOR_CATALOG.map(v => {
+      const matched = allMessages.filter(m => v.kw.some(k => m.includes(k)));
+      let conversations = 0;
+      convUserMsgs.forEach(um => { if (um.some(t => v.kw.some(k => t.includes(k)))) conversations++; });
+      const problems = PROBLEM_TYPES
+        .map(p => ({ label:p.label, count: matched.filter(m => p.kw.some(k => m.includes(k))).length }))
+        .filter(p => p.count>0).sort((a,b)=>b.count-a.count).slice(0,5);
+      const samples = matched.slice(0,3).map(m => m.length>150 ? m.slice(0,147)+'…' : m);
+      const npsMatch = npsData.find(n => v.kw.some(k => String(n.vendor||'').toLowerCase().includes(k)) || v.n.toLowerCase().includes(String(n.vendor||'').toLowerCase()));
+      let nps = null;
+      if (npsMatch) {
+        const passive = Math.max(0, npsMatch.count - npsMatch.promoters - npsMatch.detractors);
+        nps = { avg: npsMatch.avg, count: npsMatch.count, nps: npsMatch.nps, promoters: npsMatch.promoters, passive, detractors: npsMatch.detractors };
+      }
+      return { vendor:v.n, category:v.cat, mentions: matched.length, conversations, problems, samples, nps };
+    }).filter(v => v.mentions>0 || (v.nps && v.nps.count>0))
+      .sort((a,b)=> (b.mentions-a.mentions) || ((b.nps?b.nps.count:0)-(a.nps?a.nps.count:0)));
+
     return {
       totalConvs: convs.length, totalMessages: allMessages.length,
+      vendorIntel,
       openTickets: tickets.filter(t => t.status === 'open').length,
       escalatedTickets: tickets.filter(t => t.escalated).length,
       totalDocs: uniqueDocs.length,
@@ -4498,6 +4554,18 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
 .nav-item{padding:5px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;transition:all 0.1s}
 .nav-item:hover{background:var(--surface2);color:var(--text)}
 .nav-item.active{background:var(--surface2);color:var(--text);font-weight:600}
+.vlb{width:100%;border-collapse:collapse}
+.vlb th{text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)}
+.vlb th.r,.vlb td.r{text-align:right}
+.vlb td{padding:11px 14px;border-bottom:1px solid var(--surface2);font-size:13px;vertical-align:middle}
+.vlb tr.vr{cursor:pointer}
+.vlb tr.vr:hover{background:var(--surface2)}
+.vlb tr.vr.sel{background:#FFF3EE;box-shadow:inset 3px 0 0 var(--blue)}
+.npsp{display:inline-block;font-weight:700;font-size:12px;padding:2px 8px;border-radius:20px;font-variant-numeric:tabular-nums}
+.npsp.g{background:#E3F3E9;color:#16834a}.npsp.a{background:#FBEFD9;color:#b9750f}.npsp.r{background:#FBE3DF;color:#c0392b}
+.blk2{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:700;margin:15px 0 9px}
+.vbar{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}.vbar i{display:block;height:100%;border-radius:4px}
+.vq{font-size:12px;color:var(--text2);background:var(--surface2);border-radius:6px;padding:7px 10px;margin-bottom:5px;border-left:2px solid #F8DBCC;line-height:1.4}
 .nav-divider{width:1px;height:16px;background:var(--border2);margin:0 4px}
 .sub-tab-bar{display:flex;gap:4px;margin:16px 0 20px;border-bottom:1px solid var(--border);padding-bottom:0}
 .sub-tab{padding:7px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:1px solid transparent;border-bottom:none;background:none;font-family:inherit;transition:all 0.1s;margin-bottom:-1px}
@@ -4634,6 +4702,7 @@ tbody tr:hover td{background:var(--surface2)}
     <nav class="header-nav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
       <div class="nav-divider"></div>
+      <button class="nav-item" onclick="showTab('vendors')">&#x1F4CA; Vendor Intelligence</button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('venues')">Venues</button>
       <div class="nav-divider"></div>
@@ -4665,6 +4734,20 @@ tbody tr:hover td{background:var(--surface2)}
       <div class="card"><div class="card-header"><span class="card-title">Issue categories</span></div><div class="chart-wrap"><canvas id="donutChart"></canvas></div></div>
     </div>
     <div class="card"><div class="card-header"><span class="card-title">Recent conversations</span><button class="btn" onclick="showTab('conversations')">View all &rarr;</button></div><div id="recentConvs"><div class="empty">No conversations yet</div></div></div>
+  </div>
+
+  <div class="tab-panel" id="tab-vendors">
+    <div class="page-header">
+      <div><div class="page-title">Vendor Intelligence</div><div class="page-sub">What operators experience across your tech partners &mdash; aggregated &amp; anonymised across all venues</div></div>
+      <button class="btn" onclick="exportVendorCSV()">&#x2193; Export CSV</button>
+    </div>
+    <div class="grid-2" style="grid-template-columns:1.55fr 1fr;align-items:start">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Tech partner leaderboard</span><span class="card-meta">Ranked by mentions</span></div>
+        <div id="vendorTable"><div class="empty">Loading&hellip;</div></div>
+      </div>
+      <div class="card" style="padding:18px 20px"><div id="vendorDetail"><div class="empty">Select a vendor to drill in</div></div></div>
+    </div>
   </div>
 
   <div class="tab-panel" id="tab-conversations">
@@ -4910,7 +4993,7 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','conversations','venues','content','health'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','conversations','venues','content','health'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
 }
@@ -5054,9 +5137,66 @@ async function loadAnalytics() {
         '</div>';
     }
     renderVenues(a.venueStats || []);
+    renderVendorIntel(a.vendorIntel || []);
     renderDocs(a.docs);
     renderHealthData(a);
   } catch(e) { notify('Failed: '+e.message,'red'); console.error(e); }
+}
+
+// ── Vendor Intelligence (Phase 1) ─────────────────────────────────────────
+function renderVendorIntel(vis){
+  window._vendorIntel = vis || [];
+  const t = document.getElementById('vendorTable');
+  if(!t) return;
+  if(!vis || !vis.length){
+    t.innerHTML = '<div class="empty">No vendor mentions yet &mdash; this populates as operators chat about their tech.</div>';
+    const d=document.getElementById('vendorDetail'); if(d) d.innerHTML='<div class="empty">No data yet</div>';
+    return;
+  }
+  const cls = a => a==null ? '' : (a>=8?'g':(a>=6?'a':'r'));
+  t.innerHTML = '<table class="vlb"><thead><tr><th>Vendor</th><th>Category</th><th class="r">Mentions</th><th class="r">Convos</th><th class="r">Avg NPS</th></tr></thead><tbody>' +
+    vis.map(function(v,i){
+      const avg = v.nps ? v.nps.avg : null;
+      const pill = avg==null ? '<span style="color:var(--text3)">&mdash;</span>' : '<span class="npsp '+cls(parseFloat(avg))+'">'+avg+'</span>';
+      return '<tr class="vr'+(i===0?' sel':'')+'" onclick="selectVendor('+i+',this)"><td><strong>'+esc(v.vendor)+'</strong></td><td style="color:var(--text2);font-size:11px;text-transform:uppercase">'+esc(v.category)+'</td><td class="r">'+v.mentions+'</td><td class="r">'+v.conversations+'</td><td class="r">'+pill+'</td></tr>';
+    }).join('') + '</tbody></table>';
+  selectVendor(0);
+}
+function selectVendor(i, el){
+  const vis = window._vendorIntel || []; const v = vis[i]; if(!v) return;
+  if(el){ document.querySelectorAll('.vlb tr.vr').forEach(function(r){r.classList.remove('sel');}); el.classList.add('sel'); }
+  let html = '<div style="display:flex;align-items:baseline;justify-content:space-between"><div style="font-size:18px;font-weight:700">'+esc(v.vendor)+'</div><div style="font-size:11px;color:var(--text3);text-transform:uppercase">'+esc(v.category)+' &middot; '+v.mentions+' mentions</div></div>';
+  html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Anonymised insight from '+v.conversations+' conversation'+(v.conversations!==1?'s':'')+'</div>';
+  if(v.nps){
+    const tot = v.nps.count || 1;
+    const r = function(lab,val,col){ return '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:5px"><span style="width:64px;color:var(--text2)">'+lab+'</span><span class="vbar" style="flex:1"><i style="width:'+Math.round(val/tot*100)+'%;background:'+col+'"></i></span><span style="width:32px;text-align:right;font-weight:600">'+Math.round(val/tot*100)+'%</span></div>'; };
+    html += '<div class="blk2">NPS &middot; '+v.nps.count+' responses &middot; avg '+v.nps.avg+'/10</div>';
+    html += r('Promoters',v.nps.promoters,'#16a34a') + r('Passive',v.nps.passive,'#C77A12') + r('Detractors',v.nps.detractors,'#dc2626');
+  }
+  if(v.problems && v.problems.length){
+    const max = v.problems[0].count || 1;
+    html += '<div class="blk2">Most common problems</div>';
+    html += v.problems.map(function(p){ return '<div style="display:flex;align-items:center;gap:9px;font-size:12px;margin-bottom:6px"><span style="flex-basis:150px;flex-shrink:0">'+esc(p.label)+'</span><span class="vbar" style="flex:1"><i style="width:'+Math.round(p.count/max*100)+'%;background:var(--blue)"></i></span><span style="width:26px;text-align:right;color:var(--text2);font-size:11px">'+p.count+'</span></div>'; }).join('');
+  }
+  if(v.samples && v.samples.length){
+    html += '<div class="blk2">Sample questions (anonymised)</div>';
+    html += v.samples.map(function(s){ return '<div class="vq">'+esc(s)+'</div>'; }).join('');
+  }
+  if(!v.nps && (!v.problems || !v.problems.length)){
+    html += '<div class="empty" style="margin-top:14px">Mentions logged, but not enough detail yet for a breakdown.</div>';
+  }
+  document.getElementById('vendorDetail').innerHTML = html;
+}
+function exportVendorCSV(){
+  const vis = window._vendorIntel || [];
+  if(!vis.length){ notify('No vendor data to export yet','red'); return; }
+  const rows = [['Vendor','Category','Mentions','Conversations','Avg NPS','NPS responses','Top problems']];
+  vis.forEach(function(v){ rows.push([v.vendor,v.category,v.mentions,v.conversations,v.nps?v.nps.avg:'',v.nps?v.nps.count:'',(v.problems||[]).map(function(p){return p.label;}).join('; ')]); });
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'stacked-vendor-intelligence.csv'; a.click();
+  notify('Exported vendor intelligence CSV','green');
 }
 
 function toggleConv(el) { el.classList.toggle('open'); }
