@@ -6104,34 +6104,40 @@ const server = http.createServer(async (req, res) => {
           }
         } catch(e) {}
 
-        // ── Dish/menu images: find the closest match so the AI can mention it ──
+        // ── Dish/menu images: surface a photo ONLY when the user actually asks
+        // to SEE one (a photo/picture/image, or "what does it look like"). This
+        // prevents a photo popping up unprompted just because the chat mentioned
+        // something that happens to match an image name.
         let imageContext = '';
         let matchedImages = [];
-        try {
-          const imgQ = workspaceId
-            ? '/rest/v1/images?or=(tenant.is.null,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=url,title,description&limit=300'
-            : '/rest/v1/images?tenant=is.null&select=url,title,description&limit=300';
-          let imgR; try { imgR = await sbFetch(imgQ); if (!imgR || (imgR.status && imgR.status >= 400) || !Array.isArray(imgR.data)) throw 0; } catch(e2) { imgR = { data: [] }; }
-          const imgs = Array.isArray(imgR.data) ? imgR.data : [];
-          if (imgs.length) {
-            const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','images','send','what','does','the','and','for','our','can','of','me','please']);
-            // Include the last few turns so "send me that image" right after
-            // discussing it still resolves to the right picture (filename + context).
-            const imgSearch = ((message || '') + ' ' + history.slice(-3).map(m => (typeof m.content === 'string' ? m.content : '')).join(' ')).toLowerCase();
-            const words = [...new Set(imgSearch.split(/[\s,?!.;:()\[\]_]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
-            const scored = imgs.map(im => { const t = ((im.title || '') + ' ' + (im.description || '')).toLowerCase(); return { im: im, hits: words.filter(w => t.includes(w)).length }; });
-            matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 1).map(s => ({ url: s.im.url, title: s.im.title }));
-            if (matchedImages.length) {
-              imageContext = '\n\nIMAGE LIBRARY — you have a photo that matches this question:\n' +
-                matchedImages.map(m => '- "' + m.title + '"').join('\n') +
-                '\nIMPORTANT: If the photo is relevant, mention it naturally in one short sentence (e.g. "Here is a photo of the ' + matchedImages[0].title + ' below"). The image is attached automatically beneath your reply — never paste a URL or use technical phrases like "the system will attach".';
+        const wantsPhoto = /\b(photo|photos|picture|pictures|image|images|pic|pics|snap|visual)\b/i.test(message) || /\blooks?\s+like\b/i.test(message) || /\bwhat\b.*\blooks?\b/i.test(message);
+        if (wantsPhoto) {
+          try {
+            const imgQ = workspaceId
+              ? '/rest/v1/images?or=(tenant.is.null,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=url,title,description&limit=300'
+              : '/rest/v1/images?tenant=is.null&select=url,title,description&limit=300';
+            let imgR; try { imgR = await sbFetch(imgQ); if (!imgR || (imgR.status && imgR.status >= 400) || !Array.isArray(imgR.data)) throw 0; } catch(e2) { imgR = { data: [] }; }
+            const imgs = Array.isArray(imgR.data) ? imgR.data : [];
+            if (imgs.length) {
+              const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','images','send','what','does','the','and','for','our','can','of','me','please']);
+              // Only gated by wantsPhoto, so it's safe to use recent turns to
+              // resolve "what does it look like" right after naming the item.
+              const imgSearch = ((message || '') + ' ' + history.slice(-3).map(m => (typeof m.content === 'string' ? m.content : '')).join(' ')).toLowerCase();
+              const words = [...new Set(imgSearch.split(/[\s,?!.;:()\[\]_]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
+              const scored = imgs.map(im => { const t = ((im.title || '') + ' ' + (im.description || '')).toLowerCase(); return { im: im, hits: words.filter(w => t.includes(w)).length }; });
+              matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 1).map(s => ({ url: s.im.url, title: s.im.title }));
+              if (matchedImages.length) {
+                imageContext = '\n\nIMAGE LIBRARY — you have a photo that matches this question:\n' +
+                  matchedImages.map(m => '- "' + m.title + '"').join('\n') +
+                  '\nIMPORTANT: If the photo is relevant, mention it naturally in one short sentence (e.g. "Here is a photo of the ' + matchedImages[0].title + ' below"). The image is attached automatically beneath your reply — never paste a URL or use technical phrases like "the system will attach".';
+              }
             }
-          }
-        } catch(e) {}
+          } catch(e) {}
+        }
 
         const systemPrompt = `You are Stacked Chat — a friendly, direct AI assistant for UK hospitality businesses. You answer ANY question about running this business using its own knowledge base: staff handbooks, SOPs, policies, supplier and delivery info, rotas, opening/closing procedures — as well as hospitality technology troubleshooting. Tech support is one of the things you do, not the only thing.
 
-ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents don't cover the question, say so and answer from general best practice — never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
+ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. If a document below clearly relates to what the user is asking about, USE it and share what it contains — do NOT say you have nothing just because their exact wording or a qualifier (a season, a year, "summer", etc.) isn't in the document's title. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents genuinely don't cover the question, say so and answer from general best practice — never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
 
 IMAGES & PHOTOS: You CAN show photos added to this venue's library — when one matches, it attaches automatically beneath your reply (see "IMAGE LIBRARY" below if present). You can also READ an image a user attaches. You CANNOT email/download files or re-send an image the user just uploaded, so never say a flat "I am just a chat assistant, I cannot send images". IMPORTANT — when the user asks to SEE or SHARE a photo: FIRST answer their question fully from the knowledge base if the topic is covered there (give the details you have). NEVER say a document or topic is missing if it appears in the KNOWLEDGE BASE / documents below — it is only the PHOTO that might be missing. ONLY if no photo is attached beneath your reply, add ONE short line that a photo of it is not in the image library yet and an admin can add one with the "+" button. Do not refuse the whole request.
 
