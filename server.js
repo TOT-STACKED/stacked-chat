@@ -2308,7 +2308,6 @@ async function sendMessage() {
     const data = await res.json();
     const reply = data.response || "Sorry, I couldn't get a response. Please try again.";
     const supportUrl = data.supportUrl || null;
-    const shouldEscalate = data.escalate || false;
     lastBotMsg = reply;
     typing.remove();
     let videoData = null, displayReply = reply;
@@ -2322,13 +2321,6 @@ async function sendMessage() {
     if (data.detectedVendor && !npsShown && (data.forceNPS || messages.filter(m=>m.role==='user').length >= 2)) {
       npsShown = true;
       setTimeout(() => showNPS(data.detectedVendor), 1200);
-    }
-    if (shouldEscalate) {
-      const msgs = document.getElementById('messages');
-      const banner = document.createElement('div'); banner.className = 'escalation-banner';
-      banner.innerHTML = '<div class="esc-icon">&#x1F6A8;</div><div class="esc-body"><div class="esc-title">We&#39;ve flagged this for our team</div><div class="esc-sub">A member of the Stacked team has been alerted and will follow up with you shortly.</div></div>';
-      msgs.appendChild(banner);
-      msgs.scrollTop = msgs.scrollHeight;
     }
     messages.push({ role: 'assistant', content: displayReply });
     await saveConversation();
@@ -6085,7 +6077,7 @@ const server = http.createServer(async (req, res) => {
             const imgSearch = ((message || '') + ' ' + history.slice(-3).map(m => (typeof m.content === 'string' ? m.content : '')).join(' ')).toLowerCase();
             const words = [...new Set(imgSearch.split(/[\s,?!.;:()\[\]_]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
             const scored = imgs.map(im => { const t = ((im.title || '') + ' ' + (im.description || '')).toLowerCase(); return { im: im, hits: words.filter(w => t.includes(w)).length }; });
-            matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 2).map(s => ({ url: s.im.url, title: s.im.title }));
+            matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 1).map(s => ({ url: s.im.url, title: s.im.title }));
             if (matchedImages.length) {
               imageContext = '\n\nIMAGE LIBRARY — you have a photo that matches this question:\n' +
                 matchedImages.map(m => '- "' + m.title + '"').join('\n') +
@@ -6101,8 +6093,6 @@ ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE
 IMAGES & PHOTOS: You CAN show photos that have been added to this venue's library — when one matches, it is attached automatically beneath your reply (see "IMAGE LIBRARY" below if present). You can also READ an image a user attaches to their message. You CANNOT email/download files or re-send an image the user just uploaded. So never say a flat "I am just a chat assistant, I cannot send images". If the user asks to see/share a photo and there is NO "IMAGE LIBRARY" match below, reply briefly that the image is not in the library yet and an admin can add it using the "+" button (Add doc / Add image) — then it can be shown on request. Keep it to one short sentence.
 
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
-
-ESCALATION: If the issue clearly needs human intervention — for example the user has tried all steps and it's still broken, there is data loss, a vendor outage, account access issues only the vendor can fix, or the user is losing significant revenue — add [ESCALATE] on its own line at the very end of your response. Keep your reply helpful and reassuring; the system will handle alerting the team automatically.
 
 Your personality:
 - Calm under pressure (operators often message you during a crisis)
@@ -6330,19 +6320,9 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${ve
           }
         } catch(e) {}
 
-        // ─── ESCALATION DETECTION ────────────────────────────────────────
-        const ESCALATION_PHRASES = [
-          'speak to someone','talk to someone','need a human','need a person',
-          'real person','human agent','actual person','still not working',
-          'still broken','nothing works','tried everything','tried all','not fixed',
-          'losing money','losing sales','no solution','cant fix','can\'t fix','given up'
-        ];
-        const botEscalate = rawReply.includes('[ESCALATE]');
-        const userEscalate = ESCALATION_PHRASES.some(p => message.toLowerCase().includes(p));
-        const longUnresolved = history.length >= 10;
-        const shouldEscalate = botEscalate || userEscalate || longUnresolved;
-
-        // Strip [ESCALATE] tag from reply text
+        // ─── ESCALATION REMOVED ──────────────────────────────────────────
+        // The "flagged for our team" handoff has been removed entirely.
+        // Strip any stray [ESCALATE] tag defensively so it can never leak.
         reply = reply.replace(/\[ESCALATE\]/g, '').trim();
         finalReply = finalReply.replace(/\[ESCALATE\]/g, '').trim();
 
@@ -6355,22 +6335,8 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${ve
           finalReply = finalReply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
         }
 
-        if (shouldEscalate) {
-          try {
-            const issue = history.length > 0
-              ? history.find(m => m.role === 'user')?.content || message
-              : message;
-            await sbFetch('/rest/v1/tickets', {
-              method: 'POST',
-              headers: { 'Prefer': 'return=minimal' },
-              body: { email: 'escalation@stackedchat.io', name: userName || 'Unknown', venue: venue || 'Unknown', issue: issue.substring(0, 300), status: 'open', escalated: true }
-            });
-            await sendSlackAlert({ venue, userName, email: 'via chat', issue: message.substring(0, 200), turns: history.length + 1 });
-          } catch(e) { console.error('Escalation error:', e); }
-        }
-
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, images: matchedImages, detectedVendor, forceNPS: npsForced || !!npsMatch}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: false, videos:relevantVideos, videoCount:relevantVideos.length, images: matchedImages, detectedVendor, forceNPS: npsForced || !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
