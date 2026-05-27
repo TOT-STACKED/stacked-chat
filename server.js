@@ -749,14 +749,16 @@ async function verifyAuthEmail(token) {
 
 async function getAnalytics() {
   try {
-    const [convsR, ticketsR, docsR] = await Promise.all([
+    const [convsR, ticketsR, docsR, venuesR] = await Promise.all([
       sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=200'),
       sbFetch('/rest/v1/tickets?select=*&order=created_at.desc&limit=100'),
       sbFetch('/rest/v1/documents?select=filename,created_at&order=created_at.desc&limit=1000'),
+      sbFetch('/rest/v1/venues?select=id,name,created_at&order=created_at.asc&limit=1000'),
     ]);
     const convs = Array.isArray(convsR.data) ? convsR.data : [];
     const tickets = Array.isArray(ticketsR.data) ? ticketsR.data : [];
     const docs = Array.isArray(docsR.data) ? docsR.data : [];
+    const venuesAll = Array.isArray(venuesR.data) ? venuesR.data : [];
     const allMessages = [];
     convs.forEach(c => {
       if (c.messages && Array.isArray(c.messages)) {
@@ -901,9 +903,29 @@ async function getAnalytics() {
     });
     const knowledgeGaps = gaps.slice(-60).reverse();
 
+    // ── Adoption (Phase 4): onboarding over time, active accounts, top venues ──
+    const nowMs = Date.now();
+    const d30 = nowMs - 30 * 24 * 3600 * 1000;
+    const mk = ts => { try { return new Date(ts).toLocaleDateString('en-GB',{month:'short',year:'2-digit'}); } catch(e){ return '—'; } };
+    const onboardByMonth = {};
+    venuesAll.forEach(v => { const k = mk(v.created_at); onboardByMonth[k] = (onboardByMonth[k]||0)+1; });
+    const months = [];
+    for (let i = 5; i >= 0; i--) { const d = new Date(); d.setMonth(d.getMonth()-i); months.push(d.toLocaleDateString('en-GB',{month:'short',year:'2-digit'})); }
+    const onboarding = months.map(m => ({ month: m, count: onboardByMonth[m] || 0 }));
+    const newThisMonth = venuesAll.filter(v => new Date(v.created_at).getTime() > d30).length;
+    const activeVenues = venueStats.filter(v => new Date(v.lastSeen).getTime() > d30);
+    const adoption = {
+      totalVenues: venuesAll.length,
+      activeCount: activeVenues.length,
+      newThisMonth,
+      avgQuestionsPerVenue: venueStats.length ? Math.round(allMessages.length / venueStats.length) : 0,
+      onboarding,
+      topVenues: venueStats.slice(0, 10).map(v => ({ venue: v.venue, convs: v.convs, msgs: v.msgs, lastSeen: v.lastSeen, active: new Date(v.lastSeen).getTime() > d30 }))
+    };
+
     return {
       totalConvs: convs.length, totalMessages: allMessages.length,
-      vendorIntel, topKeywords, knowledgeGaps, knowledgeGapCount: gaps.length,
+      vendorIntel, topKeywords, knowledgeGaps, knowledgeGapCount: gaps.length, adoption,
       openTickets: tickets.filter(t => t.status === 'open').length,
       escalatedTickets: tickets.filter(t => t.escalated).length,
       totalDocs: uniqueDocs.length,
@@ -4523,6 +4545,7 @@ tbody tr:hover td{background:var(--surface2)}
       <button class="nav-item" onclick="showTab('vendors')">&#x1F4CA; Vendor Intelligence</button>
       <button class="nav-item" onclick="showTab('questions')">&#x1F4AC; Operator Questions</button>
       <button class="nav-item" onclick="showTab('gaps')">&#x1F9E9; Knowledge Gaps</button>
+      <button class="nav-item" onclick="showTab('adoption')">&#x1F4C8; Adoption</button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('venues')">Venues</button>
       <div class="nav-divider"></div>
@@ -4599,6 +4622,28 @@ tbody tr:hover td{background:var(--surface2)}
     <div class="card">
       <div class="card-header"><span class="card-title">Recent unanswered questions</span><span class="card-meta">Add the missing knowledge to close these</span></div>
       <div id="gapsList"><div class="empty">Loading&hellip;</div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-adoption">
+    <div class="page-header">
+      <div><div class="page-title">Adoption</div><div class="page-sub">How Stacked Chat is spreading across operators</div></div>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi"><div class="kpi-label">Total venues</div><div class="kpi-value" id="adTotal"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Active (30 days)</div><div class="kpi-value" id="adActive"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">New (30 days)</div><div class="kpi-value" id="adNew"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Avg questions / venue</div><div class="kpi-value" id="adAvg"><span class="shimmer"></span></div></div>
+    </div>
+    <div class="grid-2" style="align-items:start">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Venues onboarded</span><span class="card-meta">Last 6 months</span></div>
+        <div id="adOnboard"><div class="empty">Loading&hellip;</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Most active venues</span><span class="card-meta">By messages</span></div>
+        <div id="adTopVenues"><div class="empty">Loading&hellip;</div></div>
+      </div>
     </div>
   </div>
 
@@ -4823,7 +4868,7 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','conversations','venues','content'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','adoption','conversations','venues','content'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
 }
@@ -4970,6 +5015,7 @@ async function loadAnalytics() {
     renderVendorIntel(a.vendorIntel || []);
     renderOperatorQuestions(a.topTopics || [], a.topKeywords || []);
     renderKnowledgeGaps(a.knowledgeGaps || [], a.knowledgeGapCount || 0, a.totalMessages || 0);
+    renderAdoption(a.adoption || {});
     renderDocs(a.docs);
   } catch(e) { notify('Failed: '+e.message,'red'); console.error(e); }
 }
@@ -5044,6 +5090,34 @@ function renderOperatorQuestions(topTopics, topKeywords){
     }
   }
 }
+// ── Adoption (Phase 4) ────────────────────────────────────────────────────
+function renderAdoption(ad){
+  const set = function(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('adTotal', (ad.totalVenues||0).toLocaleString());
+  set('adActive', (ad.activeCount||0).toLocaleString());
+  set('adNew', (ad.newThisMonth||0).toLocaleString());
+  set('adAvg', (ad.avgQuestionsPerVenue||0).toLocaleString());
+  const ob = document.getElementById('adOnboard');
+  if(ob){
+    const onb = ad.onboarding || [];
+    const max = Math.max(1, ...onb.map(function(o){return o.count;}));
+    if(!onb.length){ ob.innerHTML='<div class="empty">No venues yet</div>'; }
+    else ob.innerHTML = onb.map(function(o){
+      return '<div class="data-row"><span class="data-label" style="min-width:60px">'+esc(o.month)+'</span><div class="bar-outer"><div class="bar-inner alt" style="width:'+Math.round(o.count/max*100)+'%"></div></div><span class="data-count">'+o.count+'</span></div>';
+    }).join('');
+  }
+  const tv = document.getElementById('adTopVenues');
+  if(tv){
+    const vs = ad.topVenues || [];
+    if(!vs.length){ tv.innerHTML='<div class="empty">No venue activity yet</div>'; return; }
+    tv.innerHTML = '<table class="vlb"><thead><tr><th>Venue</th><th class="r">Chats</th><th class="r">Messages</th><th class="r">Status</th></tr></thead><tbody>' +
+      vs.map(function(v){
+        const badge = v.active ? '<span class="npsp g">Active</span>' : '<span class="npsp" style="background:var(--surface2);color:var(--text3)">Dormant</span>';
+        return '<tr><td><strong>'+esc(v.venue||'Unknown')+'</strong></td><td class="r">'+v.convs+'</td><td class="r">'+v.msgs+'</td><td class="r">'+badge+'</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+}
+
 // ── Knowledge Gaps (Phase 3) ──────────────────────────────────────────────
 function renderKnowledgeGaps(gaps, total, totalQs){
   window._gaps = gaps || [];
