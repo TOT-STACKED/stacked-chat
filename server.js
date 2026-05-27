@@ -5950,6 +5950,8 @@ const server = http.createServer(async (req, res) => {
 
         let docContext = '';
         let docFile = null; // top source doc's shareable file link, if it has one
+        // Only attach a downloadable file when the user actually asks for one.
+        const fileIntent = /\b(pdf|document|file|doc|download|forward|share|send|email|copy|attachment)\b/i.test(message);
         // Resolve the asker's workspace (group) so private docs stay isolated.
         let workspaceId = null;
         try {
@@ -6015,12 +6017,16 @@ const server = http.createServer(async (req, res) => {
             if (relevant.length > 0) {
               docContext = '\n\n=== FROM KNOWLEDGE BASE ===\n' +
                 relevant.map(d => '[' + d.filename + ']\n' + d.section).join('\n\n');
-              // Prefer the top relevant doc's file; if duplicates (an older
-              // text-only copy of the same file) push the file-bearing chunk out
-              // of the top results, fall back to ANY matching chunk that has a
-              // file — so a stale duplicate can never hide the download link.
-              const withFile = relevant.find(d => d.file_url) || hitDocs.find(d => d.file_url);
-              if (withFile) docFile = { url: withFile.file_url, filename: withFile.filename };
+              // Only offer the downloadable file when the user actually asked for
+              // it (share/send/download a doc/pdf) — never attach it to unrelated
+              // answers. Prefer the top relevant doc's file; if a stale duplicate
+              // of the SAME file pushed the file-bearing chunk out of the top
+              // results, fall back to a matching chunk of that same filename.
+              if (fileIntent) {
+                const top = relevant[0];
+                const withFile = relevant.find(d => d.file_url) || (top && hitDocs.find(d => d.file_url && d.filename === top.filename));
+                if (withFile) docFile = { url: withFile.file_url, filename: withFile.filename };
+              }
             }
           }
         } catch(e) { /* no docs */ }
@@ -6153,7 +6159,6 @@ const server = http.createServer(async (req, res) => {
         // Tell the model whether a downloadable file link is ACTUALLY attached to
         // this reply, so it never promises a "link below" that isn't there.
         let docFileNote = '';
-        const fileIntent = /\b(pdf|document|file|doc|menu|download|forward|share|send|email)\b/i.test(message);
         if (docFile) {
           docFileNote = '\n\nSHAREABLE FILE: A download link for "' + docFile.filename + '" IS attached automatically beneath your reply. If the user wants to share, forward or download it, tell them to open/forward it using that link below.';
         } else if (fileIntent) {
