@@ -6098,6 +6098,8 @@ const server = http.createServer(async (req, res) => {
 
 ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents don't cover the question, say so and answer from general best practice — never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
 
+IMAGES & PHOTOS: You CAN show photos that have been added to this venue's library — when one matches, it is attached automatically beneath your reply (see "IMAGE LIBRARY" below if present). You can also READ an image a user attaches to their message. You CANNOT email/download files or re-send an image the user just uploaded. So never say a flat "I am just a chat assistant, I cannot send images". If the user asks to see/share a photo and there is NO "IMAGE LIBRARY" match below, reply briefly that the image is not in the library yet and an admin can add it using the "+" button (Add doc / Add image) — then it can be shown on request. Keep it to one short sentence.
+
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
 
 ESCALATION: If the issue clearly needs human intervention — for example the user has tried all steps and it's still broken, there is data loss, a vendor outage, account access issues only the vendor can fix, or the user is losing significant revenue — add [ESCALATE] on its own line at the very end of your response. Keep your reply helpful and reassuring; the system will handle alerting the team automatically.
@@ -6275,16 +6277,24 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${ve
         }
         const rawReply = apiRes.content?.[0]?.text || 'Sorry, I could not get a response. Please try again.';
 
-        // Detect supportUrl BEFORE cleaning — user message first (most accurate), then Claude's reply
+        // Detect supportUrl BEFORE cleaning — user message first (most accurate), then Claude's reply.
+        // Only surface a vendor support link when the user is genuinely asking for
+        // TECH HELP. A product name merely appearing (e.g. "Tech on Toast") must NOT
+        // trigger a support pill.
         let supportUrl = null;
         const userMsgLower = message.toLowerCase();
-        for (const [vendor, url] of Object.entries(VENDOR_SUPPORT_URLS)) {
-          if (userMsgLower.includes(vendor)) { supportUrl = url; break; }
-        }
-        if (!supportUrl) {
-          const mlm = rawReply.match(/\]\((https?:\/\/[^)]+)\)/);
-          if (mlm) supportUrl = mlm[1];
-          else { const pm = rawReply.match(/https?:\/\/[^\s)>\]]+/); if (pm) supportUrl = pm[0]; }
+        const techIntent = /\b(not working|isn'?t working|not connecting|won'?t|wont|broken|down|crash(ing|ed)?|error|issue|problem|fault|glitch|fix|setup|set ?up|configure|connect|disconnect|offline|frozen|freeze|stuck|reset|reboot|restart|re-?sync|sync|update|install|uninstall|log ?in|login|logged out|password|printer|terminal|card machine|payment|epos|e-?pos|till|\bpos\b|how do i|how to|troubleshoot|trouble|support|helpline|keeps|not printing|declined)\b/i.test(userMsgLower);
+        if (techIntent) {
+          // Guard against "tech on toast" matching the Toast POS vendor.
+          const vendorScan = userMsgLower.replace(/tech on toast/g, '');
+          for (const [vendor, url] of Object.entries(VENDOR_SUPPORT_URLS)) {
+            if (vendorScan.includes(vendor)) { supportUrl = url; break; }
+          }
+          if (!supportUrl) {
+            const mlm = rawReply.match(/\]\((https?:\/\/[^)]+)\)/);
+            if (mlm) supportUrl = mlm[1];
+            else { const pm = rawReply.match(/https?:\/\/[^\s)>\]]+/); if (pm) supportUrl = pm[0]; }
+          }
         }
 
         // Clean reply: strip markdown link syntax (keep label text), remove bare URLs
