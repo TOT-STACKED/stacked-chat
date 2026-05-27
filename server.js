@@ -6135,6 +6135,16 @@ const server = http.createServer(async (req, res) => {
           } catch(e) {}
         }
 
+        // Tell the model whether a downloadable file link is ACTUALLY attached to
+        // this reply, so it never promises a "link below" that isn't there.
+        let docFileNote = '';
+        const fileIntent = /\b(pdf|document|file|doc|menu|download|forward|share|send|email)\b/i.test(message);
+        if (docFile) {
+          docFileNote = '\n\nSHAREABLE FILE: A download link for "' + docFile.filename + '" IS attached automatically beneath your reply. If the user wants to share, forward or download it, tell them to open/forward it using that link below.';
+        } else if (fileIntent) {
+          docFileNote = '\n\nSHAREABLE FILE: There is NO downloadable file link attached to this reply. If the user asks to share/forward/download a document file, do NOT claim a link is below. Explain the document was stored as text only, and an admin can re-add it with the "+" button (Add doc) to make the original file shareable.';
+        }
+
         const systemPrompt = `You are Stacked Chat — a friendly, direct AI assistant for UK hospitality businesses. You answer ANY question about running this business using its own knowledge base: staff handbooks, SOPs, policies, supplier and delivery info, rotas, opening/closing procedures — as well as hospitality technology troubleshooting. Tech support is one of the things you do, not the only thing.
 
 ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. If a document below clearly relates to what the user is asking about, USE it and share what it contains — do NOT say you have nothing just because their exact wording or a qualifier (a season, a year, "summer", etc.) isn't in the document's title. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents genuinely don't cover the question, say so and answer from general best practice — never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
@@ -6267,7 +6277,7 @@ Support URLs:
 - ALWAYS include the full vendor support URL (starting with https://) when referencing a support page - never just the domain name
 
 KNOWLEDGE BASE:
-${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${venueContext}`;
+${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${docFileNote}${venueContext}`;
 
         const messages = history.slice(-8).map(m => ({role:m.role,content:m.content}));
         // Build the current user turn. If an image was attached, send it as a
