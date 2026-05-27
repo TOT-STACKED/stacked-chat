@@ -1144,6 +1144,15 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   #mic { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); }
   #mic:hover { border-color: var(--orange); color: var(--orange); }
   #mic.listening { background: var(--orange); border-color: var(--orange); color: #fff; animation: pulse 1s infinite; }
+  #attachBtn { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); padding: 0; }
+  #attachBtn:hover { border-color: var(--orange); color: var(--orange); }
+  #attachBtn.has { border-color: var(--orange); color: var(--orange); background: #fff3ee; }
+  .attach-preview { padding: 8px 12px 0; display: flex; }
+  .attach-chip { position: relative; display: inline-flex; align-items: center; gap: 8px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 5px 10px 5px 5px; max-width: 240px; }
+  .attach-chip img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; display: block; }
+  .attach-chip .ac-name { font-size: 12px; color: var(--brown-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attach-chip .ac-x { border: none; background: var(--brown); color: #fff; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 1; cursor: pointer; flex-shrink: 0; }
+  .msg-img { max-width: 240px; width: 100%; border-radius: 12px; margin-top: 6px; display: block; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(230,78,26,0.4); } 50% { box-shadow: 0 0 0 8px rgba(230,78,26,0); } }
   #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(230,78,26,0.30); }
   #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(230,78,26,0.4); }
@@ -1436,11 +1445,16 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     </div>
   </main>
 
+  <div id="attachPreview" class="attach-preview" style="display:none"></div>
   <div class="input-bar">
     <input type="file" id="kbFile" accept=".pdf,.doc,.docx,.txt,.csv,.md,.png,.jpg,.jpeg,.webp" style="display:none" onchange="handleKbUpload(this.files)" multiple>
     <input type="file" id="vidFile" accept="video/*" style="display:none" onchange="handleVideoUpload(this.files)" multiple>
+    <input type="file" id="chatImgFile" accept="image/*" style="display:none" onchange="handleChatImage(this.files)">
     <button id="kbAdd" onclick="requireAdminVerify(function(){document.getElementById('kbFile').click();})" title="Add to knowledge base" style="display:none">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button id="attachBtn" onclick="document.getElementById('chatImgFile').click()" title="Attach a photo">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
     </button>
     <textarea id="input" placeholder="Ask anything about your business&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
     <button id="mic" onclick="toggleMic()" title="Voice input">
@@ -2238,20 +2252,58 @@ function toggleMic() {
   recognition.start();
 }
 
+// ── Attach a photo for the bot to read (vision) ──────────────────────────
+let pendingImage = null; // { dataUrl, data, media_type, name }
+function handleChatImage(files) {
+  const f = files && files[0]; if (!f) return;
+  if (!/^image\//.test(f.type)) { showToast('Please choose an image file'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const MAX = 1024;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) { if (w >= h) { h = Math.round(h * MAX / w); w = MAX; } else { w = Math.round(w * MAX / h); h = MAX; } }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = cv.toDataURL('image/jpeg', 0.8);
+      pendingImage = { dataUrl: dataUrl, data: dataUrl.split(',')[1], media_type: 'image/jpeg', name: f.name || 'photo' };
+      showAttachPreview();
+    };
+    img.onerror = function() { showToast('Could not read that image'); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function() { showToast('Could not read that file'); };
+  reader.readAsDataURL(f);
+  document.getElementById('chatImgFile').value = '';
+}
+function showAttachPreview() {
+  const el = document.getElementById('attachPreview');
+  const btn = document.getElementById('attachBtn');
+  if (!el) return;
+  if (!pendingImage) { el.style.display = 'none'; el.innerHTML = ''; if (btn) btn.classList.remove('has'); return; }
+  el.style.display = 'flex';
+  el.innerHTML = '<div class="attach-chip"><img src="' + pendingImage.dataUrl + '" alt=""><span class="ac-name">' + teamEsc(pendingImage.name) + '</span><button class="ac-x" onclick="clearAttach()" title="Remove">✕</button></div>';
+  if (btn) btn.classList.add('has');
+}
+function clearAttach() { pendingImage = null; showAttachPreview(); }
+
 async function sendMessage() {
   const input = document.getElementById('input');
   const text = input.value.trim();
-  if (!text) return;
+  const img = pendingImage;
+  if (!text && !img) return;
   hideWelcome();
   input.value = ''; input.style.height = 'auto';
   document.getElementById('send').disabled = true;
-  addMessage('user', text);
-  messages.push({ role: 'user', content: text });
+  addMessage('user', text, false, null, null, img ? img.dataUrl : null);
+  messages.push({ role: 'user', content: text || '📷 (image)' });
+  clearAttach();
   const typing = addTyping();
   try {
     const res = await fetch(SERVER_URL + '/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history: messages.slice(-10), venue: user?.venue, venue_id: user?.venue_id, userName: user?.name })
+      body: JSON.stringify({ message: text, history: messages.slice(-10), venue: user?.venue, venue_id: user?.venue_id, userName: user?.name, image: img ? { data: img.data, media_type: img.media_type } : null })
     });
     const data = await res.json();
     const reply = data.response || "Sorry, I couldn't get a response. Please try again.";
@@ -2292,7 +2344,7 @@ async function sendMessage() {
 
 function hideWelcome() { stopCarousel(); const w = document.getElementById('welcome'); if (w) w.remove(); }
 
-function addMessage(role, content, showTicket, video, supportUrl) {
+function addMessage(role, content, showTicket, video, supportUrl, userImg) {
   const msgs = document.getElementById('messages');
   const wrap = document.createElement('div'); wrap.className = 'msg ' + role;
   const avatar = document.createElement('div'); avatar.className = 'msg-avatar';
@@ -2308,7 +2360,10 @@ function addMessage(role, content, showTicket, video, supportUrl) {
       return "<a href=" + url + " target=_blank rel=noopener class=link-pill style=margin:0>" + url + "</a>";
     });
     bubble.innerHTML = t;
-  } else { bubble.textContent = content; }
+  } else {
+    if (content) bubble.textContent = content;
+    if (userImg) { const im = document.createElement('img'); im.className = 'msg-img'; im.src = userImg; im.alt = 'attached image'; bubble.appendChild(im); }
+  }
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
   if (role === 'assistant' && supportUrl) {
     const pillMap = {
@@ -5812,7 +5867,7 @@ const server = http.createServer(async (req, res) => {
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
-        const { message, history = [], venue, venue_id, userName } = JSON.parse(body);
+        const { message, history = [], venue, venue_id, userName, image } = JSON.parse(body);
 
         // Fetch venue tech stack if we have a venue_id
         let techStackContext = '';
@@ -5985,6 +6040,28 @@ const server = http.createServer(async (req, res) => {
           }
         } catch(e) {}
 
+        // ── Dish/menu images: find the closest match so the AI can mention it ──
+        let imageContext = '';
+        let matchedImages = [];
+        try {
+          const imgQ = workspaceId
+            ? '/rest/v1/images?or=(tenant.is.null,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=url,title,description&limit=300'
+            : '/rest/v1/images?tenant=is.null&select=url,title,description&limit=300';
+          let imgR; try { imgR = await sbFetch(imgQ); if (!imgR || (imgR.status && imgR.status >= 400) || !Array.isArray(imgR.data)) throw 0; } catch(e2) { imgR = { data: [] }; }
+          const imgs = Array.isArray(imgR.data) ? imgR.data : [];
+          if (imgs.length) {
+            const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','what','does','the','and','for','our','can','of']);
+            const words = [...new Set((message || '').toLowerCase().split(/[\s,?!.;:()\[\]]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
+            const scored = imgs.map(im => { const t = ((im.title || '') + ' ' + (im.description || '')).toLowerCase(); return { im: im, hits: words.filter(w => t.includes(w)).length }; });
+            matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 2).map(s => ({ url: s.im.url, title: s.im.title }));
+            if (matchedImages.length) {
+              imageContext = '\n\nIMAGE LIBRARY — you have a photo that matches this question:\n' +
+                matchedImages.map(m => '- "' + m.title + '"').join('\n') +
+                '\nIMPORTANT: If the photo is relevant, mention it naturally in one short sentence (e.g. "Here is a photo of the ' + matchedImages[0].title + ' below"). The image is attached automatically beneath your reply — never paste a URL or use technical phrases like "the system will attach".';
+            }
+          }
+        } catch(e) {}
+
         const systemPrompt = `You are Stacked Chat — a friendly, direct AI assistant for UK hospitality businesses. You answer ANY question about running this business using its own knowledge base: staff handbooks, SOPs, policies, supplier and delivery info, rotas, opening/closing procedures — as well as hospitality technology troubleshooting. Tech support is one of the things you do, not the only thing.
 
 ANSWER FROM THE KNOWLEDGE BASE: Prefer information from the "FROM KNOWLEDGE BASE" and "VENDOR KNOWLEDGE" context below when it's relevant. When your answer draws on a specific document, cite it briefly on its own line at the end, e.g. "Source: Staff Handbook" using the document's filename. If the documents don't cover the question, say so and answer from general best practice — never invent business-specific facts (policies, contacts, prices, hours) that aren't in the documents.
@@ -6115,11 +6192,24 @@ Support URLs:
 - ALWAYS include the full vendor support URL (starting with https://) when referencing a support page - never just the domain name
 
 KNOWLEDGE BASE:
-${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
+${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${venueContext}`;
 
         const messages = history.slice(-8).map(m => ({role:m.role,content:m.content}));
-        if (!messages.length || messages[messages.length-1].content !== message) {
-          messages.push({role:'user',content:message});
+        // Build the current user turn. If an image was attached, send it as a
+        // multimodal block so the model can actually SEE it (Claude vision).
+        const userContent = (image && image.data && image.media_type)
+          ? [
+              { type: 'image', source: { type: 'base64', media_type: image.media_type, data: image.data } },
+              { type: 'text', text: (message && message.trim()) ? message : 'Please look at this image and help me with it.' }
+            ]
+          : message;
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === 'user') {
+          // The client already included this turn in history — upgrade it
+          // (attaches the image / ensures the text is present).
+          lastMsg.content = userContent;
+        } else {
+          messages.push({ role: 'user', content: userContent });
         }
 
         const https = require('https');
@@ -6236,22 +6326,6 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
             await sendSlackAlert({ venue, userName, email: 'via chat', issue: message.substring(0, 200), turns: history.length + 1 });
           } catch(e) { console.error('Escalation error:', e); }
         }
-
-        // ── Dish/menu images: surface the closest match(es) to the question ──
-        let matchedImages = [];
-        try {
-          const imgQ = workspaceId
-            ? '/rest/v1/images?or=(tenant.is.null,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=url,title,description&limit=300'
-            : '/rest/v1/images?tenant=is.null&select=url,title,description&limit=300';
-          let imgR; try { imgR = await sbFetch(imgQ); if (!imgR || (imgR.status && imgR.status >= 400) || !Array.isArray(imgR.data)) throw 0; } catch(e2) { imgR = { data: [] }; }
-          const imgs = Array.isArray(imgR.data) ? imgR.data : [];
-          if (imgs.length) {
-            const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','what','does','the','and','for','our','can','of']);
-            const words = [...new Set(message.toLowerCase().split(/[\s,?!.;:()\[\]]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
-            const scored = imgs.map(im => { const t = ((im.title || '') + ' ' + (im.description || '')).toLowerCase(); return { im: im, hits: words.filter(w => t.includes(w)).length }; });
-            matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 2).map(s => ({ url: s.im.url, title: s.im.title }));
-          }
-        } catch(e) {}
 
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, images: matchedImages, detectedVendor, forceNPS: npsForced || !!npsMatch}));
