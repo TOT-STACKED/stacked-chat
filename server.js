@@ -6015,7 +6015,11 @@ const server = http.createServer(async (req, res) => {
             if (relevant.length > 0) {
               docContext = '\n\n=== FROM KNOWLEDGE BASE ===\n' +
                 relevant.map(d => '[' + d.filename + ']\n' + d.section).join('\n\n');
-              const withFile = relevant.find(d => d.file_url);
+              // Prefer the top relevant doc's file; if duplicates (an older
+              // text-only copy of the same file) push the file-bearing chunk out
+              // of the top results, fall back to ANY matching chunk that has a
+              // file — so a stale duplicate can never hide the download link.
+              const withFile = relevant.find(d => d.file_url) || hitDocs.find(d => d.file_url);
               if (withFile) docFile = { url: withFile.file_url, filename: withFile.filename };
             }
           }
