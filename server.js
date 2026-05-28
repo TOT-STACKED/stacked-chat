@@ -749,16 +749,18 @@ async function verifyAuthEmail(token) {
 
 async function getAnalytics() {
   try {
-    const [convsR, ticketsR, docsR, venuesR] = await Promise.all([
+    const [convsR, ticketsR, docsR, venuesR, leadsR] = await Promise.all([
       sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=200'),
       sbFetch('/rest/v1/tickets?select=*&order=created_at.desc&limit=100'),
       sbFetch('/rest/v1/documents?select=filename,created_at&order=created_at.desc&limit=1000'),
       sbFetch('/rest/v1/venues?select=id,name,created_at&order=created_at.asc&limit=1000'),
+      sbFetch('/rest/v1/leads?select=name,venue,email,phone,created_at&order=created_at.desc&limit=500'),
     ]);
     const convs = Array.isArray(convsR.data) ? convsR.data : [];
     const tickets = Array.isArray(ticketsR.data) ? ticketsR.data : [];
     const docs = Array.isArray(docsR.data) ? docsR.data : [];
     const venuesAll = Array.isArray(venuesR.data) ? venuesR.data : [];
+    const leadsAll = Array.isArray(leadsR.data) ? leadsR.data : [];
     const allMessages = [];
     convs.forEach(c => {
       if (c.messages && Array.isArray(c.messages)) {
@@ -925,7 +927,7 @@ async function getAnalytics() {
 
     return {
       totalConvs: convs.length, totalMessages: allMessages.length,
-      vendorIntel, topKeywords, knowledgeGaps, knowledgeGapCount: gaps.length, adoption,
+      vendorIntel, topKeywords, knowledgeGaps, knowledgeGapCount: gaps.length, adoption, leads: leadsAll,
       openTickets: tickets.filter(t => t.status === 'open').length,
       escalatedTickets: tickets.filter(t => t.escalated).length,
       totalDocs: uniqueDocs.length,
@@ -4542,14 +4544,15 @@ tbody tr:hover td{background:var(--surface2)}
     <nav class="header-nav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
       <div class="nav-divider"></div>
-      <button class="nav-item" onclick="showTab('vendors')">&#x1F4CA; Vendor Intelligence</button>
-      <button class="nav-item" onclick="showTab('questions')">&#x1F4AC; Operator Questions</button>
-      <button class="nav-item" onclick="showTab('gaps')">&#x1F9E9; Knowledge Gaps</button>
-      <button class="nav-item" onclick="showTab('adoption')">&#x1F4C8; Adoption</button>
+      <button class="nav-item" onclick="showTab('vendors')">Vendor Intelligence</button>
+      <button class="nav-item" onclick="showTab('questions')">Operator Questions</button>
+      <button class="nav-item" onclick="showTab('gaps')">Knowledge Gaps</button>
+      <button class="nav-item" onclick="showTab('adoption')">Adoption</button>
+      <div class="nav-divider"></div>
+      <button class="nav-item" onclick="showTab('signups')">Sign-ups</button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('venues')">Venues</button>
-      <div class="nav-divider"></div>
-      <button class="nav-item" onclick="showTab('content')">&#x1F4DA; Content</button>
+      <button class="nav-item" onclick="showTab('content')">Content</button>
     </nav>
   </div>
   <div class="header-right">
@@ -4644,6 +4647,22 @@ tbody tr:hover td{background:var(--surface2)}
         <div class="card-header"><span class="card-title">Most active venues</span><span class="card-meta">By messages</span></div>
         <div id="adTopVenues"><div class="empty">Loading&hellip;</div></div>
       </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-signups">
+    <div class="page-header">
+      <div><div class="page-title">Sign-ups</div><div class="page-sub">Everyone who has signed in to Stacked Chat &mdash; with their contact details</div></div>
+      <button class="btn" onclick="exportSignupsCSV()">&#x2193; Export CSV</button>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="kpi-label">Total sign-ups</div><div class="kpi-value" id="suTotal"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Last 30 days</div><div class="kpi-value" id="suRecent"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Most recent</div><div class="kpi-value" id="suLatest" style="font-size:18px;padding-top:4px"><span class="shimmer"></span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">All sign-ups</span><span class="card-meta">Newest first</span></div>
+      <div id="signupsTable"><div class="empty">Loading&hellip;</div></div>
     </div>
   </div>
 
@@ -4868,7 +4887,7 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','adoption','conversations','venues','content'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','adoption','signups','conversations','venues','content'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
 }
@@ -5016,6 +5035,7 @@ async function loadAnalytics() {
     renderOperatorQuestions(a.topTopics || [], a.topKeywords || []);
     renderKnowledgeGaps(a.knowledgeGaps || [], a.knowledgeGapCount || 0, a.totalMessages || 0);
     renderAdoption(a.adoption || {});
+    renderSignups(a.leads || []);
     renderDocs(a.docs);
   } catch(e) { notify('Failed: '+e.message,'red'); console.error(e); }
 }
@@ -5090,6 +5110,57 @@ function renderOperatorQuestions(topTopics, topKeywords){
     }
   }
 }
+// ── Sign-ups (who has signed in, with contact details) ───────────────────
+function renderSignups(leads){
+  window._signups = leads || [];
+  const d30 = Date.now() - 30*24*3600*1000;
+  const recent = (leads || []).filter(function(l){ try { return new Date(l.created_at).getTime() > d30; } catch(e){ return false; } }).length;
+  const set = function(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('suTotal', (leads ? leads.length : 0).toLocaleString());
+  set('suRecent', recent.toLocaleString());
+  if(leads && leads.length){
+    const latest = leads[0];
+    set('suLatest', (latest.name || 'Unknown') + ' · ' + new Date(latest.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
+  } else { set('suLatest', '—'); }
+  const t = document.getElementById('signupsTable');
+  if(!t) return;
+  if(!leads || !leads.length){ t.innerHTML='<div class="empty">No sign-ups yet</div>'; return; }
+  t.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+    '<thead><tr>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Date</th>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Name</th>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Venue</th>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Email</th>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Phone</th>' +
+    '</tr></thead><tbody>' +
+    leads.map(function(l){
+      const d = l.created_at ? new Date(l.created_at) : null;
+      const ds = d ? d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}) + ' &middot; ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '&mdash;';
+      const cell = 'padding:11px 14px;border-bottom:1px solid var(--surface2)';
+      return '<tr>' +
+        '<td style="'+cell+';color:var(--text2);font-size:12px">'+ds+'</td>' +
+        '<td style="'+cell+'"><strong>'+esc(l.name || '—')+'</strong></td>' +
+        '<td style="'+cell+'">'+esc(l.venue || '—')+'</td>' +
+        '<td style="'+cell+';font-size:12px">'+esc(l.email || '—')+'</td>' +
+        '<td style="'+cell+';font-size:12px;color:var(--text2)">'+esc(l.phone || '—')+'</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
+}
+function exportSignupsCSV(){
+  const leads = window._signups || [];
+  if(!leads.length){ notify('No sign-ups to export','red'); return; }
+  const rows = [['Date','Name','Venue','Email','Phone']];
+  leads.forEach(function(l){
+    const d = l.created_at ? new Date(l.created_at).toISOString() : '';
+    rows.push([d, l.name||'', l.venue||'', l.email||'', l.phone||'']);
+  });
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'stacked-signups.csv'; a.click();
+  notify('Exported sign-ups CSV','green');
+}
+
 // ── Adoption (Phase 4) ────────────────────────────────────────────────────
 function renderAdoption(ad){
   const set = function(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; };
