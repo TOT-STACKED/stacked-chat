@@ -4551,7 +4551,6 @@ tbody tr:hover td{background:var(--surface2)}
       <div class="nav-divider"></div>
       <button class="nav-item" onclick="showTab('signups')">Sign-ups</button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
-      <button class="nav-item" onclick="showTab('venues')">Venues</button>
       <button class="nav-item" onclick="showTab('content')">Content</button>
     </nav>
   </div>
@@ -4669,14 +4668,6 @@ tbody tr:hover td{background:var(--surface2)}
   <div class="tab-panel" id="tab-conversations">
     <div class="page-header"><div><div class="page-title">Conversations</div><div class="page-sub" id="convCount">&mdash;</div></div></div>
     <div class="card"><div id="convsTable"><div class="empty">Loading...</div></div></div>
-  </div>
-
-  <div class="tab-panel" id="tab-venues">
-    <div class="page-header">
-      <div><div class="page-title">Venues</div><div class="page-sub" id="venueCount">&mdash;</div></div>
-      <button class="btn btn-primary" onclick="showBrandingModal()">+ Set up branding</button>
-    </div>
-    <div id="venueGrid" class="venue-grid"><div class="empty">Loading...</div></div>
   </div>
 
   <!-- Branding Modal -->
@@ -4887,7 +4878,7 @@ tbody tr:hover td{background:var(--surface2)}
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','adoption','signups','conversations','venues','content'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','adoption','signups','conversations','content'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
 }
@@ -5030,7 +5021,6 @@ async function loadAnalytics() {
         '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--red);margin-right:4px"></span>Detractors (0-6)</span>' +
         '</div>';
     }
-    renderVenues(a.venueStats || []);
     renderVendorIntel(a.vendorIntel || []);
     renderOperatorQuestions(a.topTopics || [], a.topKeywords || []);
     renderKnowledgeGaps(a.knowledgeGaps || [], a.knowledgeGapCount || 0, a.totalMessages || 0);
@@ -5238,42 +5228,6 @@ function exportVendorCSV(){
 
 function toggleConv(el) { el.classList.toggle('open'); }
 function imgErr(el) { el.style.display='none'; }
-function renderVenues(venues) {
-  const el=document.getElementById('venueGrid');
-  const vc=document.getElementById('venueCount');
-  if(vc) vc.textContent = venues.length + ' venue' + (venues.length!==1?'s':'') + ' active';
-  if(!venues||!venues.length){if(el)el.innerHTML='<div class="empty">No venues yet</div>';return;}
-  el.innerHTML=venues.map(v=>{
-    const lastD = new Date(v.lastSeen).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-    return '<div class="venue-card">'+
-      '<div class="venue-card-name">&#x1F3E2; '+esc(v.venue)+'</div>'+
-      '<div class="venue-stats">'+
-        '<div class="venue-stat"><div class="venue-stat-num">'+v.convs+'</div><div class="venue-stat-label">Chats</div></div>'+
-        '<div class="venue-stat"><div class="venue-stat-num">'+v.msgs+'</div><div class="venue-stat-label">Messages</div></div>'+
-      '</div>'+
-      '<div class="venue-last">Last active: '+lastD+'</div>'+
-      '</div>';
-  }).join('');
-  // Load actual venue records for branding links
-  fetch('/venues/all').then(r=>r.json()).then(function(venueDbs){
-    venueDbs.forEach(function(vdb){
-      if(!vdb.slug)return;
-      const cards=el.querySelectorAll('.venue-card');
-      cards.forEach(function(card){
-        if(card.querySelector('.venue-card-name').textContent.trim().replace(/[^\w\s]/g,'').trim().toLowerCase()===vdb.name.toLowerCase()){
-          const branded=vdb.primary_color||vdb.logo_url||vdb.bot_name;
-          const link='stackedchat.io/chat/'+vdb.slug;
-          let extra='<div class="venue-last" style="margin-top:4px;display:flex;align-items:center;gap:8px">';
-          extra+='<a href="https://'+link+'" target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:600">/chat/'+vdb.slug+' &rarr;</a>';
-          if(branded)extra+='<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">Branded</span>';
-          extra+='</div>';
-          card.insertAdjacentHTML('beforeend',extra);
-        }
-      });
-    });
-  }).catch(function(){});
-}
-
 var allDocs=[];
 function filterDocs(q){var f=q?allDocs.filter(function(d){return d.filename.toLowerCase().includes(q.toLowerCase());}):allDocs;var c=document.getElementById('docCount');if(c)c.textContent=f.length+' / '+allDocs.length+' docs';renderDocList(f);}
 function renderDocs(docs){allDocs=docs||[];var c=document.getElementById('docCount');if(c)c.textContent=allDocs.length+' docs';renderDocList(allDocs);}
