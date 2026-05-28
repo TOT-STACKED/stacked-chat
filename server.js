@@ -4390,7 +4390,7 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
 .wordmark{height:32px;max-width:200px;object-fit:contain;filter: brightness(0) saturate(100%) invert(44%) sepia(73%) saturate(700%) hue-rotate(334deg) brightness(107%);}
 .divider{width:1px;height:20px;background:var(--border2)}
 .header-nav{display:flex;align-items:center;gap:2px}
-.nav-item{padding:5px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;transition:all 0.1s}
+.nav-item{padding:5px 9px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;transition:all 0.1s;white-space:nowrap}
 .nav-item:hover{background:var(--surface2);color:var(--text)}
 .nav-item.active{background:var(--surface2);color:var(--text);font-weight:600}
 .vlb{width:100%;border-collapse:collapse}
@@ -4544,9 +4544,9 @@ tbody tr:hover td{background:var(--surface2)}
     <nav class="header-nav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
       <div class="nav-divider"></div>
-      <button class="nav-item" onclick="showTab('vendors')">Vendor Intelligence</button>
-      <button class="nav-item" onclick="showTab('questions')">Operator Questions</button>
-      <button class="nav-item" onclick="showTab('gaps')">Knowledge Gaps</button>
+      <button class="nav-item" onclick="showTab('vendors')">Vendors</button>
+      <button class="nav-item" onclick="showTab('questions')">Questions</button>
+      <button class="nav-item" onclick="showTab('gaps')">Gaps</button>
       <button class="nav-item" onclick="showTab('adoption')">Adoption</button>
       <div class="nav-divider"></div>
       <button class="nav-item" onclick="showTab('signups')">Sign-ups</button>
