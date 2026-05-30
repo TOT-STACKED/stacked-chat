@@ -4393,6 +4393,12 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
 .nav-item{padding:5px 9px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;transition:all 0.1s;white-space:nowrap}
 .nav-item:hover{background:var(--surface2);color:var(--text)}
 .nav-item.active{background:var(--surface2);color:var(--text);font-weight:600}
+.nav-toggle{display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 14px;cursor:pointer;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;align-items:center;justify-content:center;gap:6px;height:38px;flex-shrink:0;transition:all 0.15s;line-height:1}
+.nav-toggle:hover{background:#FFF3EE;border-color:var(--blue);color:var(--blue)}
+.nav-toggle .x{display:none}
+.nav-toggle.open{background:var(--blue);border-color:var(--blue);color:#fff}
+.nav-toggle.open .bars{display:none}
+.nav-toggle.open .x{display:inline}
 .vlb{width:100%;border-collapse:collapse}
 .vlb th{text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)}
 .vlb th.r,.vlb td.r{text-align:right}
@@ -4436,15 +4442,19 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
   .grid-2{grid-template-columns:1fr !important}
 }
 @media (max-width: 900px){
-  header{padding:0 14px;height:auto;min-height:56px;flex-wrap:wrap;gap:8px 12px}
-  .header-left{flex:1 1 100%;min-width:0;display:flex;align-items:center;gap:10px}
-  .header-right{flex:1 1 100%;justify-content:space-between;padding-bottom:8px}
-  .header-nav{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;width:100%;padding-bottom:4px;scrollbar-width:none}
-  .header-nav::-webkit-scrollbar{display:none}
-  .nav-divider{display:none}
-  .nav-item{flex:0 0 auto;font-size:12.5px;padding:6px 10px}
-  .wordmark{height:22px}
+  header{padding:10px 14px;height:auto;min-height:auto;flex-wrap:wrap;gap:8px;position:sticky;top:0}
+  .header-left{display:flex !important;align-items:center !important;justify-content:space-between !important;gap:10px;width:100%;min-width:0;flex-wrap:nowrap}
+  .header-right{display:flex;justify-content:flex-start;align-items:center;width:100%;gap:8px;font-size:12px}
+  .nav-toggle{display:inline-flex !important;flex-shrink:0}
   .divider{display:none}
+  .wordmark{height:24px}
+  /* nav becomes a dropdown panel below the header, hidden by default */
+  .header-nav{display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,0.08);flex-direction:column;align-items:stretch;gap:0;padding:8px 12px 12px;z-index:99}
+  .header-nav.open{display:flex}
+  .nav-divider{display:none}
+  .nav-item{width:100%;text-align:left;padding:11px 14px;font-size:14px;border-radius:8px;font-weight:500;white-space:nowrap}
+  .nav-item.active{background:#FFF3EE;color:var(--blue)}
+  header{position:sticky;top:0}
   .container{padding:14px 14px 60px}
   .page-header{flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:14px}
   .page-header > .btn,.page-header > button{align-self:stretch}
@@ -4587,8 +4597,9 @@ tbody tr:hover td{background:var(--surface2)}
 <header>
   <div class="header-left">
     <img class="wordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
+    <button class="nav-toggle" id="navToggle" onclick="toggleNav()" aria-label="Menu"><span class="bars">&#9776; Menu</span><span class="x">&times; Close</span></button>
     <div class="divider"></div>
-    <nav class="header-nav">
+    <nav class="header-nav" id="headerNav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
       <div class="nav-divider"></div>
       <button class="nav-item" onclick="showTab('vendors')">Vendors</button>
@@ -4928,6 +4939,17 @@ function showTab(id) {
   document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','adoption','signups','conversations','content'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
+  // close mobile hamburger menu on tab pick
+  const nav = document.getElementById('headerNav');
+  const tog = document.getElementById('navToggle');
+  if (nav && nav.classList.contains('open')) { nav.classList.remove('open'); if (tog) tog.classList.remove('open'); }
+}
+function toggleNav() {
+  const nav = document.getElementById('headerNav');
+  const tog = document.getElementById('navToggle');
+  if (!nav) return;
+  nav.classList.toggle('open');
+  if (tog) tog.classList.toggle('open');
 }
 function showContentTab(sub) {
   const showVideos = sub === 'videos';
