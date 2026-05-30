@@ -4429,7 +4429,54 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
 .kpi-label{font-size:12px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
 .kpi-value{font-size:28px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-0.5px}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-@media(max-width:900px){.grid-2,.kpi-grid{grid-template-columns:1fr}}
+/* ─── Responsive (tablet / mobile) ─── */
+@media (max-width: 1024px){
+  .container{padding:18px 16px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr) !important}
+  .grid-2{grid-template-columns:1fr !important}
+}
+@media (max-width: 900px){
+  header{padding:0 14px;height:auto;min-height:56px;flex-wrap:wrap;gap:8px 12px}
+  .header-left{flex:1 1 100%;min-width:0;display:flex;align-items:center;gap:10px}
+  .header-right{flex:1 1 100%;justify-content:space-between;padding-bottom:8px}
+  .header-nav{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;width:100%;padding-bottom:4px;scrollbar-width:none}
+  .header-nav::-webkit-scrollbar{display:none}
+  .nav-divider{display:none}
+  .nav-item{flex:0 0 auto;font-size:12.5px;padding:6px 10px}
+  .wordmark{height:22px}
+  .divider{display:none}
+  .container{padding:14px 14px 60px}
+  .page-header{flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:14px}
+  .page-header > .btn,.page-header > button{align-self:stretch}
+  .page-title{font-size:18px !important}
+  .card{border-radius:12px}
+  /* tables become horizontally scrollable so they never break the page */
+  .card > div{max-width:100%}
+  .card table{min-width:560px}
+  #vendorTable,#signupsTable,#convsTable,#gapsList,#adTopVenues,#hotTopics,#topProducts,#npsTable{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  /* vendor leaderboard + detail panel: stack with inline-style override */
+  .tab-panel .grid-2[style*="1.55fr"],.tab-panel .grid-2[style*="1fr 1fr"]{grid-template-columns:1fr !important}
+}
+@media (max-width: 600px){
+  .container{padding:12px 10px 60px}
+  .kpi-grid{grid-template-columns:1fr 1fr !important;gap:10px}
+  .kpi{padding:12px 14px}
+  .kpi-value{font-size:22px !important}
+  .kpi-label{font-size:10.5px}
+  .nav-item{font-size:12px;padding:5px 9px}
+  .update-text{display:none}
+  .card-header{padding:12px 14px;flex-wrap:wrap;gap:6px}
+  .card-title{font-size:13px !important}
+  .card-meta{font-size:10px}
+  th{font-size:9.5px !important;padding:8px 10px !important}
+  td{padding:9px 10px !important;font-size:12px}
+  .kwchip{font-size:11px !important}
+  .conv-item{padding:10px 12px}
+  /* gaps tab: keep 3 KPIs but smaller */
+  #tab-gaps .kpi-grid{grid-template-columns:repeat(3,1fr) !important;gap:6px}
+  #tab-gaps .kpi{padding:9px 10px}
+  #tab-gaps .kpi-value{font-size:18px !important}
+}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px}
 .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .card-title{font-size:13px;font-weight:600;color:var(--text)}
