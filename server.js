@@ -4460,12 +4460,19 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
   .page-header > .btn,.page-header > button{align-self:stretch}
   .page-title{font-size:18px !important}
   .card{border-radius:12px}
-  /* tables become horizontally scrollable so they never break the page */
+  /* tables that need scrolling get a wrapper with overflow-x */
   .card > div{max-width:100%}
-  .card table{min-width:560px}
-  #vendorTable,#signupsTable,#convsTable,#gapsList,#adTopVenues,#hotTopics,#topProducts,#npsTable{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #signupsTable,#convsTable,#npsTable{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #signupsTable table,#convsTable table,#npsTable table{min-width:560px}
   /* vendor leaderboard + detail panel: stack with inline-style override */
   .tab-panel .grid-2[style*="1.55fr"],.tab-panel .grid-2[style*="1fr 1fr"]{grid-template-columns:1fr !important}
+  /* vendor leaderboard fits natively — table responsive, no horizontal scroll */
+  #vendorTable{overflow-x:visible}
+  #vendorTable .vlb{width:100%;table-layout:auto}
+  #vendorTable .vlb th,#vendorTable .vlb td{padding:10px 10px}
+  /* detail panel padding tighter on mobile */
+  #vendorDetail{padding:0}
+  .vbar{height:7px}
 }
 @media (max-width: 600px){
   .container{padding:12px 10px 60px}
@@ -4479,6 +4486,16 @@ header{background:var(--surface);border-bottom:1px solid var(--border);height:56
   .card-title{font-size:13px !important}
   .card-meta{font-size:10px}
   th{font-size:9.5px !important;padding:8px 10px !important}
+  /* vendor leaderboard on phone: hide Category + Convos columns, keep Vendor + Mentions + NPS */
+  #vendorTable .vlb th:nth-child(2),#vendorTable .vlb td:nth-child(2){display:none}
+  #vendorTable .vlb th:nth-child(4),#vendorTable .vlb td:nth-child(4){display:none}
+  #vendorTable .vlb th{padding:8px 8px !important}
+  #vendorTable .vlb td{padding:11px 8px !important}
+  /* vendor detail: tighter NPS rows, smaller labels */
+  #vendorDetail{font-size:12px}
+  #vendorDetail > div:first-child > div:first-child{font-size:16px !important}
+  .blk2{margin:12px 0 7px !important}
+  .vq{font-size:11.5px;padding:6px 9px}
   td{padding:9px 10px !important;font-size:12px}
   .kwchip{font-size:11px !important}
   .conv-item{padding:10px 12px}
