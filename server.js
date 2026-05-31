@@ -749,18 +749,30 @@ async function verifyAuthEmail(token) {
 
 async function getAnalytics() {
   try {
-    const [convsR, ticketsR, docsR, venuesR, leadsR] = await Promise.all([
+    const [convsR, ticketsR, docsR, venuesR, membersR] = await Promise.all([
       sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=200'),
       sbFetch('/rest/v1/tickets?select=*&order=created_at.desc&limit=100'),
       sbFetch('/rest/v1/documents?select=filename,created_at&order=created_at.desc&limit=1000'),
       sbFetch('/rest/v1/venues?select=id,name,created_at&order=created_at.asc&limit=1000'),
-      sbFetch('/rest/v1/leads?select=name,venue,email,phone,created_at&order=created_at.desc&limit=500'),
+      sbFetch('/rest/v1/venue_members?select=name,email,phone,venue_id,role,created_at&order=created_at.desc&limit=1000'),
     ]);
     const convs = Array.isArray(convsR.data) ? convsR.data : [];
     const tickets = Array.isArray(ticketsR.data) ? ticketsR.data : [];
     const docs = Array.isArray(docsR.data) ? docsR.data : [];
     const venuesAll = Array.isArray(venuesR.data) ? venuesR.data : [];
-    const leadsAll = Array.isArray(leadsR.data) ? leadsR.data : [];
+    // Sign-ups: derived from venue_members (the reliable source — /save-lead has
+    // been silently 400-ing, so the leads table is empty). Join venue name in.
+    const venueNameById = {};
+    venuesAll.forEach(v => { if (v.id) venueNameById[v.id] = v.name; });
+    const membersAll = Array.isArray(membersR.data) ? membersR.data : [];
+    const leadsAll = membersAll.map(m => ({
+      name: m.name || '',
+      email: m.email || '',
+      phone: m.phone || '',
+      venue: venueNameById[m.venue_id] || '',
+      role: m.role || '',
+      created_at: m.created_at
+    }));
     const allMessages = [];
     convs.forEach(c => {
       if (c.messages && Array.isArray(c.messages)) {
@@ -6053,13 +6065,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ─── SAVE LEAD ─────────────────────────────────────────────────────────
+  // Note: sign-ups are read off venue_members (reliable, always written), so
+  // this endpoint is best-effort. Strip the phone field because the leads
+  // table doesn't have that column — sending it returns 400 silently.
   if (method === 'POST' && url === '/save-lead') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body);
-        await sbFetch('/rest/v1/leads', { method: 'POST', body: payload });
+        const safe = { name: payload.name, venue: payload.venue, email: payload.email };
+        if (payload.venue_id) safe.venue_id = payload.venue_id;
+        await sbFetch('/rest/v1/leads', { method: 'POST', body: safe });
         res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true}));
       } catch(e) { res.writeHead(500); res.end(JSON.stringify({error:e.message})); }
     }); return;
