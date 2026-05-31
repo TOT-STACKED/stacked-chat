@@ -652,6 +652,33 @@ async function sendSlackTicketAlert(ticket) {
   });
 }
 
+// New sign-up notification — fired once per new venue_member (not on returning users).
+async function sendSlackSignupAlert({ name, venue, email, phone, role, isFirstAtVenue }) {
+  if (!SLACK_WEBHOOK_URL) return;
+  const https = require('https');
+  const now = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour: '2-digit', minute: '2-digit' });
+  const roleTag = role === 'admin' ? (isFirstAtVenue ? ':crown: *Admin* _(first user — created the venue)_' : ':crown: *Admin*') : ':bust_in_silhouette: *Staff*';
+  const text = [
+    ':tada: *New Stacked Chat sign-up*',
+    `*Name:* ${name || 'Unknown'}`,
+    `*Venue:* ${venue || 'Unknown'}`,
+    `*Email:* ${email || '—'}`,
+    `*Phone:* ${phone || '—'}`,
+    `*Role:* ${roleTag}`,
+    `*When:* ${now}`,
+  ].join('\n');
+  const body = JSON.stringify({ text });
+  const url = new URL(SLACK_WEBHOOK_URL);
+  return new Promise((res) => {
+    const req = https.request({
+      hostname: url.hostname, path: url.pathname + url.search,
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, (r) => { r.resume(); r.on('end', res); });
+    req.on('error', () => {});
+    req.write(body); req.end();
+  });
+}
+
 // ─── SUPABASE HELPERS ──────────────────────────────────────────────────────
 // Mirror a /save-nps payload into the approved-reporting portal's unified
 // nps_scores table. Silent no-op if STACKCOLLECT env vars aren't set.
@@ -5692,12 +5719,14 @@ const server = http.createServer(async (req, res) => {
         // Self-serve roles: the FIRST member of a venue becomes its admin;
         // everyone after is staff. Never downgrade an existing admin.
         let role = 'staff';
+        let isReturning = false;
+        let isFirstAtVenue = false;
         try {
           const ex = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(payload.venue_id || '') + '&select=email,role&limit=200');
           if (Array.isArray(ex.data)) {
             const mine = ex.data.find(m => (m.email || '').toLowerCase() === (payload.email || '').toLowerCase());
-            if (mine) role = mine.role || 'staff';        // keep existing role
-            else if (ex.data.length === 0) role = 'admin'; // first ever member
+            if (mine) { role = mine.role || 'staff'; isReturning = true; }        // keep existing role
+            else if (ex.data.length === 0) { role = 'admin'; isFirstAtVenue = true; } // first ever member
           }
         } catch(e) { /* table/role lookup issue — default staff */ }
         payload.role = role;
@@ -5707,6 +5736,16 @@ const server = http.createServer(async (req, res) => {
           headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
           body: payload
         });
+        // Fire a Slack notification once per genuinely new sign-up (not returning users).
+        if (!isReturning) {
+          let venueName = null;
+          try {
+            const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(payload.venue_id || '') + '&select=name&limit=1');
+            if (Array.isArray(vr.data) && vr.data[0]) venueName = vr.data[0].name;
+          } catch(e) {}
+          sendSlackSignupAlert({ name: payload.name, venue: venueName, email: payload.email, phone: payload.phone, role, isFirstAtVenue })
+            .catch(e => console.error('[signup-slack]', e.message));
+        }
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ok:true, role}));
       } catch(e) {
