@@ -2223,9 +2223,14 @@ async function sendMessage() {
     addMessage('assistant', displayReply, true, videoData, supportUrl);
     if (data.images && data.images.length) renderDishImages(data.images);
     if (data.docFile && data.docFile.url) renderDocFile(data.docFile);
-    if (data.detectedVendor && !npsShown && (data.forceNPS || messages.filter(m=>m.role==='user').length >= 2)) {
-      npsShown = true;
-      setTimeout(() => showNPS(data.detectedVendor), 1200);
+    if (data.detectedVendor) {
+      // Explicit user request (forceNPS) always shows, so "Can I rate sky?" works
+      // even after an earlier NPS. Auto-triggered NPS still gated to once per session.
+      const shouldShow = data.forceNPS || (!npsShown && messages.filter(m=>m.role==='user').length >= 2);
+      if (shouldShow) {
+        if (!data.forceNPS) npsShown = true;
+        setTimeout(() => showNPS(data.detectedVendor), 1200);
+      }
     }
     messages.push({ role: 'assistant', content: displayReply });
     await saveConversation();
@@ -6262,14 +6267,11 @@ const server = http.createServer(async (req, res) => {
             const found = vendorNames.find(v => userMsgsLower.includes(v));
             if (found) detectedVendor = found;
           }
-          // Last resort: check the bot's most recent reply for a single clear vendor
-          // (only if user didn't name one — avoids the multi-vendor suggestion problem)
-          if (!detectedVendor && history.length > 0) {
-            const lastBotReply = (history.filter(m=>m.role==='assistant').slice(-1)[0]?.content || '').toLowerCase();
-            const botVendors = Object.entries(VENDOR_PROFILES).filter(([key]) => lastBotReply.includes(key));
-            // Only use bot reply if exactly 1 vendor is strongly referenced (not a list of suggestions)
-            if (botVendors.length === 1) detectedVendor = botVendors[0][0];
-          }
+          // NOTE: do NOT auto-detect NPS from the bot's previous reply. If the bot
+          // mentioned a vendor in passing (e.g. "Have you tried Stampede?") that is
+          // not a signal the user wants to rate it — only USER mentions/intent count.
+          // This previously triggered an unrelated Stampede NPS when the user was
+          // actually asking about SKY WiFi.
           // List-free NPS: if the bot just asked which vendor to rate, the
           // user's reply IS the vendor — allow ANY vendor, no allow-list.
           if (!detectedVendor && history.length > 0) {
@@ -6404,11 +6406,12 @@ Once you know the product, respond with:
 - A mid-service workaround if relevant
 - The vendor support URL inline
 
-NPS / VENDOR RATING REQUESTS:
-When a user says they want to rate their tech vendors, rate a product, give feedback, or provide an NPS score:
-1. Ask them which specific vendor/product they would like to rate. Be friendly and concise, e.g. "Sure! Which vendor would you like to rate? For example Lightspeed, Square, Tevalis, Dojo, OpenTable, Deputy, or any other product you use."
-2. Once they name the vendor — ANY vendor or product, even one not in your support list — reply with a short confirmation like "Great — rating [vendor name] now." and ALWAYS add [NPS:vendorname] on its own line at the very end (use the exact name the user gave, lowercased, e.g. [NPS:tenzo]). Never skip this tag. The system displays the rating widget automatically.
+NPS / VENDOR RATING REQUESTS (STRICT — only when the user EXPLICITLY asks):
+Only follow this flow when the USER says they want to rate / review / give feedback / give an NPS score for a product or vendor. NEVER volunteer an [NPS:...] tag just because a vendor was mentioned in passing (yours or theirs) — that produces wrong-vendor ratings (e.g. talking about SKY WiFi must never trigger a Stampede rating).
+1. If the user clearly wants to rate but hasn't named the vendor, ask which one. Friendly and concise, e.g. "Sure! Which vendor would you like to rate?"
+2. If the user names the vendor in the same message (e.g. "can I rate Sky?", "I want to give feedback on Tenzo"), reply with a short confirmation like "Great — rating [vendor name] now." and ALWAYS add [NPS:vendorname] on its own line at the very end (use the exact name the user gave, lowercased, e.g. [NPS:sky], [NPS:tenzo]). Allow ANY vendor name, even ones not in your support list.
 3. Do NOT ask them to rate on a scale yourself — the system handles the rating UI.
+4. Never emit [NPS:...] outside this explicit user-driven flow.
 
 Support URLs:
   --- POINT OF SALE ---
