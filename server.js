@@ -4709,14 +4709,17 @@ function renderVenues(venues) {
   el.innerHTML=venues.map(v=>{
     const lastD = new Date(v.lastSeen).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
     const escPart = v.escalated ? '<span style="color:var(--red);font-size:11px;font-weight:600;margin-left:4px">&#x26A0; '+v.escalated+' escalated</span>' : '';
-    return '<div class="venue-card">'+
+    return '<div class="venue-card" data-vname="'+esc(v.venue)+'">'+
       '<div class="venue-card-name">&#x1F3E2; '+esc(v.venue)+escPart+'</div>'+
       '<div class="venue-stats">'+
         '<div class="venue-stat"><div class="venue-stat-num">'+v.convs+'</div><div class="venue-stat-label">Chats</div></div>'+
         '<div class="venue-stat"><div class="venue-stat-num">'+v.msgs+'</div><div class="venue-stat-label">Messages</div></div>'+
         '<div class="venue-stat"><div class="venue-stat-num">'+(v.tickets||0)+'</div><div class="venue-stat-label">Tickets</div></div>'+
       '</div>'+
-      '<div class="venue-last">Last active: '+lastD+'</div>'+
+      '<div class="venue-last" style="display:flex;align-items:center;justify-content:space-between">'+
+        '<span>Last active: '+lastD+'</span>'+
+        '<button class="btn" style="font-size:11px;padding:2px 10px" onclick="generateVenueToken(this.closest(\'[data-vname]\').dataset.vname,this)">Copy link</button>'+
+      '</div>'+
       '</div>';
   }).join('');
   // Load actual venue records for branding links
@@ -4740,17 +4743,17 @@ function renderVenues(venues) {
   }).catch(function(){});
 }
 
-async function generateVenueToken(id,btn){
+async function generateVenueToken(name,btn){
   btn.disabled=true;btn.textContent='Generating...';
   try{
-    const r=await fetch('/venues/'+id+'/generate-token',{method:'POST'});
+    const r=await fetch('/venues/generate-token-by-name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
     const d=await r.json();
     if(d.token){
       const url=window.location.origin+'/venue-dashboard/'+d.token;
       await navigator.clipboard.writeText(url);
       btn.textContent='Copied!';btn.style.background='var(--green)';btn.style.color='#fff';
       setTimeout(()=>{btn.textContent='Copy link';btn.style.background='';btn.style.color='';btn.disabled=false;},3000);
-    }else{notify('Could not generate link','red');btn.textContent='Copy link';btn.disabled=false;}
+    }else{notify('Could not generate link: '+(d.error||'unknown'),'red');btn.textContent='Copy link';btn.disabled=false;}
   }catch(e){notify('Error: '+e.message,'red');btn.textContent='Copy link';btn.disabled=false;}
 }
 
@@ -6141,6 +6144,41 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
       res.end(JSON.stringify([]));
     }
     return;
+  }
+
+  // ─── VENUE DASHBOARD TOKEN BY NAME ───────────────────────────────────────
+  if (method === 'POST' && url === '/venues/generate-token-by-name') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { name } = JSON.parse(body);
+        if (!name) { res.writeHead(400); res.end(JSON.stringify({ error: 'name required' })); return; }
+        const crypto = require('crypto');
+        // Look up by name (case-insensitive)
+        const found = await sbFetch('/rest/v1/venues?select=id,dashboard_token&name=ilike.' + encodeURIComponent(name) + '&limit=1');
+        let venue = found.data && found.data[0];
+        if (!venue) {
+          // Create a minimal venue record
+          const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+          const token = crypto.randomBytes(16).toString('hex');
+          const created = await sbFetch('/rest/v1/venues', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: { name, slug, dashboard_token: token } });
+          if (!created.data || !created.data[0]) throw new Error('Could not create venue record');
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({ ok: true, token }));
+          return;
+        }
+        let token = venue.dashboard_token;
+        if (!token) {
+          token = crypto.randomBytes(16).toString('hex');
+          await sbFetch('/rest/v1/venues?id=eq.' + venue.id, { method: 'PATCH', headers: { 'Prefer': 'return=minimal' }, body: { dashboard_token: token } });
+        }
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: true, token }));
+      } catch(e) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    }); return;
   }
 
   // ─── VENUE DASHBOARD TOKEN GENERATION ────────────────────────────────────
