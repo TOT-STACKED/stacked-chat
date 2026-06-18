@@ -4731,12 +4731,27 @@ function renderVenues(venues) {
           let extra='<div class="venue-last" style="margin-top:4px;display:flex;align-items:center;gap:8px">';
           extra+='<a href="https://'+link+'" target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:600">/chat/'+vdb.slug+' &rarr;</a>';
           if(branded)extra+='<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">Branded</span>';
+          extra+='<button class="btn" style="font-size:11px;padding:2px 8px" data-vid="'+vdb.id+'" onclick="generateVenueToken(this.dataset.vid,this)">Copy link</button>';
           extra+='</div>';
           card.insertAdjacentHTML('beforeend',extra);
         }
       });
     });
   }).catch(function(){});
+}
+
+async function generateVenueToken(id,btn){
+  btn.disabled=true;btn.textContent='Generating...';
+  try{
+    const r=await fetch('/venues/'+id+'/generate-token',{method:'POST'});
+    const d=await r.json();
+    if(d.token){
+      const url=window.location.origin+'/venue-dashboard/'+d.token;
+      await navigator.clipboard.writeText(url);
+      btn.textContent='Copied!';btn.style.background='var(--green)';btn.style.color='#fff';
+      setTimeout(()=>{btn.textContent='Copy link';btn.style.background='';btn.style.color='';btn.disabled=false;},3000);
+    }else{notify('Could not generate link','red');btn.textContent='Copy link';btn.disabled=false;}
+  }catch(e){notify('Error: '+e.message,'red');btn.textContent='Copy link';btn.disabled=false;}
 }
 
 var allDocs=[];
@@ -6124,6 +6139,164 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     } catch(e) {
       res.writeHead(200, {'Content-Type':'application/json'});
       res.end(JSON.stringify([]));
+    }
+    return;
+  }
+
+  // ─── VENUE DASHBOARD TOKEN GENERATION ────────────────────────────────────
+  if (method === 'POST' && url.match(/^\/venues\/[^/]+\/generate-token$/)) {
+    try {
+      const id = url.split('/')[2];
+      const existing = await sbFetch('/rest/v1/venues?select=id,dashboard_token&id=eq.' + id + '&limit=1');
+      let token = existing.data && existing.data[0] && existing.data[0].dashboard_token;
+      if (!token) {
+        const crypto = require('crypto');
+        token = crypto.randomBytes(16).toString('hex');
+        await sbFetch('/rest/v1/venues?id=eq.' + id, { method: 'PATCH', headers: { 'Prefer': 'return=minimal' }, body: { dashboard_token: token } });
+      }
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({ ok: true, token }));
+    } catch(e) {
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({ ok: false, error: e.message }));
+    }
+    return;
+  }
+
+  // ─── VENUE DASHBOARD DATA ─────────────────────────────────────────────────
+  if (method === 'GET' && url.startsWith('/venue-data/')) {
+    try {
+      const token = url.split('/venue-data/')[1];
+      const vr = await sbFetch('/rest/v1/venues?select=id,name,slug,primary_color,logo_url,bot_name&dashboard_token=eq.' + encodeURIComponent(token) + '&limit=1');
+      if (!vr.data || !vr.data[0]) { res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' })); return; }
+      const venue = vr.data[0];
+      const [convsR, npsR] = await Promise.all([
+        sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=500'),
+        sbFetch('/rest/v1/nps_scores?select=vendor,score,comment,respondent_name,created_at&order=created_at.desc&limit=500'),
+      ]);
+      const allConvs = Array.isArray(convsR.data) ? convsR.data : [];
+      const convs = allConvs.filter(c => (c.venue || '').toLowerCase() === venue.name.toLowerCase());
+      const totalMsgs = convs.reduce((n, c) => n + (c.messages || []).filter(m => m.role === 'user').length, 0);
+      const lastSeen = convs.length ? convs[0].created_at : null;
+      const allNps = Array.isArray(npsR.data) ? npsR.data : [];
+      const venueNps = allNps.filter(n => (n.vendor || '').toLowerCase() === venue.name.toLowerCase());
+      let nps = null;
+      if (venueNps.length) {
+        const scores = venueNps.map(n => n.score);
+        const promoters = scores.filter(s => s >= 9).length;
+        const detractors = scores.filter(s => s <= 6).length;
+        nps = { score: Math.round((promoters / scores.length - detractors / scores.length) * 100), count: scores.length, avg: (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) };
+      }
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({ venue, convs: convs.slice(0, 20), totalConvs: convs.length, totalMsgs, lastSeen, nps }));
+    } catch(e) {
+      res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // ─── VENUE DASHBOARD PAGE ─────────────────────────────────────────────────
+  if (method === 'GET' && url.startsWith('/venue-dashboard/')) {
+    try {
+      const token = url.split('/venue-dashboard/')[1];
+      const vr = await sbFetch('/rest/v1/venues?select=id,name,primary_color&dashboard_token=eq.' + encodeURIComponent(token) + '&limit=1');
+      if (!vr.data || !vr.data[0]) {
+        res.writeHead(404, {'Content-Type':'text/html'});
+        res.end('<html><body style="font-family:sans-serif;padding:40px;background:#F7EDE0"><h2>Link not found</h2><p>This dashboard link is invalid or has been removed.</p></body></html>');
+        return;
+      }
+      const v = vr.data[0];
+      const accent = v.primary_color || '#E8622A';
+      const page = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${v.name} — Stacked Chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:wght@300..700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#F7EDE0;font-family:'DM Sans',system-ui,sans-serif;color:#1A1100;min-height:100vh}
+.header{background:#fff;border-bottom:1px solid #E2D4C0;padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+.header-title{font-family:'Archivo Black',sans-serif;font-size:20px;color:#1A1100}
+.header-sub{font-size:13px;color:#6A5545}
+.powered{font-size:11px;color:#A08870;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.content{max-width:900px;margin:0 auto;padding:32px 24px}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
+.kpi{background:#fff;border:1px solid #E2D4C0;border-radius:12px;padding:20px 24px}
+.kpi-label{font-size:12px;color:#6A5545;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+.kpi-value{font-family:'Archivo Black',sans-serif;font-size:28px;color:#1A1100}
+.kpi-sub{font-size:12px;color:#A08870;margin-top:2px}
+.nps-pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:13px;font-weight:700;background:#dcfce7;color:#166534}
+.nps-pill.neg{background:#fee2e2;color:#991b1b}
+.section-title{font-family:'Archivo Black',sans-serif;font-size:15px;color:#1A1100;margin-bottom:16px}
+.conv-list{display:flex;flex-direction:column;gap:8px}
+.conv-card{background:#fff;border:1px solid #E2D4C0;border-radius:10px;padding:14px 18px;display:flex;align-items:flex-start;gap:12px}
+.conv-avatar{width:34px;height:34px;border-radius:50%;background:${accent};color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Archivo Black',sans-serif;font-size:13px;flex-shrink:0}
+.conv-name{font-weight:600;font-size:14px;color:#1A1100}
+.conv-meta{font-size:12px;color:#A08870;margin-top:2px}
+.conv-preview{font-size:13px;color:#6A5545;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:600px}
+.empty{color:#A08870;font-size:14px;padding:32px;text-align:center;background:#fff;border:1px solid #E2D4C0;border-radius:12px}
+.nps-section{background:#fff;border:1px solid #E2D4C0;border-radius:12px;padding:20px 24px;margin-bottom:32px}
+</style>
+</head><body>
+<div class="header">
+  <div>
+    <div class="header-title">${v.name}</div>
+    <div class="header-sub">Support activity overview</div>
+  </div>
+  <div class="powered">Powered by Stacked Chat</div>
+</div>
+<div class="content" id="app"><div class="empty">Loading...</div></div>
+<script>
+const TOKEN='${token}';
+async function load(){
+  const app=document.getElementById('app');
+  try{
+    const r=await fetch('/venue-data/'+TOKEN);
+    const d=await r.json();
+    if(d.error){app.innerHTML='<div class="empty">'+d.error+'</div>';return;}
+    const lastD=d.lastSeen?new Date(d.lastSeen).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—';
+    let npsHtml='';
+    if(d.nps){
+      const cls=d.nps.score>=0?'':'neg';
+      npsHtml='<div class="nps-section"><div class="section-title">Customer Satisfaction (NPS)</div>'+
+        '<div style="display:flex;align-items:center;gap:12px">'+
+        '<span class="nps-pill '+cls+'">'+(d.nps.score>0?'+':'')+d.nps.score+' NPS</span>'+
+        '<span style="font-size:13px;color:#6A5545">Avg rating: <strong>'+d.nps.avg+'/10</strong> from '+d.nps.count+' responses</span>'+
+        '</div></div>';
+    }
+    let convHtml='<div class="empty">No conversations yet</div>';
+    if(d.convs&&d.convs.length){
+      convHtml=d.convs.map(c=>{
+        const initials=(c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        const dt=new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+        const msgs=(c.messages||[]).filter(m=>m.role==='user');
+        const preview=msgs.length?msgs[msgs.length-1].content.slice(0,100):'';
+        return '<div class="conv-card">'+
+          '<div class="conv-avatar">'+initials+'</div>'+
+          '<div style="flex:1;min-width:0">'+
+            '<div class="conv-name">'+(c.name||'Anonymous')+'</div>'+
+            '<div class="conv-meta">'+(c.email||'')+(c.email&&dt?' · ':'')+dt+' · '+msgs.length+' message'+(msgs.length!==1?'s':'')+'</div>'+
+            (preview?'<div class="conv-preview">'+preview+'</div>':'')+
+          '</div>'+
+        '</div>';
+      }).join('');
+    }
+    app.innerHTML=
+      '<div class="kpi-row">'+
+        '<div class="kpi"><div class="kpi-label">Total chats</div><div class="kpi-value">'+d.totalConvs+'</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Messages sent</div><div class="kpi-value">'+d.totalMsgs+'</div></div>'+
+        '<div class="kpi"><div class="kpi-label">Last active</div><div class="kpi-value" style="font-size:18px">'+lastD+'</div></div>'+
+      '</div>'+
+      npsHtml+
+      '<div class="section-title">Recent conversations</div>'+
+      '<div class="conv-list">'+convHtml+'</div>';
+  }catch(e){app.innerHTML='<div class="empty">Error: '+e.message+'</div>';}
+}
+load();
+</script>
+</body></html>`;
+      res.writeHead(200, {'Content-Type':'text/html'});
+      res.end(page);
+    } catch(e) {
+      res.writeHead(500, {'Content-Type':'text/html'});
+      res.end('<html><body>Error: ' + e.message + '</body></html>');
     }
     return;
   }
