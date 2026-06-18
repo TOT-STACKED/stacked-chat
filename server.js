@@ -4718,7 +4718,7 @@ function renderVenues(venues) {
       '</div>'+
       '<div class="venue-last" style="display:flex;align-items:center;justify-content:space-between">'+
         '<span>Last active: '+lastD+'</span>'+
-        '<button class="btn" style="font-size:11px;padding:2px 10px" onclick="generateVenueToken(this.closest(\'[data-vname]\').dataset.vname,this)">Copy link</button>'+
+        '<button class="btn" style="font-size:11px;padding:2px 10px" data-vname="'+esc(v.venue)+'" onclick="generateVenueToken(this.dataset.vname,this)">Copy link</button>'+
       '</div>'+
       '</div>';
   }).join('');
