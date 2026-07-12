@@ -839,6 +839,152 @@ async function verifyAuthEmail(token) {
   });
 }
 
+// ─── WEEKLY DIGEST ────────────────────────────────────────────────────────────
+// Aggregates the last 7 days of a venue's activity into a Monday email:
+// counts, top topics from question text, and knowledge-gap suggestions where
+// the bot admitted it didn't know. Email transport is Resend (RESEND_API_KEY).
+const DIGEST_STOPWORDS = new Set([
+  'about','after','again','also','always','around','because','been','before','being',
+  'between','both','cannot','could','does','doing','done','down','during','each',
+  'even','ever','every','from','give','goes','going','gone','have','having','here',
+  'into','just','know','like','made','make','many','more','most','much','must',
+  'need','never','only','other','over','same','some','somebody','someone','something',
+  'still','such','take','than','that','their','them','then','there','these','they',
+  'this','those','through','under','until','very','want','were','what','when','where',
+  'which','while','whom','will','with','would','your','yours','you','ours','have',
+  'been','said','says','tell','thing','things','something','anything','everything',
+  'stuff','well','okay','yeah','yes','please','thanks','thank','hello','hey',
+  'from','onto','into','onto','also','still','went','come','came','also','only',
+  'today','tomorrow','yesterday','week','weeks','month','months','year','years',
+  'need','needs','get','got','one','two','set','use','used','using','best','good'
+]);
+const GAP_PHRASES = [
+  "i don't have","i do not have","i dont have",
+  "not in your knowledge","not in the knowledge","not in my knowledge",
+  "no information","no info","don't know","dont know","do not know",
+  "couldn't find","could not find","couldnt find","no relevant","no matching",
+  "unable to find","not sure","haven't been told","havent been told",
+  "isn't in","is not in","doesn't appear","doesnt appear","does not appear"
+];
+function digestEsc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+async function buildVenueDigest(venue_id) {
+  const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=id,name&limit=1');
+  const venue = (Array.isArray(vr.data) && vr.data[0]) ? vr.data[0] : null;
+  if (!venue) return null;
+  const sevenAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const conv = await sbFetch('/rest/v1/conversations?venue_id=eq.' + encodeURIComponent(venue_id) +
+    '&created_at=gte.' + encodeURIComponent(sevenAgo) +
+    '&select=id,email,name,messages,created_at&order=created_at.desc&limit=500');
+  const convs = Array.isArray(conv.data) ? conv.data : [];
+  const askers = new Set();
+  let questions = 0;
+  const topicCounts = {};
+  const gapQuestions = {};
+  for (const c of convs) {
+    if (c.email) askers.add(String(c.email).toLowerCase());
+    if (!Array.isArray(c.messages)) continue;
+    let lastUserText = null;
+    for (const m of c.messages) {
+      if (m.role === 'user') {
+        questions++;
+        lastUserText = String(m.content || '');
+        const words = lastUserText.toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/);
+        for (const w of words) {
+          if (w.length < 4 || DIGEST_STOPWORDS.has(w)) continue;
+          topicCounts[w] = (topicCounts[w] || 0) + 1;
+        }
+      } else if (m.role === 'assistant' && lastUserText) {
+        const body = String(m.content || '').toLowerCase();
+        if (GAP_PHRASES.some(p => body.includes(p))) {
+          const key = lastUserText.trim().slice(0, 140);
+          gapQuestions[key] = (gapQuestions[key] || 0) + 1;
+        }
+        lastUserText = null;
+      }
+    }
+  }
+  const topTopics = Object.keys(topicCounts)
+    .map(k => ({ topic: k, count: topicCounts[k] }))
+    .sort((a, b) => b.count - a.count).slice(0, 5);
+  const gaps = Object.keys(gapQuestions)
+    .map(k => ({ question: k, count: gapQuestions[k] }))
+    .sort((a, b) => b.count - a.count).slice(0, 5);
+  return {
+    venueId: venue.id,
+    venueName: venue.name,
+    periodDays: 7,
+    stats: {
+      questions,
+      conversations: convs.length,
+      activeMembers: askers.size
+    },
+    topTopics,
+    gaps
+  };
+}
+function renderDigestHtml(d, opts) {
+  opts = opts || {};
+  const origin = opts.origin || 'https://stackedchat.io';
+  if (!d) return '<p>No data.</p>';
+  const topicsHtml = d.topTopics.length
+    ? d.topTopics.map(t => '<li><b>' + digestEsc(t.topic) + '</b> — ' + t.count + '&times;</li>').join('')
+    : '<li style="color:#888">Not enough activity yet.</li>';
+  const gapsHtml = d.gaps.length
+    ? d.gaps.map(g => '<li>' + digestEsc(g.question) + (g.count > 1 ? ' <span style="color:#888">(&times;' + g.count + ')</span>' : '') + '</li>').join('')
+    : '<li style="color:#888">Nothing your bot couldn\'t answer — nice.</li>';
+  const empty = d.stats.questions === 0;
+  const summary = empty
+    ? 'Quiet week — no questions asked. Share the chat link with your team to get them started.'
+    : 'Your team asked <b>' + d.stats.questions + '</b> question' + (d.stats.questions === 1 ? '' : 's') +
+      ' across <b>' + d.stats.conversations + '</b> conversation' + (d.stats.conversations === 1 ? '' : 's') +
+      ' — <b>' + d.stats.activeMembers + '</b> active team member' + (d.stats.activeMembers === 1 ? '' : 's') + '.';
+  return [
+    '<div style="font-family: -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1a1a1a;">',
+      '<div style="font-size:14px; letter-spacing:1px; color:#e35a2f; font-weight:700; margin-bottom:4px;">STACKED CHAT</div>',
+      '<h1 style="font-size:22px; margin:0 0 6px 0;">' + digestEsc(d.venueName) + ': your week</h1>',
+      '<div style="color:#666; font-size:13px; margin-bottom:20px;">Last 7 days</div>',
+      '<p style="line-height:1.5; margin:0 0 18px 0;">' + summary + '</p>',
+      '<h2 style="font-size:15px; text-transform:uppercase; letter-spacing:1px; color:#888; margin:24px 0 8px 0;">Top topics</h2>',
+      '<ul style="margin:0 0 18px 0; padding-left:18px; line-height:1.7;">' + topicsHtml + '</ul>',
+      '<h2 style="font-size:15px; text-transform:uppercase; letter-spacing:1px; color:#888; margin:24px 0 8px 0;">Knowledge gaps</h2>',
+      '<p style="margin:0 0 8px 0; color:#666; font-size:13px;">Questions your bot admitted it couldn\'t answer — good candidates to upload:</p>',
+      '<ul style="margin:0 0 22px 0; padding-left:18px; line-height:1.6;">' + gapsHtml + '</ul>',
+      '<div style="margin-top:28px; padding:16px; background:#faf5f2; border-radius:10px; text-align:center;">',
+        '<a href="' + digestEsc(origin) + '" style="display:inline-block; padding:10px 20px; background:#e35a2f; color:#fff; text-decoration:none; border-radius:8px; font-weight:600;">Open Stacked Chat</a>',
+        '<div style="color:#888; font-size:12px; margin-top:10px;">Sign in as admin → tap the ⚙ icon → add docs, videos, or images to close gaps.</div>',
+      '</div>',
+      '<div style="color:#aaa; font-size:11px; text-align:center; margin-top:24px;">Sent to venue admins. Reply to unsubscribe.</div>',
+    '</div>'
+  ].join('');
+}
+async function sendEmail(to, subject, html) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return { ok: false, error: 'RESEND_API_KEY not configured' };
+  const from = process.env.RESEND_FROM || 'Stacked Chat <onboarding@resend.dev>';
+  const https = require('https');
+  const body = JSON.stringify({ from, to: Array.isArray(to) ? to : [to], subject, html });
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'api.resend.com', path: '/emails', method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (r) => {
+      let d = ''; r.on('data', c => d += c);
+      r.on('end', () => {
+        try { const j = JSON.parse(d); resolve({ ok: r.statusCode < 400, status: r.statusCode, data: j }); }
+        catch { resolve({ ok: r.statusCode < 400, status: r.statusCode, data: d }); }
+      });
+    });
+    req.on('error', (e) => resolve({ ok: false, error: e.message }));
+    req.write(body); req.end();
+  });
+}
+
 async function getAnalytics() {
   try {
     const [convsR, ticketsR, docsR, venuesR, membersR] = await Promise.all([
@@ -1658,6 +1804,14 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="drawer-body" id="adminBody"><div class="empty-history">Loading&hellip;</div></div>
 </div>
 
+<!-- ─── DIGEST DRAWER (admin weekly-digest preview) ─── -->
+<div class="drawer-overlay" id="digestOverlay" onclick="closeDigest()"></div>
+<div class="drawer" id="digestDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header"><span>Weekly digest</span><button class="drawer-close" onclick="closeDigest()">&times;</button></div>
+  <div class="drawer-body" id="digestBody"><div class="empty-history">Loading&hellip;</div></div>
+</div>
+
 <!-- ─── TEAM DRAWER (admin manage-team) ─── -->
 <div class="drawer-overlay" id="teamOverlay" onclick="closeTeam()"></div>
 <div class="drawer" id="teamDrawer">
@@ -2221,7 +2375,9 @@ document.addEventListener('click', function(e) {
   if (action === 'vidLinkClick') { closeAdmin(); openVideoLink(); }
   if (action === 'imgAddClick') { closeAdmin(); openImgAdd(); }
   if (action === 'openTeamFromAdmin') { closeAdmin(); openTeam(); }
+  if (action === 'openDigestFromAdmin') { closeAdmin(); openDigest(); }
   if (action === 'copyInviteLink') { copyInviteLink(btn); }
+  if (action === 'sendTestDigest') { sendTestDigest(btn); }
 });
 
 let recognition = null;
@@ -2806,6 +2962,59 @@ function copyInviteLink(btn) {
   }
 }
 
+function openDigest() {
+  const overlay = document.getElementById('digestOverlay');
+  const drawer = document.getElementById('digestDrawer');
+  const bodyEl = document.getElementById('digestBody');
+  if (bodyEl) bodyEl.innerHTML = '<div class="empty-history">Building digest…</div>';
+  if (overlay) overlay.classList.add('open');
+  if (drawer) drawer.classList.add('open');
+  loadDigest();
+}
+function closeDigest() {
+  const overlay = document.getElementById('digestOverlay');
+  const drawer = document.getElementById('digestDrawer');
+  if (overlay) overlay.classList.remove('open');
+  if (drawer) drawer.classList.remove('open');
+}
+async function loadDigest() {
+  const bodyEl = document.getElementById('digestBody');
+  if (!user || !user.venue_id) { bodyEl.innerHTML = '<p style="padding:16px">Sign in first.</p>'; return; }
+  try {
+    const r = await fetch(SERVER_URL + '/admin/digest/preview', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ venue_id: user.venue_id, token: user.token || null })
+    });
+    const j = await r.json();
+    if (!j.ok) { bodyEl.innerHTML = '<p style="padding:16px; color:#b33;">' + (j.error || 'Failed to build') + '</p>'; return; }
+    const cta = '<div style="padding: 12px 16px 4px; text-align:center;">' +
+      '<button class="admin-cta primary" data-action="sendTestDigest">Send test to my email</button>' +
+      '<div style="color:#888; font-size:12px; margin-top:6px;">Sends the preview above to ' + (user.email || 'you') + '.</div>' +
+      '</div>';
+    bodyEl.innerHTML = '<div style="padding:8px 0;">' + j.html + '</div>' + cta;
+  } catch (e) {
+    bodyEl.innerHTML = '<p style="padding:16px; color:#b33;">Network error: ' + e.message + '</p>';
+  }
+}
+async function sendTestDigest(btn) {
+  if (!user || !user.venue_id) return;
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = 'Sending…'; btn.disabled = true; }
+  try {
+    const r = await fetch(SERVER_URL + '/admin/digest/send-test', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ venue_id: user.venue_id, token: user.token || null })
+    });
+    const j = await r.json();
+    if (btn) {
+      btn.textContent = j.ok ? 'Sent!' : ('Failed: ' + (j.error || 'unknown'));
+      setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 2200);
+    }
+  } catch (e) {
+    if (btn) { btn.textContent = 'Failed'; setTimeout(function(){ btn.textContent = orig; btn.disabled = false; }, 2000); }
+  }
+}
+
 function openAdmin() { loadAdmin(); document.getElementById('adminOverlay').classList.add('open'); document.getElementById('adminDrawer').classList.add('open'); }
 function closeAdmin() { document.getElementById('adminOverlay').classList.remove('open'); document.getElementById('adminDrawer').classList.remove('open'); }
 async function loadAdmin() {
@@ -2836,7 +3045,7 @@ async function loadAdmin() {
         return '<div class="kb-row"><div class="kb-icon">' + teamEsc(ext) + '</div><div class="kb-name">' + teamEsc(doc.filename) + '</div><span class="kb-chunks">' + (doc.chunks || 0) + '</span><button class="kb-del" data-action="kbRemove" data-file="' + teamEsc(doc.filename) + '" title="Remove">\\u2715</button></div>';
       }).join('');
     }
-    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="imgAddClick">+ Add image</button><button class="admin-cta primary" data-action="vidAddClick">+ Upload video</button><button class="admin-cta primary" data-action="vidLinkClick">+ Video link</button><button class="admin-cta ghost" data-action="copyInviteLink">Copy invite link</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
+    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="imgAddClick">+ Add image</button><button class="admin-cta primary" data-action="vidAddClick">+ Upload video</button><button class="admin-cta primary" data-action="vidLinkClick">+ Video link</button><button class="admin-cta ghost" data-action="copyInviteLink">Copy invite link</button><button class="admin-cta ghost" data-action="openDigestFromAdmin">Preview digest</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
     bodyEl.innerHTML = '<div class="admin-section-label">Overview</div>' + stats + kb + buttons;
   } catch(e) { bodyEl.innerHTML = '<div class="empty-history">Could not load admin.</div>'; }
 }
@@ -6073,6 +6282,89 @@ const server = http.createServer(async (req, res) => {
         res.end(JSON.stringify({ ok:false, error:e.message }));
       }
     }); return;
+  }
+
+  // ─── WEEKLY DIGEST: preview (admin-guarded, returns rendered HTML) ────────
+  if (method === 'POST' && url === '/admin/digest/preview') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id, token } = JSON.parse(body);
+        if (!venue_id) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing venue_id'})); return; }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can preview the digest'})); return; }
+        const digest = await buildVenueDigest(venue_id);
+        const origin = 'https://' + (req.headers.host || 'stackedchat.io');
+        const html = renderDigestHtml(digest, { origin });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: true, digest, html }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
+  // ─── WEEKLY DIGEST: send test to the caller's email (admin-guarded) ───────
+  if (method === 'POST' && url === '/admin/digest/send-test') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id, token } = JSON.parse(body);
+        if (!venue_id) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing venue_id'})); return; }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can send the digest'})); return; }
+        const digest = await buildVenueDigest(venue_id);
+        const html = renderDigestHtml(digest, { origin: 'https://' + (req.headers.host || 'stackedchat.io') });
+        const subject = '[Test] ' + (digest ? digest.venueName : 'Your venue') + ' · Stacked Chat weekly digest';
+        const sent = await sendEmail(vEmail, subject, html);
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: sent.ok, error: sent.error || null, to: vEmail }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
+  // ─── WEEKLY DIGEST: cron trigger (send to every venue admin) ──────────────
+  // Guarded by CRON_SECRET env var. Wire an external scheduler (Render Cron,
+  // cron-job.org, GitHub Actions) to hit this Monday morning.
+  if (method === 'GET' && url.startsWith('/cron/digest')) {
+    try {
+      const params = new URL(url, 'http://localhost');
+      const secret = params.searchParams.get('secret') || '';
+      const expected = process.env.CRON_SECRET || '';
+      if (!expected || secret !== expected) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'bad secret'})); return; }
+      const venuesR = await sbFetch('/rest/v1/venues?select=id,name&limit=1000');
+      const venues = Array.isArray(venuesR.data) ? venuesR.data : [];
+      const results = [];
+      for (const v of venues) {
+        const digest = await buildVenueDigest(v.id);
+        if (!digest || digest.stats.questions === 0) { results.push({ venue: v.name, skipped: 'no activity' }); continue; }
+        const admins = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(v.id) + '&role=eq.admin&select=email&limit=50');
+        const emails = (Array.isArray(admins.data) ? admins.data : []).map(a => a.email).filter(Boolean);
+        if (!emails.length) { results.push({ venue: v.name, skipped: 'no admins' }); continue; }
+        const html = renderDigestHtml(digest, { origin: 'https://stackedchat.io' });
+        const subject = digest.venueName + ' · Your Stacked Chat weekly digest';
+        const sent = await sendEmail(emails, subject, html);
+        results.push({ venue: v.name, to: emails, sent: sent.ok, error: sent.error || null });
+      }
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({ ok: true, count: results.length, results }));
+    } catch(e) {
+      res.writeHead(500, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({ ok:false, error:e.message }));
+    }
+    return;
   }
 
   // ─── KB REMOVE (admin removes a doc from THEIR workspace only) ────────────
