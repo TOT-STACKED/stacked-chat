@@ -22,6 +22,71 @@ function isAdminAuthed(req) {
   return !!(m && m[1] === ADMIN_TOKEN);
 }
 
+// ─── RATE LIMIT + MODERATION ─────────────────────────────────────────────
+// In-memory counters — resets on server restart. Good enough for launch MVP;
+// swap for Redis/Supabase-backed if we outgrow single-process deploys.
+const RL_IP_PER_MIN   = parseInt(process.env.RL_IP_PER_MIN   || '25', 10);   // messages / minute / IP
+const RL_VENUE_PER_DAY = parseInt(process.env.RL_VENUE_PER_DAY || '600', 10); // messages / day / venue
+const RL_MSG_MAX_CHARS = 2500;
+const _rlIpMin = new Map();     // ip -> { count, resetAt }
+const _rlVenueDay = new Map();  // venue_id -> { count, resetAt }
+
+function getClientIP(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (xf) return String(xf).split(',')[0].trim();
+  return (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+
+function checkRateLimit(req, venue_id) {
+  const now = Date.now();
+  const ip = getClientIP(req);
+  // per-IP per minute
+  let ipRec = _rlIpMin.get(ip);
+  if (!ipRec || now > ipRec.resetAt) ipRec = { count: 0, resetAt: now + 60_000 };
+  ipRec.count++;
+  _rlIpMin.set(ip, ipRec);
+  if (ipRec.count > RL_IP_PER_MIN) {
+    return { blocked: true, kind: 'ip', message: "You're sending messages a bit too quickly — give me a moment to catch up. Try again in a minute." };
+  }
+  // per-venue per day (resets at UTC midnight)
+  if (venue_id) {
+    let vRec = _rlVenueDay.get(venue_id);
+    if (!vRec || now > vRec.resetAt) {
+      const nextMidnight = new Date(); nextMidnight.setUTCHours(24, 0, 0, 0);
+      vRec = { count: 0, resetAt: nextMidnight.getTime() };
+    }
+    vRec.count++;
+    _rlVenueDay.set(venue_id, vRec);
+    if (vRec.count > RL_VENUE_PER_DAY) {
+      return { blocked: true, kind: 'venue', message: `Your venue has reached today's message limit (${RL_VENUE_PER_DAY.toLocaleString()}). It resets at midnight UTC — please continue tomorrow.` };
+    }
+  }
+  return { blocked: false };
+}
+
+function moderateMessage(message) {
+  const raw = String(message || '');
+  if (raw.length > RL_MSG_MAX_CHARS) {
+    return { blocked: true, message: `That message is too long (${raw.length} characters). Please keep it under ${RL_MSG_MAX_CHARS.toLocaleString()} characters — shorter questions get better answers anyway.` };
+  }
+  // Prompt-injection guards. Deliberately narrow — genuine business questions
+  // never contain these phrases; catches the common jailbreak boilerplate.
+  const patterns = [
+    /\bignore\s+(all\s+|your\s+|the\s+|any\s+|previous\s+|prior\s+)?(previous|prior|above|earlier|preceding|all|all previous)\s+(instructions|prompt|rules|system|directives|guidelines|constraints)/i,
+    /\bdisregard\s+(all\s+|your\s+|the\s+|any\s+)?(previous|prior|above|earlier|preceding|all)\s+(instructions|prompt|rules|system|directives|guidelines)/i,
+    /\byou\s+are\s+(now\s+|actually\s+)?(dan|jailbroken|unrestricted|unlocked|uncensored|free\s+of|no longer)/i,
+    /\bforget\s+everything\s+(you|above|previously|before)/i,
+    /\breveal\s+(your\s+)?(system\s+prompt|instructions|initial\s+prompt|hidden\s+prompt)/i,
+    /\bshow\s+(me\s+)?(your\s+)?(system\s+prompt|hidden\s+instructions|initial\s+instructions)/i,
+    /\bnew\s+(system\s+)?(instructions|prompt)\s*[:\-]/i,
+    /\brepeat\s+(the\s+|your\s+)?(above|previous)\s+(word\s+for\s+word|verbatim|exactly)/i,
+  ];
+  if (patterns.some(rx => rx.test(raw))) {
+    return { blocked: true, message: "I can only help with genuine questions about running your venue. Try asking me about your handbook, suppliers, or fixing a system." };
+  }
+  return { blocked: false };
+}
+
 const KNOWLEDGE_BASE = `
 You have access to a comprehensive knowledge base of hospitality technology vendor guides.
 The knowledge base docs injected below are your PRIMARY source - always use them.
@@ -1710,6 +1775,28 @@ window.addEventListener('DOMContentLoaded', () => {
     if (vcChange) vcChange.style.display = 'none'; // no "Change" link on locked pages
   }
 
+  // Team invite links: ?join=<venue_id> pre-selects and locks the venue on the
+  // gate so staff only enter their name/email/phone.
+  const inviteId = new URLSearchParams(window.location.search).get('join');
+  if (inviteId && !PRESET_VENUE_ID) {
+    fetch('/venues/lookup?id=' + encodeURIComponent(inviteId))
+      .then(function(r){ return r.json(); })
+      .then(function(v){
+        if (v && v.id && v.name) {
+          selectVenue(v.id, v.name, false);
+          const venueWrap = document.querySelector('.venue-wrap');
+          const venueConfirmed = document.getElementById('venueConfirmed');
+          const venueConfirmedName = document.getElementById('venueConfirmedName');
+          const vcChange = document.querySelector('.vc-change');
+          if (venueWrap) venueWrap.style.display = 'none';
+          if (venueConfirmedName) venueConfirmedName.textContent = v.name;
+          if (venueConfirmed) venueConfirmed.style.display = 'flex';
+          if (vcChange) vcChange.style.display = 'none';
+        }
+      })
+      .catch(function(){});
+  }
+
   const saved = localStorage.getItem('stacked_user');
   if (saved) {
     user = JSON.parse(saved);
@@ -2134,6 +2221,7 @@ document.addEventListener('click', function(e) {
   if (action === 'vidLinkClick') { closeAdmin(); openVideoLink(); }
   if (action === 'imgAddClick') { closeAdmin(); openImgAdd(); }
   if (action === 'openTeamFromAdmin') { closeAdmin(); openTeam(); }
+  if (action === 'copyInviteLink') { copyInviteLink(btn); }
 });
 
 let recognition = null;
@@ -2700,6 +2788,24 @@ async function submitImage() {
 }
 
 // ─── ADMIN PANEL (scoped analytics + knowledge, admins only) ──────────────
+function copyInviteLink(btn) {
+  if (!user || !user.venue_id) return;
+  const link = window.location.origin + '/?join=' + user.venue_id;
+  const done = function(){
+    if (!btn) return;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function(){ btn.textContent = orig; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(link).then(done).catch(function(){
+      window.prompt('Copy this invite link:', link);
+    });
+  } else {
+    window.prompt('Copy this invite link:', link);
+  }
+}
+
 function openAdmin() { loadAdmin(); document.getElementById('adminOverlay').classList.add('open'); document.getElementById('adminDrawer').classList.add('open'); }
 function closeAdmin() { document.getElementById('adminOverlay').classList.remove('open'); document.getElementById('adminDrawer').classList.remove('open'); }
 async function loadAdmin() {
@@ -2730,7 +2836,7 @@ async function loadAdmin() {
         return '<div class="kb-row"><div class="kb-icon">' + teamEsc(ext) + '</div><div class="kb-name">' + teamEsc(doc.filename) + '</div><span class="kb-chunks">' + (doc.chunks || 0) + '</span><button class="kb-del" data-action="kbRemove" data-file="' + teamEsc(doc.filename) + '" title="Remove">\\u2715</button></div>';
       }).join('');
     }
-    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="imgAddClick">+ Add image</button><button class="admin-cta primary" data-action="vidAddClick">+ Upload video</button><button class="admin-cta primary" data-action="vidLinkClick">+ Video link</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
+    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="imgAddClick">+ Add image</button><button class="admin-cta primary" data-action="vidAddClick">+ Upload video</button><button class="admin-cta primary" data-action="vidLinkClick">+ Video link</button><button class="admin-cta ghost" data-action="copyInviteLink">Copy invite link</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
     bodyEl.innerHTML = '<div class="admin-section-label">Overview</div>' + stats + kb + buttons;
   } catch(e) { bodyEl.innerHTML = '<div class="empty-history">Could not load admin.</div>'; }
 }
@@ -5656,6 +5762,24 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ─── VENUE SEARCH ──────────────────────────────────────────────────────
+  // Lookup a venue by id (used by ?join=<id> invite links to show the venue
+  // name on the gate before someone signs in). Public: id is opaque UUID.
+  if (method === 'GET' && url.startsWith('/venues/lookup')) {
+    try {
+      const params = new URL(url, 'http://localhost');
+      const id = params.searchParams.get('id') || '';
+      if (!id) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'missing id'})); return; }
+      const r = await sbFetch('/rest/v1/venues?select=id,name&id=eq.' + encodeURIComponent(id) + '&limit=1');
+      const row = Array.isArray(r.data) && r.data[0] ? r.data[0] : null;
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify(row || { error: 'not found' }));
+    } catch(e) {
+      res.writeHead(200, {'Content-Type':'application/json'});
+      res.end(JSON.stringify({error:e.message}));
+    }
+    return;
+  }
+
   if (method === 'GET' && url.startsWith('/venues/search')) {
     try {
       const params = new URL(url, 'http://localhost');
@@ -6133,6 +6257,21 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const { message, history = [], venue, venue_id, userName, image } = JSON.parse(body);
+
+        // ── Rate limit + moderation (fail-friendly: return a normal 200 with a
+        //    bot-styled message so the chat widget renders it as a reply). ──
+        const rl = checkRateLimit(req, venue_id);
+        if (rl.blocked) {
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({response: rl.message, supportUrl: null, escalate: false, videos: [], videoCount: 0, images: [], docFile: null, detectedVendor: null, forceNPS: false}));
+          return;
+        }
+        const mod = moderateMessage(message);
+        if (mod.blocked) {
+          res.writeHead(200, {'Content-Type':'application/json'});
+          res.end(JSON.stringify({response: mod.message, supportUrl: null, escalate: false, videos: [], videoCount: 0, images: [], docFile: null, detectedVendor: null, forceNPS: false}));
+          return;
+        }
 
         // Fetch venue tech stack if we have a venue_id
         let techStackContext = '';
@@ -6964,7 +7103,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
   }
 
   // ─── MAIN CHAT PAGE ────────────────────────────────────────────────────
-  if (method === 'GET' && (url === '/' || url === '')) {
+  if (method === 'GET' && (url === '/' || url === '' || url.startsWith('/?'))) {
     res.writeHead(200, {'Content-Type':'text/html','Cache-Control':'no-store'});
     res.end(buildChatPage()); return;
   }
