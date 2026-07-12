@@ -2983,7 +2983,7 @@ async function loadDigest() {
   try {
     const r = await fetch(SERVER_URL + '/admin/digest/preview', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ venue_id: user.venue_id, token: user.token || null })
+      body: JSON.stringify({ venue_id: user.venue_id, token: getAuthToken() })
     });
     const j = await r.json();
     if (!j.ok) { bodyEl.innerHTML = '<p style="padding:16px; color:#b33;">' + (j.error || 'Failed to build') + '</p>'; return; }
@@ -3003,7 +3003,7 @@ async function sendTestDigest(btn) {
   try {
     const r = await fetch(SERVER_URL + '/admin/digest/send-test', {
       method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ venue_id: user.venue_id, token: user.token || null })
+      body: JSON.stringify({ venue_id: user.venue_id, token: getAuthToken() })
     });
     const j = await r.json();
     if (btn) {
