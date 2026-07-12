@@ -6338,6 +6338,24 @@ const server = http.createServer(async (req, res) => {
   // ─── WEEKLY DIGEST: cron trigger (send to every venue admin) ──────────────
   // Guarded by CRON_SECRET env var. Wire an external scheduler (Render Cron,
   // cron-job.org, GitHub Actions) to hit this Monday morning.
+  // Temporary: prove which env vars the running Node process actually sees.
+  // Returns booleans + string lengths only — never leaks the actual values.
+  // Remove after digest sending is confirmed working.
+  if (method === 'GET' && url === '/debug/env-check') {
+    res.writeHead(200, {'Content-Type':'application/json'});
+    res.end(JSON.stringify({
+      RESEND_API_KEY_set: !!process.env.RESEND_API_KEY,
+      RESEND_API_KEY_length: (process.env.RESEND_API_KEY || '').length,
+      RESEND_FROM_set: !!process.env.RESEND_FROM,
+      RESEND_FROM_value: process.env.RESEND_FROM ? process.env.RESEND_FROM.slice(0, 30) + '...' : null,
+      CRON_SECRET_set: !!process.env.CRON_SECRET,
+      NODE_ENV: process.env.NODE_ENV || null,
+      pid: process.pid,
+      uptime_seconds: Math.round(process.uptime())
+    }));
+    return;
+  }
+
   if (method === 'GET' && url.startsWith('/cron/digest')) {
     try {
       const params = new URL(url, 'http://localhost');
