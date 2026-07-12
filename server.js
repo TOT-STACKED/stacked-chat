@@ -6338,6 +6338,7 @@ const server = http.createServer(async (req, res) => {
   // ─── WEEKLY DIGEST: cron trigger (send to every venue admin) ──────────────
   // Guarded by CRON_SECRET env var. Wire an external scheduler (Render Cron,
   // cron-job.org, GitHub Actions) to hit this Monday morning.
+  // (redeploy trigger 2026-07-12)
   // Temporary: prove which env vars the running Node process actually sees.
   // Returns booleans + string lengths only — never leaks the actual values.
   // Remove after digest sending is confirmed working.
