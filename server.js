@@ -960,9 +960,12 @@ function renderDigestHtml(d, opts) {
   ].join('');
 }
 async function sendEmail(to, subject, html) {
-  const key = process.env.RESEND_API_KEY;
+  // Trim env values — Render/Railway UIs occasionally save trailing newlines
+  // when values are pasted with an accidental Enter, which breaks the SMTP
+  // header validation on Resend.
+  const key = (process.env.RESEND_API_KEY || '').trim();
   if (!key) return { ok: false, error: 'RESEND_API_KEY not configured' };
-  const from = process.env.RESEND_FROM || 'Stacked Chat <onboarding@resend.dev>';
+  const from = (process.env.RESEND_FROM || 'Stacked Chat <onboarding@resend.dev>').trim();
   const https = require('https');
   const body = JSON.stringify({ from, to: Array.isArray(to) ? to : [to], subject, html });
   return new Promise((resolve) => {
@@ -983,6 +986,295 @@ async function sendEmail(to, subject, html) {
     req.on('error', (e) => resolve({ ok: false, error: e.message }));
     req.write(body); req.end();
   });
+}
+
+// ─── PARTNER REPORTS ──────────────────────────────────────────────────────────
+// Per-vendor monthly Intelligence Report — the artifact sold to tech partners.
+// Aggregates conversations, NPS, problem categories, and verbatim samples for
+// one vendor in one month. Rendered as a print-friendly HTML page: admin visits
+// /report?vendor=<slug>&month=YYYY-MM → Cmd+P → PDF → email to partner.
+const REPORT_VENDOR_CATALOG = [
+  {n:'Square',cat:'POS',kw:['square']},{n:'Toast',cat:'POS',kw:['toasttab','toast pos','toast support']},
+  {n:'Lightspeed',cat:'POS',kw:['lightspeed']},{n:'Zonal',cat:'POS',kw:['zonal']},
+  {n:'EPOS Now',cat:'POS',kw:['epos now','eposnow']},{n:'Tevalis',cat:'POS',kw:['tevalis']},
+  {n:'ICRTouch',cat:'POS',kw:['icrtouch','touchpoint']},{n:'Vita Mojo',cat:'POS',kw:['vita mojo','vitamojo']},
+  {n:'SumUp',cat:'Payments',kw:['sumup']},{n:'Zettle',cat:'Payments',kw:['zettle']},
+  {n:'Stripe',cat:'Payments',kw:['stripe']},{n:'Dojo',cat:'Payments',kw:['dojo']},
+  {n:'Worldpay',cat:'Payments',kw:['worldpay']},{n:'Adyen',cat:'Payments',kw:['adyen']},
+  {n:'Deliveroo',cat:'Delivery',kw:['deliveroo']},{n:'Uber Eats',cat:'Delivery',kw:['uber eats','ubereats']},
+  {n:'Just Eat',cat:'Delivery',kw:['just eat','justeat']},{n:'Deliverect',cat:'Delivery',kw:['deliverect']},
+  {n:'Flipdish',cat:'Delivery',kw:['flipdish']},{n:'Deputy',cat:'Rotas',kw:['deputy']},
+  {n:'Rotaready',cat:'Rotas',kw:['rotaready']},{n:'Workforce.com',cat:'Rotas',kw:['workforce']},
+  {n:'Fourth',cat:'Rotas',kw:['fourth hospitality','fourth app']},{n:'Planday',cat:'Rotas',kw:['planday']},
+  {n:'S4Labour',cat:'Rotas',kw:['s4labour']},{n:'OpenTable',cat:'Bookings',kw:['opentable']},
+  {n:'ResDiary',cat:'Bookings',kw:['resdiary']},{n:'SevenRooms',cat:'Bookings',kw:['sevenrooms']},
+  {n:'Resy',cat:'Bookings',kw:['resy']},{n:'Collins',cat:'Bookings',kw:['designmynight','collins']},
+  {n:'Crunchtime',cat:'Inventory',kw:['crunchtime']},{n:'Apicbase',cat:'Inventory',kw:['apicbase']},
+  {n:'Marketman',cat:'Inventory',kw:['marketman']},{n:'Nutritics',cat:'Inventory',kw:['nutritics']},
+  {n:'Tenzo',cat:'Analytics',kw:['tenzo']},{n:'Yumpingo',cat:'Analytics',kw:['yumpingo']},
+  {n:'Stampede',cat:'WiFi / Marketing',kw:['stampede']},{n:'Purple WiFi',cat:'WiFi',kw:['purple wifi','purple wi-fi']},
+  {n:'Airship',cat:'Loyalty',kw:['airship']}
+];
+const REPORT_PROBLEM_TYPES = [
+  {label:'Connection / offline',kw:["won't connect","wont connect","not connecting","can't connect","disconnect","offline","dropping","no connection"]},
+  {label:'Errors / crashing',kw:['error','crash','frozen','freezing','not working',"isn't working","won't work",'broken','glitch']},
+  {label:'Syncing',kw:['sync','out of sync','resync','re-sync']},
+  {label:'Printing',kw:['printer','not printing','print issue','kitchen ticket']},
+  {label:'Refunds / voids',kw:['refund','void','chargeback']},
+  {label:'Login / access',kw:['login','log in','password','locked out',"can't access"]},
+  {label:'Reports / end of day',kw:['report','end of day','z-report','reconcile']},
+  {label:'Payments / settlement',kw:['declined','settlement','payout','transaction failed']},
+  {label:'Menu / setup',kw:['menu','set up','setup','configure','pricing']},
+  {label:'Missing orders',kw:['missing order','order not','lost order','orders not']}
+];
+function reportSlug(name) { return String(name).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function reportEsc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function reportMonthLabel(iso) {
+  const [y, m] = String(iso).split('-').map(Number);
+  const d = new Date(Date.UTC(y || 1970, (m || 1) - 1, 1));
+  return d.toLocaleString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+function reportDefaultMonth() {
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  const prev = new Date(Date.UTC(y, m - 1, 1));
+  return prev.getUTCFullYear() + '-' + String(prev.getUTCMonth() + 1).padStart(2, '0');
+}
+async function buildVendorReport(vendorSlug, monthISO) {
+  const vendor = REPORT_VENDOR_CATALOG.find(v => reportSlug(v.n) === reportSlug(vendorSlug));
+  if (!vendor) return null;
+  const [y, m] = String(monthISO).split('-').map(Number);
+  if (!y || !m) return null;
+  const start = new Date(Date.UTC(y, m - 1, 1)).toISOString();
+  const end = new Date(Date.UTC(y, m, 1)).toISOString();
+  const conv = await sbFetch('/rest/v1/conversations?created_at=gte.' + encodeURIComponent(start) +
+    '&created_at=lt.' + encodeURIComponent(end) +
+    '&select=id,venue,messages,created_at&order=created_at.desc&limit=2000');
+  const convs = Array.isArray(conv.data) ? conv.data : [];
+  let mentions = 0;
+  let convsWithMention = 0;
+  const venuesTouched = new Set();
+  const samples = [];
+  const problemCounts = {};
+  const questionCounts = {};
+  for (const c of convs) {
+    if (!Array.isArray(c.messages)) continue;
+    let hasMention = false;
+    for (const msg of c.messages) {
+      if (msg.role !== 'user') continue;
+      const text = String(msg.content || '');
+      const t = text.toLowerCase();
+      if (!vendor.kw.some(k => t.includes(k))) continue;
+      mentions++;
+      hasMention = true;
+      if (samples.length < 12) samples.push({ text: text.length > 280 ? text.slice(0, 277) + '…' : text, venue: c.venue || null });
+      for (const p of REPORT_PROBLEM_TYPES) {
+        if (p.kw.some(k => t.includes(k))) {
+          problemCounts[p.label] = (problemCounts[p.label] || 0) + 1;
+        }
+      }
+      if (text.includes('?')) {
+        const key = text.trim().replace(/\s+/g, ' ').slice(0, 120);
+        questionCounts[key] = (questionCounts[key] || 0) + 1;
+      }
+    }
+    if (hasMention) {
+      convsWithMention++;
+      if (c.venue) venuesTouched.add(String(c.venue).toLowerCase());
+    }
+  }
+  const npsR = await sbFetch('/rest/v1/nps_scores?created_at=gte.' + encodeURIComponent(start) +
+    '&created_at=lt.' + encodeURIComponent(end) +
+    '&select=vendor,score,comment&limit=2000');
+  const allNps = Array.isArray(npsR.data) ? npsR.data : [];
+  const vendorNps = allNps.filter(n => {
+    const nv = String(n.vendor || '').toLowerCase();
+    return vendor.kw.some(k => nv.includes(k)) || nv.includes(vendor.n.toLowerCase());
+  });
+  const scores = vendorNps.map(n => n.score).filter(s => typeof s === 'number');
+  const scoreAvg = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+  const promoters = scores.filter(s => s >= 9).length;
+  const passives = scores.filter(s => s >= 7 && s <= 8).length;
+  const detractors = scores.filter(s => s <= 6).length;
+  const npsScore = scores.length ? Math.round(((promoters - detractors) / scores.length) * 100) : null;
+  const npsComments = vendorNps.map(n => n.comment).filter(c => c && String(c).trim().length > 4).slice(0, 8);
+  const topProblems = Object.keys(problemCounts)
+    .map(k => ({ label: k, count: problemCounts[k] }))
+    .sort((a, b) => b.count - a.count).slice(0, 6);
+  const topQuestions = Object.keys(questionCounts)
+    .map(k => ({ q: k, count: questionCounts[k] }))
+    .sort((a, b) => b.count - a.count).slice(0, 8);
+  return {
+    vendor: vendor.n,
+    category: vendor.cat,
+    period: monthISO,
+    periodLabel: reportMonthLabel(monthISO),
+    stats: {
+      mentions,
+      conversations: convsWithMention,
+      venues: venuesTouched.size
+    },
+    nps: {
+      avg: scoreAvg,
+      score: npsScore,
+      count: scores.length,
+      promoters, passives, detractors,
+      comments: npsComments
+    },
+    topProblems,
+    topQuestions,
+    samples
+  };
+}
+function renderVendorReportHtml(r) {
+  if (!r) return '<!doctype html><html><body><p>Not found.</p></body></html>';
+  const empty = r.stats.mentions === 0 && (!r.nps.count);
+  const npsBarPct = (n) => r.nps.count ? Math.round((n / r.nps.count) * 100) : 0;
+  const problemsRows = r.topProblems.length
+    ? r.topProblems.map(p =>
+        '<tr><td>' + reportEsc(p.label) + '</td><td class="num">' + p.count + '</td>' +
+        '<td><div class="bar"><span style="width:' + Math.min(100, p.count * 12) + '%"></span></div></td></tr>'
+      ).join('')
+    : '<tr><td colspan="3" class="empty">No problems detected in operator questions this month.</td></tr>';
+  const questionsHtml = r.topQuestions.length
+    ? '<ol class="qlist">' + r.topQuestions.map(q => '<li>' + reportEsc(q.q) + (q.count > 1 ? ' <span class="qcount">×' + q.count + '</span>' : '') + '</li>').join('') + '</ol>'
+    : '<p class="empty">No repeat questions this month.</p>';
+  const samplesHtml = r.samples.length
+    ? r.samples.slice(0, 8).map(s =>
+        '<blockquote>' + reportEsc(s.text) +
+        (s.venue ? '<cite>— ' + reportEsc(s.venue) + '</cite>' : '') +
+        '</blockquote>'
+      ).join('')
+    : '<p class="empty">No verbatim quotes captured this month.</p>';
+  const npsCommentsHtml = r.nps.comments.length
+    ? r.nps.comments.map(c => '<blockquote class="nps">' + reportEsc(c) + '</blockquote>').join('')
+    : '<p class="empty">No written NPS comments this month.</p>';
+  return [
+    '<!doctype html><html><head><meta charset="utf-8">',
+    '<title>' + reportEsc(r.vendor) + ' · Partner Intelligence Report</title>',
+    '<meta name="viewport" content="width=device-width,initial-scale=1">',
+    '<style>',
+    '  :root { --ink:#1a1a1a; --muted:#666; --line:#e6e6e6; --brand:#e35a2f; --bg:#fafafa; }',
+    '  * { box-sizing: border-box; }',
+    '  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); margin: 0; padding: 32px 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }',
+    '  .page { max-width: 780px; margin: 0 auto; background: #fff; padding: 44px 52px; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.06); }',
+    '  .brand { color: var(--brand); font-weight: 800; letter-spacing: 1.5px; font-size: 12px; text-transform: uppercase; }',
+    '  h1 { font-size: 34px; margin: 6px 0 4px 0; letter-spacing: -0.5px; }',
+    '  .sub { color: var(--muted); font-size: 15px; margin-bottom: 32px; }',
+    '  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1.4px; color: #888; margin: 40px 0 12px 0; font-weight: 700; }',
+    '  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }',
+    '  .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 16px; }',
+    '  .kpi .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }',
+    '  .kpi .v { font-size: 28px; font-weight: 800; margin-top: 4px; letter-spacing: -0.5px; }',
+    '  .kpi .h { color: var(--muted); font-size: 12px; margin-top: 2px; }',
+    '  table { width: 100%; border-collapse: collapse; }',
+    '  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); font-size: 14px; }',
+    '  td.num { font-weight: 700; text-align: right; width: 60px; }',
+    '  .bar { background: #f1f1f1; border-radius: 4px; height: 8px; overflow: hidden; }',
+    '  .bar span { display:block; height: 100%; background: var(--brand); border-radius: 4px; }',
+    '  .qlist { padding-left: 20px; line-height: 1.55; }',
+    '  .qcount { color: var(--muted); font-size: 12px; }',
+    '  blockquote { margin: 0 0 14px 0; padding: 14px 18px; background: #fbf8f5; border-left: 3px solid var(--brand); border-radius: 4px; font-size: 14px; line-height: 1.55; }',
+    '  blockquote.nps { background: #f5f8ff; border-left-color: #4a80ff; }',
+    '  blockquote cite { display: block; color: var(--muted); font-style: normal; font-size: 12px; margin-top: 6px; }',
+    '  .empty { color: var(--muted); font-style: italic; padding: 6px 0; }',
+    '  .nps-block { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }',
+    '  .nps-num { font-size: 64px; font-weight: 800; letter-spacing: -2px; line-height: 1; }',
+    '  .nps-label { color: var(--muted); text-transform: uppercase; letter-spacing: 1.4px; font-size: 11px; font-weight: 700; margin-top: 6px; }',
+    '  .dist { margin-top: 12px; }',
+    '  .dist-row { display: flex; align-items: center; gap: 10px; margin: 4px 0; font-size: 13px; }',
+    '  .dist-lbl { width: 90px; color: var(--muted); }',
+    '  .dist-bar { flex: 1; background: #f1f1f1; height: 12px; border-radius: 4px; overflow: hidden; }',
+    '  .dist-bar span { display: block; height: 100%; border-radius: 4px; }',
+    '  .dist-row.prom .dist-bar span { background: #2ea44f; }',
+    '  .dist-row.pass .dist-bar span { background: #f5b400; }',
+    '  .dist-row.det .dist-bar span { background: #d1462f; }',
+    '  .dist-val { width: 44px; text-align: right; font-weight: 600; }',
+    '  footer { color: var(--muted); font-size: 11px; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--line); text-align: center; }',
+    '  .toolbar { max-width: 780px; margin: 0 auto 12px auto; display: flex; justify-content: flex-end; gap: 8px; }',
+    '  .toolbar a, .toolbar button { background: #fff; border: 1px solid var(--line); padding: 8px 14px; border-radius: 8px; text-decoration: none; color: var(--ink); font-size: 13px; cursor: pointer; }',
+    '  .toolbar button:hover { background: var(--brand); color: #fff; border-color: var(--brand); }',
+    '  @media print { body { background: #fff; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; } .page { box-shadow: none; border-radius: 0; max-width: none; padding: 32px 40px; } .toolbar { display: none; } h2 { page-break-after: avoid; } blockquote, .kpi { page-break-inside: avoid; } }',
+    '</style>',
+    '</head><body>',
+    '<div class="toolbar"><a href="/report">← Change vendor / month</a><button onclick="window.print()">Save as PDF</button></div>',
+    '<div class="page">',
+      '<div class="brand">Confidential · Partner Intelligence</div>',
+      '<h1>' + reportEsc(r.vendor) + '</h1>',
+      '<div class="sub">' + reportEsc(r.category) + ' · ' + reportEsc(r.periodLabel) + '</div>',
+      empty
+        ? '<p class="empty" style="padding:24px 0;">No operator mentions or NPS scores for ' + reportEsc(r.vendor) + ' in ' + reportEsc(r.periodLabel) + '.</p>'
+        : [
+          '<div class="kpis">',
+            '<div class="kpi"><div class="k">Operator mentions</div><div class="v">' + r.stats.mentions + '</div><div class="h">Times the vendor came up in questions</div></div>',
+            '<div class="kpi"><div class="k">Conversations</div><div class="v">' + r.stats.conversations + '</div><div class="h">Distinct chat sessions</div></div>',
+            '<div class="kpi"><div class="k">Venues touched</div><div class="v">' + r.stats.venues + '</div><div class="h">Unique venues raising the vendor</div></div>',
+          '</div>',
+          '<h2>Operator NPS</h2>',
+          r.nps.count ? [
+            '<div class="nps-block">',
+              '<div>',
+                '<div class="nps-num">' + (r.nps.score !== null ? (r.nps.score > 0 ? '+' + r.nps.score : String(r.nps.score)) : '—') + '</div>',
+                '<div class="nps-label">Net Promoter Score</div>',
+                '<div style="color:var(--muted); font-size:12px; margin-top:8px;">Avg rating <b style="color:var(--ink)">' + (r.nps.avg !== null ? r.nps.avg + ' / 10' : '—') + '</b> across <b style="color:var(--ink)">' + r.nps.count + '</b> operator response' + (r.nps.count === 1 ? '' : 's') + '.</div>',
+              '</div>',
+              '<div class="dist">',
+                '<div class="dist-row prom"><div class="dist-lbl">Promoters</div><div class="dist-bar"><span style="width:' + npsBarPct(r.nps.promoters) + '%"></span></div><div class="dist-val">' + r.nps.promoters + '</div></div>',
+                '<div class="dist-row pass"><div class="dist-lbl">Passives</div><div class="dist-bar"><span style="width:' + npsBarPct(r.nps.passives) + '%"></span></div><div class="dist-val">' + r.nps.passives + '</div></div>',
+                '<div class="dist-row det"><div class="dist-lbl">Detractors</div><div class="dist-bar"><span style="width:' + npsBarPct(r.nps.detractors) + '%"></span></div><div class="dist-val">' + r.nps.detractors + '</div></div>',
+              '</div>',
+            '</div>',
+            '<h2 style="margin-top:28px;">What operators said</h2>',
+            npsCommentsHtml
+          ].join('') : '<p class="empty">No NPS scores collected for ' + reportEsc(r.vendor) + ' this month.</p>',
+          '<h2>Top operator issues</h2>',
+          '<table><thead><tr><th>Issue category</th><th class="num">Mentions</th><th></th></tr></thead><tbody>' + problemsRows + '</tbody></table>',
+          '<h2>Verbatim questions from operators</h2>',
+          samplesHtml,
+          '<h2>Repeat questions asked</h2>',
+          questionsHtml
+        ].join(''),
+      '<footer>Stacked Chat · Partner Intelligence Report · Generated ' + new Date().toISOString().slice(0, 10) + ' · Anonymised aggregate of live operator conversations. Confidential — do not redistribute.</footer>',
+    '</div>',
+    '</body></html>'
+  ].join('');
+}
+function renderReportPickerHtml() {
+  const monthNow = reportDefaultMonth();
+  const opts = REPORT_VENDOR_CATALOG.map(v =>
+    '<option value="' + reportEsc(reportSlug(v.n)) + '">' + reportEsc(v.n) + ' (' + reportEsc(v.cat) + ')</option>'
+  ).join('');
+  return [
+    '<!doctype html><html><head><meta charset="utf-8">',
+    '<title>Partner Reports · Stacked Chat</title>',
+    '<style>',
+    '  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background: #fafafa; padding: 40px 16px; color: #1a1a1a; }',
+    '  .card { max-width: 480px; margin: 40px auto; background: #fff; padding: 40px; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.06); }',
+    '  .brand { color: #e35a2f; font-weight: 800; letter-spacing: 1.5px; font-size: 12px; text-transform: uppercase; }',
+    '  h1 { margin: 6px 0 24px 0; font-size: 26px; letter-spacing: -0.5px; }',
+    '  label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin: 16px 0 6px 0; font-weight: 700; }',
+    '  select, input[type=month] { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 15px; background: #fff; }',
+    '  button { margin-top: 24px; background: #e35a2f; color: #fff; border: none; padding: 12px 18px; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; width: 100%; }',
+    '  button:hover { background: #c94a24; }',
+    '  a.back { color: #666; font-size: 13px; text-decoration: none; }',
+    '</style></head><body>',
+    '<div class="card">',
+      '<a class="back" href="/admin">← Back to admin</a>',
+      '<div class="brand" style="margin-top:16px;">Partner Reports</div>',
+      '<h1>Generate a monthly report</h1>',
+      '<form method="get" action="/report">',
+        '<label for="vendor">Vendor</label>',
+        '<select name="vendor" id="vendor" required>' + opts + '</select>',
+        '<label for="month">Month</label>',
+        '<input type="month" name="month" id="month" value="' + monthNow + '" required>',
+        '<button type="submit">Generate report →</button>',
+      '</form>',
+    '</div>',
+    '</body></html>'
+  ].join('');
 }
 
 async function getAnalytics() {
@@ -4986,6 +5278,8 @@ tbody tr:hover td{background:var(--surface2)}
       <button class="nav-item" onclick="showTab('signups')">Sign-ups</button>
       <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('content')">Content</button>
+      <div class="nav-divider"></div>
+      <a class="nav-item" href="/report" style="text-decoration:none;">Reports</a>
     </nav>
   </div>
   <div class="header-right">
@@ -6351,6 +6645,9 @@ const server = http.createServer(async (req, res) => {
       RESEND_FROM_value: process.env.RESEND_FROM ? process.env.RESEND_FROM.slice(0, 30) + '...' : null,
       CRON_SECRET_set: !!process.env.CRON_SECRET,
       NODE_ENV: process.env.NODE_ENV || null,
+      RAILWAY_PROJECT_NAME: process.env.RAILWAY_PROJECT_NAME || null,
+      RAILWAY_SERVICE_NAME: process.env.RAILWAY_SERVICE_NAME || null,
+      RAILWAY_ENVIRONMENT_NAME: process.env.RAILWAY_ENVIRONMENT_NAME || null,
       pid: process.pid,
       uptime_seconds: Math.round(process.uptime())
     }));
@@ -6382,6 +6679,37 @@ const server = http.createServer(async (req, res) => {
     } catch(e) {
       res.writeHead(500, {'Content-Type':'application/json'});
       res.end(JSON.stringify({ ok:false, error:e.message }));
+    }
+    return;
+  }
+
+  // ─── PARTNER REPORT (admin-guarded, HTML page for print/PDF export) ───────
+  if (method === 'GET' && (url === '/report' || url.startsWith('/report?'))) {
+    if (!isAdminAuthed(req)) {
+      res.writeHead(302, { 'Location': '/admin' });
+      res.end();
+      return;
+    }
+    try {
+      const params = new URL(url, 'http://localhost');
+      const vendor = params.searchParams.get('vendor');
+      const month = params.searchParams.get('month') || reportDefaultMonth();
+      if (!vendor) {
+        res.writeHead(200, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
+        res.end(renderReportPickerHtml());
+        return;
+      }
+      const report = await buildVendorReport(vendor, month);
+      if (!report) {
+        res.writeHead(404, {'Content-Type':'text/html'});
+        res.end('<p style="font-family:sans-serif;padding:32px;">Vendor <b>' + reportEsc(vendor) + '</b> not recognised. <a href="/report">← Back</a></p>');
+        return;
+      }
+      res.writeHead(200, {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});
+      res.end(renderVendorReportHtml(report));
+    } catch(e) {
+      res.writeHead(500, {'Content-Type':'text/plain'});
+      res.end('Report build failed: ' + e.message);
     }
     return;
   }
