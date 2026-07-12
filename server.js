@@ -12,6 +12,15 @@ const STACKCOLLECT_SUPABASE_URL = process.env.STACKCOLLECT_SUPABASE_URL || 'http
 const STACKCOLLECT_SUPABASE_KEY = process.env.STACKCOLLECT_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmYnN3aXZraGZzZWdwdmZvY294Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzc4ODQsImV4cCI6MjA3NDgxMzg4NH0.YBuuMRXtMu2sUXBG7nJ6ue5LFgkHD8Dj1OP5Zu_J9_U';
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 const CRON_SECRET = process.env.CRON_SECRET || 'stacked-cron-secret';
+// Global dashboard (/admin) login. Set STACKED_ADMIN_PASSWORD on Render + Railway
+// to your own secret; 'stacked-admin' is only a bootstrap default.
+const ADMIN_PW = process.env.STACKED_ADMIN_PASSWORD || 'stacked-admin';
+const ADMIN_TOKEN = require('crypto').createHash('sha256').update('sa::' + ADMIN_PW).digest('hex').slice(0, 40);
+function isAdminAuthed(req) {
+  const c = req.headers.cookie || '';
+  const m = c.match(/(?:^|;\s*)sa_admin=([^;]+)/);
+  return !!(m && m[1] === ADMIN_TOKEN);
+}
 
 const KNOWLEDGE_BASE = `
 You have access to a comprehensive knowledge base of hospitality technology vendor guides.
@@ -643,6 +652,33 @@ async function sendSlackTicketAlert(ticket) {
   });
 }
 
+// New sign-up notification — fired once per new venue_member (not on returning users).
+async function sendSlackSignupAlert({ name, venue, email, phone, role, isFirstAtVenue }) {
+  if (!SLACK_WEBHOOK_URL) return;
+  const https = require('https');
+  const now = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour: '2-digit', minute: '2-digit' });
+  const roleTag = role === 'admin' ? (isFirstAtVenue ? ':crown: *Admin* _(first user — created the venue)_' : ':crown: *Admin*') : ':bust_in_silhouette: *Staff*';
+  const text = [
+    ':tada: *New Stacked Chat sign-up*',
+    `*Name:* ${name || 'Unknown'}`,
+    `*Venue:* ${venue || 'Unknown'}`,
+    `*Email:* ${email || '—'}`,
+    `*Phone:* ${phone || '—'}`,
+    `*Role:* ${roleTag}`,
+    `*When:* ${now}`,
+  ].join('\n');
+  const body = JSON.stringify({ text });
+  const url = new URL(SLACK_WEBHOOK_URL);
+  return new Promise((res) => {
+    const req = https.request({
+      hostname: url.hostname, path: url.pathname + url.search,
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+    }, (r) => { r.resume(); r.on('end', res); });
+    req.on('error', () => {});
+    req.write(body); req.end();
+  });
+}
+
 // ─── SUPABASE HELPERS ──────────────────────────────────────────────────────
 // Mirror a /save-nps payload into the approved-reporting portal's unified
 // nps_scores table. Silent no-op if STACKCOLLECT env vars aren't set.
@@ -686,10 +722,6 @@ async function mirrorNpsToPortal(payload) {
   });
 }
 
-function generateSurveyToken() {
-  return require('crypto').randomBytes(16).toString('hex');
-}
-
 async function sbFetch(path, opts = {}) {
   const https = require('https');
   const url = new URL(`${SUPABASE_URL}${path}`);
@@ -719,18 +751,55 @@ async function sbFetch(path, opts = {}) {
   });
 }
 
+// ─── AUTH: validate a Supabase access token → verified email (or null) ────────
+// Used to harden admin write-actions: the caller must hold a real session
+// proving they own the email (obtained via the email-code verification flow).
+async function verifyAuthEmail(token) {
+  if (!token) return null;
+  const https = require('https');
+  const u = new URL(`${SUPABASE_URL}/auth/v1/user`);
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: u.hostname, path: u.pathname, method: 'GET',
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token }
+    }, (r) => {
+      let d = ''; r.on('data', c => d += c);
+      r.on('end', () => {
+        try { const j = JSON.parse(d); resolve((r.statusCode < 400 && j && j.email) ? String(j.email).toLowerCase() : null); }
+        catch(e) { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.end();
+  });
+}
+
 async function getAnalytics() {
   try {
-    const [convsR, ticketsR, docsR, healthR] = await Promise.all([
+    const [convsR, ticketsR, docsR, venuesR, membersR] = await Promise.all([
       sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=200'),
       sbFetch('/rest/v1/tickets?select=*&order=created_at.desc&limit=100'),
       sbFetch('/rest/v1/documents?select=filename,created_at&order=created_at.desc&limit=1000'),
-      sbFetch('/rest/v1/health_checks?select=*&order=checked_at.desc&limit=200'),
+      sbFetch('/rest/v1/venues?select=id,name,created_at&order=created_at.asc&limit=1000'),
+      sbFetch('/rest/v1/venue_members?select=name,email,phone,venue_id,role,created_at&order=created_at.desc&limit=1000'),
     ]);
     const convs = Array.isArray(convsR.data) ? convsR.data : [];
     const tickets = Array.isArray(ticketsR.data) ? ticketsR.data : [];
     const docs = Array.isArray(docsR.data) ? docsR.data : [];
-    const healthChecks = Array.isArray(healthR.data) ? healthR.data : [];
+    const venuesAll = Array.isArray(venuesR.data) ? venuesR.data : [];
+    // Sign-ups: derived from venue_members (the reliable source — /save-lead has
+    // been silently 400-ing, so the leads table is empty). Join venue name in.
+    const venueNameById = {};
+    venuesAll.forEach(v => { if (v.id) venueNameById[v.id] = v.name; });
+    const membersAll = Array.isArray(membersR.data) ? membersR.data : [];
+    const leadsAll = membersAll.map(m => ({
+      name: m.name || '',
+      email: m.email || '',
+      phone: m.phone || '',
+      venue: venueNameById[m.venue_id] || '',
+      role: m.role || '',
+      created_at: m.created_at
+    }));
     const allMessages = [];
     convs.forEach(c => {
       if (c.messages && Array.isArray(c.messages)) {
@@ -758,27 +827,6 @@ async function getAnalytics() {
     const topTopics = Object.entries(topicCounts).sort((a,b) => b[1]-a[1]).filter(([,c]) => c > 0);
     const topVendors = Object.entries(vendorCounts).sort((a,b) => b[1]-a[1]).filter(([,c]) => c > 0);
     const uniqueDocs = [...new Map(docs.map(d => [d.filename, d])).values()];
-
-    // Build per-venue latest health check summary
-    const venueHealthMap = {};
-    healthChecks.forEach(hc => {
-      const key = hc.venue_id || hc.venue || 'unknown';
-      if (!venueHealthMap[key]) venueHealthMap[key] = hc; // already sorted desc, first = latest
-    });
-    const venueHealth = Object.values(venueHealthMap);
-
-    // System-level issue counts across all recent checks (last 7 days)
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const recentChecks = healthChecks.filter(hc => new Date(hc.checked_at).getTime() > sevenDaysAgo);
-    const systemIssueCounts = { epos: 0, payments: 0, wifi: 0, printer: 0, bookings: 0 };
-    recentChecks.forEach(hc => {
-      if (!hc.answers) return;
-      Object.entries(hc.answers).forEach(([sys, val]) => {
-        if ((val === 'red' || val === 'amber') && systemIssueCounts.hasOwnProperty(sys)) {
-          systemIssueCounts[sys]++;
-        }
-      });
-    });
 
     // Build venue stats
     const venueMap = {};
@@ -818,14 +866,112 @@ async function getAnalytics() {
       }
     } catch(e) { /* nps_scores table may not exist yet */ }
 
+    // ── Vendor Intelligence: per-partner mentions, conversations, problems,
+    //    sample questions + NPS merge. Aggregated & anonymised across venues. ──
+    const VENDOR_CATALOG = [
+      {n:'Square',cat:'POS',kw:['square']},{n:'Toast',cat:'POS',kw:['toasttab','toast pos','toast support']},
+      {n:'Lightspeed',cat:'POS',kw:['lightspeed']},{n:'Zonal',cat:'POS',kw:['zonal']},
+      {n:'EPOS Now',cat:'POS',kw:['epos now','eposnow']},{n:'Tevalis',cat:'POS',kw:['tevalis']},
+      {n:'ICRTouch',cat:'POS',kw:['icrtouch','touchpoint']},{n:'Vita Mojo',cat:'POS',kw:['vita mojo','vitamojo']},
+      {n:'SumUp',cat:'Payments',kw:['sumup']},{n:'Zettle',cat:'Payments',kw:['zettle']},
+      {n:'Stripe',cat:'Payments',kw:['stripe']},{n:'Dojo',cat:'Payments',kw:['dojo']},
+      {n:'Worldpay',cat:'Payments',kw:['worldpay']},{n:'Adyen',cat:'Payments',kw:['adyen']},
+      {n:'Deliveroo',cat:'Delivery',kw:['deliveroo']},{n:'Uber Eats',cat:'Delivery',kw:['uber eats','ubereats']},
+      {n:'Just Eat',cat:'Delivery',kw:['just eat','justeat']},{n:'Deliverect',cat:'Delivery',kw:['deliverect']},
+      {n:'Flipdish',cat:'Delivery',kw:['flipdish']},{n:'Deputy',cat:'Rotas',kw:['deputy']},
+      {n:'Rotaready',cat:'Rotas',kw:['rotaready']},{n:'Workforce.com',cat:'Rotas',kw:['workforce']},
+      {n:'Fourth',cat:'Rotas',kw:['fourth hospitality','fourth app']},{n:'Planday',cat:'Rotas',kw:['planday']},
+      {n:'S4Labour',cat:'Rotas',kw:['s4labour']},{n:'OpenTable',cat:'Bookings',kw:['opentable']},
+      {n:'ResDiary',cat:'Bookings',kw:['resdiary']},{n:'SevenRooms',cat:'Bookings',kw:['sevenrooms']},
+      {n:'Resy',cat:'Bookings',kw:['resy']},{n:'Collins',cat:'Bookings',kw:['designmynight','collins']},
+      {n:'Crunchtime',cat:'Inventory',kw:['crunchtime']},{n:'Apicbase',cat:'Inventory',kw:['apicbase']},
+      {n:'Marketman',cat:'Inventory',kw:['marketman']},{n:'Nutritics',cat:'Inventory',kw:['nutritics']},
+      {n:'Tenzo',cat:'Analytics',kw:['tenzo']},{n:'Yumpingo',cat:'Analytics',kw:['yumpingo']},
+      {n:'Stampede',cat:'WiFi / Marketing',kw:['stampede']},{n:'Purple WiFi',cat:'WiFi',kw:['purple wifi','purple wi-fi']},
+      {n:'Airship',cat:'Loyalty',kw:['airship']}
+    ];
+    const PROBLEM_TYPES = [
+      {label:'Connection / offline',kw:["won't connect","wont connect","not connecting","can't connect","disconnect","offline","dropping","no connection"]},
+      {label:'Errors / crashing',kw:['error','crash','frozen','freezing','not working',"isn't working","won't work",'broken','glitch']},
+      {label:'Syncing',kw:['sync','out of sync','resync','re-sync']},
+      {label:'Printing',kw:['printer','not printing','print issue','kitchen ticket']},
+      {label:'Refunds / voids',kw:['refund','void','chargeback']},
+      {label:'Login / access',kw:['login','log in','password','locked out',"can't access"]},
+      {label:'Reports / end of day',kw:['report','end of day','z-report','reconcile']},
+      {label:'Payments / settlement',kw:['declined','settlement','payout','transaction failed']},
+      {label:'Menu / setup',kw:['menu','set up','setup','configure','pricing']},
+      {label:'Missing orders',kw:['missing order','order not','lost order','orders not']}
+    ];
+    const convUserMsgs = convs.map(c => (Array.isArray(c.messages)?c.messages:[]).filter(m=>m.role==='user').map(m=>String(m.content||'').toLowerCase()));
+    const vendorIntel = VENDOR_CATALOG.map(v => {
+      const matched = allMessages.filter(m => v.kw.some(k => m.includes(k)));
+      let conversations = 0;
+      convUserMsgs.forEach(um => { if (um.some(t => v.kw.some(k => t.includes(k)))) conversations++; });
+      const problems = PROBLEM_TYPES
+        .map(p => ({ label:p.label, count: matched.filter(m => p.kw.some(k => m.includes(k))).length }))
+        .filter(p => p.count>0).sort((a,b)=>b.count-a.count).slice(0,5);
+      const samples = matched.slice(0,3).map(m => m.length>150 ? m.slice(0,147)+'…' : m);
+      const npsMatch = npsData.find(n => v.kw.some(k => String(n.vendor||'').toLowerCase().includes(k)) || v.n.toLowerCase().includes(String(n.vendor||'').toLowerCase()));
+      let nps = null;
+      if (npsMatch) {
+        const passive = Math.max(0, npsMatch.count - npsMatch.promoters - npsMatch.detractors);
+        nps = { avg: npsMatch.avg, count: npsMatch.count, nps: npsMatch.nps, promoters: npsMatch.promoters, passive, detractors: npsMatch.detractors };
+      }
+      return { vendor:v.n, category:v.cat, mentions: matched.length, conversations, problems, samples, nps };
+    }).filter(v => v.mentions>0 || (v.nps && v.nps.count>0))
+      .sort((a,b)=> (b.mentions-a.mentions) || ((b.nps?b.nps.count:0)-(a.nps?a.nps.count:0)));
+
+    // ── What operators ask: trending keywords across all questions (Phase 2) ──
+    const KW_STOP = new Set(['the','and','for','you','your','our','have','has','had','with','can','could','would','should','this','that','these','those','what','when','where','which','from','they','them','please','need','want','help','about','there','here','just','dont','cant','wont','been','being','some','more','than','then','will','your','into','out','not','but','how','does','did','who','why','use','using','get','got','any','all','its','was','were','are','his','her','their','them','also','like','able','make','made','still','only','very','much','many','well','good','know','say','said','one','two','our','we','i','to','a','an','of','in','on','is','it','my','me','do','if','or','as','at','be','so','up','no','yes','ok','hi','hey','thanks','thank','please','need','want']);
+    const wordFreq = {};
+    allMessages.forEach(m => { m.split(/[^a-z0-9]+/).forEach(w => { if (w.length>=4 && !KW_STOP.has(w) && !/^\d+$/.test(w)) wordFreq[w] = (wordFreq[w]||0)+1; }); });
+    const topKeywords = Object.entries(wordFreq).sort((a,b)=>b[1]-a[1]).slice(0,30).map(([word,count])=>({word,count}));
+
+    // ── Knowledge Gaps (Phase 3): questions the bot couldn't answer well.
+    //    Derived from stored conversations — no schema change needed. ──
+    const GAP_PHRASES = ["don't have","do not have","not in the knowledge base","isn't in the","is not in the","couldn't find","could not find","not able to find","can't find","cannot find","hasn't been uploaded","not been uploaded","not been added","an admin can add","not in the library","don't have any","do not have any","i don't have that","not something that's been added"];
+    const gaps = [];
+    convs.forEach(c => {
+      const msgs = Array.isArray(c.messages) ? c.messages : [];
+      for (let i = 0; i < msgs.length; i++) {
+        if (msgs[i].role !== 'assistant') continue;
+        const reply = String(msgs[i].content || '').toLowerCase();
+        if (!GAP_PHRASES.some(p => reply.includes(p))) continue;
+        let q = null;
+        for (let j = i - 1; j >= 0; j--) { if (msgs[j].role === 'user') { q = String(msgs[j].content || '').trim(); break; } }
+        if (q && q.length > 2) gaps.push({ question: q.length > 180 ? q.slice(0,177)+'…' : q, when: c.created_at });
+      }
+    });
+    const knowledgeGaps = gaps.slice(-60).reverse();
+
+    // ── Adoption (Phase 4): onboarding over time, active accounts, top venues ──
+    const nowMs = Date.now();
+    const d30 = nowMs - 30 * 24 * 3600 * 1000;
+    const mk = ts => { try { return new Date(ts).toLocaleDateString('en-GB',{month:'short',year:'2-digit'}); } catch(e){ return '—'; } };
+    const onboardByMonth = {};
+    venuesAll.forEach(v => { const k = mk(v.created_at); onboardByMonth[k] = (onboardByMonth[k]||0)+1; });
+    const months = [];
+    for (let i = 5; i >= 0; i--) { const d = new Date(); d.setMonth(d.getMonth()-i); months.push(d.toLocaleDateString('en-GB',{month:'short',year:'2-digit'})); }
+    const onboarding = months.map(m => ({ month: m, count: onboardByMonth[m] || 0 }));
+    const newThisMonth = venuesAll.filter(v => new Date(v.created_at).getTime() > d30).length;
+    const activeVenues = venueStats.filter(v => new Date(v.lastSeen).getTime() > d30);
+    const adoption = {
+      totalVenues: venuesAll.length,
+      activeCount: activeVenues.length,
+      newThisMonth,
+      avgQuestionsPerVenue: venueStats.length ? Math.round(allMessages.length / venueStats.length) : 0,
+      onboarding,
+      topVenues: venueStats.slice(0, 10).map(v => ({ venue: v.venue, convs: v.convs, msgs: v.msgs, lastSeen: v.lastSeen, active: new Date(v.lastSeen).getTime() > d30 }))
+    };
+
     return {
       totalConvs: convs.length, totalMessages: allMessages.length,
+      vendorIntel, topKeywords, knowledgeGaps, knowledgeGapCount: gaps.length, adoption, leads: leadsAll,
       openTickets: tickets.filter(t => t.status === 'open').length,
       escalatedTickets: tickets.filter(t => t.escalated).length,
       totalDocs: uniqueDocs.length,
       topTopics, topVendors, recentConvs: convs.slice(0, 10), tickets, docs: uniqueDocs,
-      healthChecks: healthChecks.slice(0, 50), venueHealth, systemIssueCounts,
-      totalChecks: healthChecks.length, venueStats, npsData
+      venueStats, npsData
     };
   } catch(e) { console.error('Analytics error:', e); return { error: e.message }; }
 }
@@ -835,11 +981,11 @@ async function getAnalytics() {
 // Default branding = Stacked. White-label = venue's own logo/colour/botname.
 function buildChatPage(b = {}) {
   const logoUrl = b.logo_url || 'https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg';
-  const primaryColor = b.primary_color || '#E87830';
+  const primaryColor = b.primary_color || '#e64e1a';
   const botName = b.bot_name || 'Stacked Chat';
-  const welcomeMsg = b.welcome_message || 'AI support for hospitality tech — enter your details to get started.';
-  const welcomeHeading = b.welcome_heading || 'What can we fix<br>for you today?';
-  const poweredBy = b.white_label ? '' : '<a href="https://stackedchat.io" target="_blank" rel="noopener" style="display:block;text-align:center;padding:8px;font-size:11px;color:#A8A49C;text-decoration:none;font-family:Inter,sans-serif;">Powered by <strong style="color:#E8573C">Stacked Chat</strong></a>';
+  const welcomeMsg = b.welcome_message || 'Stacked Chat knows your business — handbooks, SOPs, supplier info, opening procedures and tech setup. Ask anything and get the right answer in seconds, with its source. Pop your details in to start.';
+  const welcomeHeading = b.welcome_heading || 'Your knowledge,<br><span class="accent">on tap.</span>';
+  const poweredBy = b.white_label ? '' : '<a href="https://stackedchat.io" target="_blank" rel="noopener" style="display:block;text-align:center;padding:8px;font-size:11px;color:#A8A49C;text-decoration:none;font-family:var(--font-sans);">Powered by <strong style="color:#e64e1a">Stacked Chat</strong></a>';
   const presetVenueId = b.venue_id || '';
   const presetVenueName = (b.venue_name || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;');
   // Inject branding into the template
@@ -865,7 +1011,10 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 <title>{{BOT_NAME}}</title>
 <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&family=Righteous&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -877,26 +1026,52 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     --cream: #EDEBE5; --cream-dark: #D6D2C8;
     --orange: {{PRIMARY_COLOR}}; --orange-light: {{PRIMARY_COLOR}}cc;
     --brown: #1A1A1A; --brown-mid: #6B6867;
-    --white: #ffffff; --green: #2a9d5c; --red: #d64545;
+    /* Answer/"solution" bubble — soft pinky-orange peach (deck chat style) */
+    --peach: #F8DBCC; --peach-border: #F0C7B4; --peach-link: #B8480F;
+    --white: #ffffff; --green: #2A9D5C; --red: #D64545;
     --purple: #9B8AC2; --purple-light: #B3A6D6;
     --green-brand: #B7D46A; --green-brand-light: #D1E58F;
-    --shadow: 0 2px 16px rgba(0,0,0,0.08);
-    --shadow-lg: 0 8px 32px rgba(0,0,0,0.12);
+
+    /* Accent glow — single source, derived from the live brand orange
+       (#E87830 → 230,78,26). Replaces the legacy 230,84,58 / 232,87,60
+       glows that no longer matched the button colour. */
+    --orange-glow-08: rgba(230,78,26,0.08);
+    --orange-glow-15: rgba(230,78,26,0.15);
+    --orange-glow-25: rgba(230,78,26,0.25);
+    --orange-ring:    rgba(230,78,26,0.14);
+
+    /* Elevation scale */
+    --shadow:    0 1px 2px rgba(26,21,16,0.04), 0 2px 12px rgba(26,21,16,0.06);
+    --shadow-lg: 0 4px 6px rgba(26,21,16,0.04), 0 16px 40px rgba(26,21,16,0.10);
+    --e1: 0 1px 2px rgba(26,21,16,0.05);
+    --e2: 0 2px 10px rgba(26,21,16,0.07);
+    --e3: 0 8px 28px rgba(26,21,16,0.12);
+
+    /* Radius scale */
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 22px; --r-pill: 999px;
+
+    /* Motion */
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --t-fast: 0.12s; --t-mid: 0.2s; --t-slow: 0.32s;
+
+    /* Brand primary-button offset shadow (carried from the /app system) */
+    --btn-offset:        0 4px 0 0 var(--stacked-orange-700);
+    --btn-offset-hover:  0 5px 0 0 var(--stacked-orange-700);
+    --btn-offset-active: 0 2px 0 0 var(--stacked-orange-700);
 
     /* Stacked design-system tokens — available for opt-in use but not
        applied as defaults on the chat widget. See colors_and_type.css. */
     --ink-900: #0A0A0A; --ink-800: #131313; --ink-700: #1D1D1D;
     --fg: #F4EFE6; --fg-muted: #928A7C; --fg-dim: #555048;
     --border: #262421;
-    --stacked-orange-500: #E87830; --stacked-orange-700: #A34F15;
+    --stacked-orange-500: #e64e1a; --stacked-orange-700: #B7351F;
     --stacked-green-500:  #3BD36F; --stacked-green-700:  #1E8A44;
     --stacked-amber-500:  #F5A524;
     --stacked-red-500:    #E5484D;
     --stacked-purple-500: #C7B3F2; --stacked-purple-700: #1D1340;
-    --font-sans:    'Geist', ui-sans-serif, system-ui, sans-serif;
-    --font-display: 'Fraunces', 'Fraunces Placeholder', ui-serif, Georgia, serif;
-    --font-mono:    'Geist Mono', ui-monospace, 'SF Mono', monospace;
+    --font-sans:    'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Chunko Bold', 'Archivo Black', 'DM Sans', sans-serif;
+    --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
   }
   ::selection { background: var(--orange); color: #fff; }
   html { height: 100%; height: 100dvh; overflow-x: hidden; overflow-y: hidden; }
@@ -910,12 +1085,22 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   #gate {
     position: fixed; inset: 0;
     background: #EDEBE5;
-    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(232,120,48,0.07) 0%, transparent 70%),
-                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(232,120,48,0.04) 0%, transparent 60%);
+    background-image: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(230,78,26,0.07) 0%, transparent 70%),
+                      radial-gradient(ellipse 40% 30% at 90% 100%, rgba(230,78,26,0.04) 0%, transparent 60%);
     display: flex; align-items: center; justify-content: center;
     z-index: 100; padding: 16px; overflow-y: auto;
   }
   #gate.hidden { display: none; }
+  /* Full-bleed hero photo + cream scrim (shown only when GATE_BG_URL is set;
+     otherwise the cream radial-gradient above is the graceful fallback). */
+  .gate-bg, .gate-scrim { position: absolute; inset: 0; pointer-events: none; }
+  .gate-bg { z-index: 0; background: var(--gate-bg) center/cover no-repeat; filter: saturate(0.9); }
+  .gate-scrim { z-index: 1; background:
+      linear-gradient(180deg, rgba(237,235,229,0.82) 0%, rgba(237,235,229,0.74) 42%, rgba(237,235,229,0.90) 100%),
+      radial-gradient(ellipse 60% 45% at 50% 8%, rgba(230,78,26,0.10) 0%, transparent 70%); }
+  #gate:not(.has-bg) .gate-bg, #gate:not(.has-bg) .gate-scrim { display: none; }
+  #gate .gate-card { position: relative; z-index: 2; }
+  #gate.has-bg .gate-card { box-shadow: 0 8px 10px rgba(26,21,16,0.10), 0 24px 60px rgba(26,21,16,0.22); }
   .gate-card {
     background: #ffffff;
     border: 1px solid #E0DDD5;
@@ -935,11 +1120,26 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     opacity: 0; animation: staggerIn 0.5s var(--ease) 0.2s forwards;
   }
   .gate-sub { display: none; }
+  .gate-card h2 .accent { color: var(--orange); }
   .gate-card p {
     font-family: var(--font-sans);
     font-size: 14px; color: #6B6867;
-    margin-bottom: 24px; line-height: 1.5; font-weight: 400;
+    margin-bottom: 16px; line-height: 1.5; font-weight: 400;
     opacity: 0; animation: staggerIn 0.5s var(--ease) 0.3s forwards;
+  }
+  .gate-eyebrow {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.15em; text-transform: uppercase; color: var(--brown-mid);
+    display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+    opacity: 0; animation: staggerIn 0.5s var(--ease) 0.15s forwards;
+  }
+  .gate-eyebrow .accent { color: var(--orange); }
+  .gate-eyebrow .ge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); flex-shrink: 0; }
+  .gate-caps {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.12em; color: var(--brown-mid);
+    margin-bottom: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    opacity: 0.55;
   }
   .gate-input {
     width: 100%; padding: 12px 14px;
@@ -951,7 +1151,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     margin-bottom: 10px; outline: none;
     transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
   }
-  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(232,120,48,0.12); }
+  .gate-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.12); }
   .gate-input::placeholder { color: #A8A49C; }
   /* Gate CTA upgraded to the 4px offset-shadow button from /app (kept from rebrand) */
   .gate-btn {
@@ -960,12 +1160,12 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
     color: #fff; border: none; border-radius: 10px;
     font-family: var(--font-sans); font-size: 15px; font-weight: 700;
     cursor: pointer; margin-top: 6px;
-    transition: transform 0.1s, box-shadow 0.15s;
+    transition: transform var(--t-fast), box-shadow var(--t-fast);
     letter-spacing: -0.2px;
-    box-shadow: 0 4px 0 0 var(--stacked-orange-700);
+    box-shadow: var(--btn-offset);
   }
-  .gate-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 0 0 var(--stacked-orange-700); }
-  .gate-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 0 var(--stacked-orange-700); }
+  .gate-btn:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
+  .gate-btn:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
   .gate-error { font-size: 13px; color: #ff6b6b; margin-top: -4px; margin-bottom: 8px; display: none; font-family: var(--font-sans); }
 
   /* ─── VENUE AUTOCOMPLETE ─── */
@@ -1013,67 +1213,77 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   main { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0; }
   #messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px 16px 8px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; width: 100%; }
   .welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 28px 20px 20px; gap: 0; text-align: center; position: relative; }
-  .welcome::before { content: ''; position: absolute; top: 25%; left: 50%; transform: translate(-50%,-50%); width: 260px; height: 260px; background: radial-gradient(circle, rgba(230,84,58,0.06) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
+  .welcome::before { content: ''; position: absolute; top: 25%; left: 50%; transform: translate(-50%,-50%); width: 260px; height: 260px; background: radial-gradient(circle, rgba(230,78,26,0.06) 0%, transparent 70%); border-radius: 50%; pointer-events: none; }
   .welcome-wordmark { height: 36px; margin-bottom: 16px; max-width: 200px; object-fit: contain; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.1s forwards; }
-  .welcome h2 { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; line-height: 1.25; letter-spacing: -0.4px; color: var(--brown); margin-bottom: 6px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
-  .welcome p { font-family: 'Inter', sans-serif; font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
-  /* ─── ROTATING CARDS CAROUSEL (Tinder-style portrait) ─── */
-  .carousel-wrap { width: 100%; max-width: 300px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards; margin-bottom: 16px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
-  .carousel-track { position: relative; height: 320px; overflow: hidden; border-radius: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
-  .carousel-card { position: absolute; inset: 0; border-radius: 24px; padding: 32px 28px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; opacity: 0; transform: translateX(50px) rotate(3deg); transition: opacity 0.4s var(--ease), transform 0.4s var(--ease); pointer-events: none; }
-  .carousel-card.active { opacity: 1; transform: translateX(0) rotate(0deg); pointer-events: auto; }
-  .carousel-card.exit { opacity: 0; transform: translateX(-50px) rotate(-3deg); pointer-events: none; }
-  .carousel-card.orange { background: linear-gradient(160deg, #F07A63 0%, var(--orange) 100%); color: #fff; }
-  .carousel-card.purple { background: linear-gradient(160deg, #B3A6D6 0%, var(--purple) 100%); color: #1E1E1E; }
-  .carousel-card.green { background: linear-gradient(160deg, #D1E58F 0%, var(--green-brand) 100%); color: #1E1E1E; }
-  .carousel-card .cc-emoji { font-size: 48px; margin-bottom: 20px; }
-  .carousel-card .cc-label { font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 700; line-height: 1.25; letter-spacing: -0.3px; }
-  .carousel-card .cc-sub { font-size: 14px; opacity: 0.7; font-weight: 500; margin-top: 8px; line-height: 1.5; max-width: 220px; }
-  .carousel-card .cc-tap { font-size: 12px; font-weight: 600; opacity: 0.5; margin-top: 24px; letter-spacing: 0.04em; }
-  .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
-  .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-dark); border: none; padding: 0; cursor: pointer; transition: all 0.3s var(--ease); }
-  .carousel-dot.active { width: 20px; border-radius: 3px; }
-  .carousel-dot.orange.active { background: var(--orange); }
-  .carousel-dot.purple.active { background: var(--purple); }
-  .carousel-dot.green.active { background: var(--green-brand); }
+  .welcome h2 { font-family: var(--font-display); font-size: clamp(34px, 9vw, 52px); font-weight: 400; line-height: 1.02; letter-spacing: -0.02em; color: var(--brown); margin-bottom: 10px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.2s forwards; }
+  .welcome h2 .accent { color: var(--orange); }
+  .welcome p { font-family: var(--font-sans); font-size: 14px; color: var(--brown-mid); margin-bottom: 24px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.35s forwards; }
+  /* ─── ASK ROTATOR (kinetic one-liner) ─── */
+  .ask-rotator {
+    display: flex; align-items: center; gap: 12px;
+    width: 100%; max-width: 340px; margin: 4px auto 18px;
+    padding: 15px 20px; text-align: left;
+    background: var(--white); border: 1px solid var(--cream-dark);
+    border-radius: var(--r-lg); box-shadow: var(--shadow);
+    cursor: pointer; position: relative; z-index: 1;
+    transition: border-color var(--t-mid), box-shadow var(--t-mid), transform var(--t-fast);
+    opacity: 0; animation: staggerIn 0.6s var(--ease) 0.4s forwards;
+  }
+  .ask-rotator:hover { border-color: var(--orange); box-shadow: var(--e2); transform: translateY(-1px); }
+  .ask-rotator:active { transform: translateY(0); }
+  .ask-rotator .ar-caret { color: var(--orange); font-weight: 700; font-size: 18px; line-height: 1; flex-shrink: 0; }
+  .ask-rotator .ar-text {
+    font-family: var(--font-sans); font-size: 15px; font-weight: 500;
+    color: var(--brown); line-height: 1.4; flex: 1; min-width: 0;
+    transition: opacity 0.34s var(--ease), transform 0.34s var(--ease);
+  }
+  .ask-rotator.swapping .ar-text { opacity: 0; transform: translateY(4px); }
 
   /* Keep quick-grid as fallback / below carousel */
   .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 360px; margin-bottom: 12px; position: relative; z-index: 1; opacity: 0; animation: staggerIn 0.6s var(--ease) 0.6s forwards; }
-  .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: all 0.3s var(--ease); line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
-  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(230,84,58,0.12); transform: translateY(-2px); }
+  .quick-btn { background: var(--white); border: 1px solid var(--cream-dark); border-radius: 14px; padding: 14px 14px 12px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; transition: all 0.3s var(--ease); line-height: 1.3; display: flex; flex-direction: column; gap: 6px; }
+  .quick-btn:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(230,78,26,0.12); transform: translateY(-2px); }
   .quick-btn:active { transform: translateY(0); }
   .quick-btn .emoji { font-size: 20px; }
   .msg { display: flex; align-items: flex-start; gap: 10px; max-width: 100%; animation: msgIn 0.4s var(--ease); }
   .msg.user { flex-direction: row-reverse; }
   .msg-avatar { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; background: var(--cream-dark); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--brown); overflow: hidden; }
   .msg-avatar img { width: 100%; height: 100%; object-fit: contain; }
-  .msg-bubble { background: var(--white); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-size: 15px; line-height: 1.55; max-width: min(calc(100vw - 90px), 520px); box-shadow: var(--shadow); white-space: pre-wrap; word-wrap: break-word; }
-  .msg-bubble a { color: var(--orange); font-weight: 600; text-decoration: underline; }
+  .msg-bubble { background: var(--peach); color: var(--brown); border: 1px solid var(--peach-border); border-radius: 18px 18px 18px 4px; padding: 12px 16px; font-size: 15px; line-height: 1.55; max-width: min(calc(100vw - 90px), 520px); box-shadow: var(--e1); white-space: pre-wrap; word-wrap: break-word; }
+  .msg-bubble a { color: var(--peach-link); font-weight: 600; text-decoration: underline; }
   .msg-bubble strong { font-weight: 700; }
-  .msg.user .msg-bubble { background: var(--orange); color: #fff; border-radius: 18px 18px 4px 18px; box-shadow: 0 2px 12px rgba(232,87,60,0.20); }
-  .ticket-row { display: flex; justify-content: center; margin-top: -4px; }
-  .ticket-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 16px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; color: var(--brown-mid); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.3s var(--ease); }
-  .ticket-btn:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,84,58,0.1); }
+  .msg.user .msg-bubble { background: var(--brown); color: #fff; border: none; border-radius: 18px 18px 4px 18px; box-shadow: var(--e2); }
   .link-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -4px; padding-left: 42px; }
-  .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: all 0.15s; white-space: nowrap; box-shadow: 0 2px 8px rgba(232,87,60,0.20); }
+  .link-pill { display: inline-flex; align-items: center; gap: 6px; background: var(--orange); border: none; border-radius: var(--r-pill); padding: 8px 14px; font-size: 13px; font-weight: 600; color: #fff; text-decoration: none; transition: transform var(--t-fast), box-shadow var(--t-mid); white-space: nowrap; box-shadow: 0 2px 8px var(--orange-glow-25); }
   .link-pill:hover { background: #C94A30; transform: translateY(-1px); }
   .typing-bubble { display: flex; align-items: flex-start; gap: 10px; }
-  .dots { display: flex; gap: 4px; align-items: center; background: var(--white); border-radius: 18px; padding: 12px 16px; box-shadow: var(--shadow); }
+  .dots { display: flex; gap: 4px; align-items: center; background: var(--peach); border: 1px solid var(--peach-border); border-radius: 18px 18px 18px 4px; padding: 12px 16px; box-shadow: var(--e1); }
   .dot-anim { width: 8px; height: 8px; border-radius: 50%; animation: dotBounce 1.4s ease-in-out infinite; }
   .dot-anim:nth-child(1) { background: var(--orange); animation-delay: 0s; }
   .dot-anim:nth-child(2) { background: var(--purple); animation-delay: 0.15s; }
   .dot-anim:nth-child(3) { background: var(--green-brand); animation-delay: 0.3s; }
   .input-bar { padding: 10px 12px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); background: var(--white); border-top: 1px solid var(--cream-dark); flex-shrink: 0; display: flex; gap: 8px; align-items: flex-end; min-width: 0; }
-  #input { flex: 1; min-width: 0; padding: 11px 14px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 20px; font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--brown); resize: none; outline: none; max-height: 120px; line-height: 1.4; transition: border-color 0.2s; }
-  #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,84,58,0.1); }
+  #input { flex: 1; min-width: 0; padding: 11px 14px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 20px; font-family: var(--font-sans); font-size: 15px; color: var(--brown); resize: none; outline: none; max-height: 120px; line-height: 1.4; transition: border-color 0.2s; }
+  #input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
   #input::placeholder { color: var(--brown-mid); opacity: 0.6; }
+  #kbAdd { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); padding: 0; }
+  #kbAdd:hover { border-color: var(--orange); color: var(--orange); }
   #mic { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); }
   #mic:hover { border-color: var(--orange); color: var(--orange); }
   #mic.listening { background: var(--orange); border-color: var(--orange); color: #fff; animation: pulse 1s infinite; }
-  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,87,60,0.4); } 50% { box-shadow: 0 0 0 8px rgba(232,87,60,0); } }
-  #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(230,84,58,0.30); }
-  #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(230,84,58,0.4); }
-  #send:active { transform: scale(0.93); box-shadow: 0 1px 6px rgba(230,84,58,0.2); }
+  #attachBtn { width: 44px; height: 44px; border-radius: 50%; background: var(--cream); border: 1.5px solid var(--cream-dark); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s; color: var(--brown-mid); padding: 0; }
+  #attachBtn:hover { border-color: var(--orange); color: var(--orange); }
+  #attachBtn.has { border-color: var(--orange); color: var(--orange); background: #fff3ee; }
+  .attach-preview { padding: 8px 12px 0; display: flex; }
+  .attach-chip { position: relative; display: inline-flex; align-items: center; gap: 8px; background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 5px 10px 5px 5px; max-width: 240px; }
+  .attach-chip img { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; display: block; }
+  .attach-chip .ac-name { font-size: 12px; color: var(--brown-mid); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attach-chip .ac-x { border: none; background: var(--brown); color: #fff; width: 18px; height: 18px; border-radius: 50%; font-size: 11px; line-height: 1; cursor: pointer; flex-shrink: 0; }
+  .msg-img { max-width: 240px; width: 100%; border-radius: 12px; margin-top: 6px; display: block; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(230,78,26,0.4); } 50% { box-shadow: 0 0 0 8px rgba(230,78,26,0); } }
+  #send { width: 44px; height: 44px; border-radius: 50%; background: var(--orange); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.25s var(--ease); box-shadow: 0 2px 12px rgba(230,78,26,0.30); }
+  #send:hover { background: var(--orange-light); transform: scale(1.08); box-shadow: 0 4px 18px rgba(230,78,26,0.4); }
+  #send:active { transform: scale(0.93); box-shadow: 0 1px 6px rgba(230,78,26,0.2); }
   #send svg { width: 18px; height: 18px; fill: #fff; }
   #send:disabled { opacity: 0.35; cursor: default; transform: none; box-shadow: none; }
   .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 50; opacity: 0; pointer-events: none; transition: opacity 0.3s var(--ease); backdrop-filter: blur(2px); }
@@ -1081,16 +1291,59 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .drawer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--white); border-radius: 24px 24px 0 0; z-index: 51; max-height: 70vh; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom); }
   .drawer.open { transform: translateY(0); }
   .drawer-handle { width: 40px; height: 4px; background: var(--cream-dark); border-radius: 2px; margin: 12px auto 0; }
-  .drawer-header { padding: 16px 20px 12px; font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--cream-dark); display: flex; align-items: center; justify-content: space-between; }
+  .drawer-header { padding: 16px 20px 12px; font-family: var(--font-display); font-size: 18px; font-weight: 700; border-bottom: 1px solid var(--cream-dark); display: flex; align-items: center; justify-content: space-between; }
   .drawer-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--brown-mid); padding: 4px; }
   .drawer-body { overflow-y: auto; padding: 16px 20px; flex: 1; }
   .history-item { padding: 14px 0; border-bottom: 1px solid var(--cream-dark); cursor: pointer; }
   .history-item:last-child { border-bottom: none; }
   .history-item:hover .history-preview { color: var(--orange); }
-  .history-date { font-size: 11px; color: var(--brown-mid); margin-bottom: 4px; }
+  .history-date { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em; color: var(--brown-mid); margin-bottom: 4px; }
   .history-preview { font-size: 14px; font-weight: 500; color: var(--brown); transition: color 0.15s; }
   .history-count { font-size: 12px; color: var(--brown-mid); margin-top: 2px; }
   .empty-history { text-align: center; padding: 32px 0; color: var(--brown-mid); font-size: 14px; }
+  /* ─── TEAM (manage-team drawer) ─── */
+  .team-item { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--cream-dark); }
+  .team-item:last-child { border-bottom: none; }
+  .team-av { width: 34px; height: 34px; border-radius: 50%; background: var(--cream-dark); color: var(--brown); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+  .team-meta { flex: 1; min-width: 0; }
+  .team-name { font-size: 14px; font-weight: 600; color: var(--brown); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team-email { font-size: 12px; color: var(--brown-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .team-role { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; padding: 3px 8px; border-radius: 999px; flex-shrink: 0; }
+  .team-role.admin { background: var(--orange-glow-15); color: var(--peach-link); }
+  .team-role.staff { background: var(--cream); color: var(--brown-mid); }
+  .team-action { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; background: none; border: 1px solid var(--cream-dark); border-radius: 8px; padding: 6px 9px; cursor: pointer; color: var(--brown-mid); white-space: nowrap; transition: border-color 0.15s, color 0.15s; flex-shrink: 0; }
+  .team-action:hover { border-color: var(--orange); color: var(--orange); }
+  .team-you { font-family: var(--font-mono); font-size: 10px; color: var(--brown-mid); flex-shrink: 0; }
+  .team-note { font-size: 12px; color: var(--brown-mid); padding: 4px 0 12px; line-height: 1.5; }
+  /* ─── ADMIN (scoped panel) ─── */
+  .admin-section-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brown-mid); margin: 18px 0 10px; }
+  .admin-section-label:first-child { margin-top: 4px; }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { background: var(--cream); border: 1px solid var(--cream-dark); border-radius: var(--r-md); padding: 12px 14px; }
+  .stat-num { font-family: var(--font-display); font-size: 26px; line-height: 1; color: var(--brown); }
+  .stat-num .accent { color: var(--orange); }
+  .stat-label { font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brown-mid); margin-top: 6px; }
+  .kb-row { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--cream-dark); }
+  .kb-row:last-child { border-bottom: none; }
+  .kb-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--orange-glow-08); color: var(--peach-link); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: var(--font-mono); font-size: 9px; font-weight: 700; }
+  .kb-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; color: var(--brown); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kb-chunks { font-family: var(--font-mono); font-size: 10px; color: var(--brown-mid); flex-shrink: 0; }
+  .kb-del { background: none; border: none; cursor: pointer; color: var(--brown-mid); padding: 4px; flex-shrink: 0; font-size: 16px; line-height: 1; transition: color 0.15s; }
+  .kb-del:hover { color: var(--red); }
+  .admin-btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .admin-cta { flex: 1 1 30%; min-width: 100px; padding: 11px; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; text-align: center; border: none; }
+  .admin-cta.primary { background: var(--orange); color: #fff; box-shadow: var(--btn-offset); }
+  .admin-cta.ghost { background: var(--cream); color: var(--brown); border: 1px solid var(--cream-dark); }
+  /* ─── DISH / MENU IMAGE CARDS (bot replies) ─── */
+  .dish-img-row { display: flex; padding-left: 42px; margin-top: -4px; }
+  .dish-img-card { max-width: 300px; border: 1px solid var(--cream-dark); border-radius: 16px; overflow: hidden; background: var(--white); box-shadow: var(--shadow); }
+  .dish-img-card img { width: 100%; display: block; aspect-ratio: 4 / 3; object-fit: cover; background: var(--cream-dark); }
+  .dish-img-cap { padding: 9px 13px; font-size: 13px; font-weight: 600; color: var(--brown); }
+  .doc-file-row { display: flex; padding-left: 42px; margin-top: -2px; }
+  .doc-file-pill { display: inline-flex; align-items: center; gap: 8px; background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 20px; padding: 8px 14px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); text-decoration: none; cursor: pointer; transition: all 0.2s var(--ease); max-width: min(calc(100vw - 90px), 420px); }
+  .doc-file-pill:hover { border-color: var(--orange); color: var(--orange); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(230,78,26,0.12); }
+  .doc-file-pill svg { flex-shrink: 0; color: var(--orange); }
+  .doc-file-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .topics-list { display: flex; flex-direction: column; gap: 8px; }
   .topic-chip { background: var(--cream); border: 1.5px solid var(--cream-dark); border-left: 3px solid transparent; border-radius: 12px; padding: 12px 16px; font-size: 14px; font-weight: 500; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: all 0.25s var(--ease); }
   .topic-chip:hover { border-color: var(--cream-dark); border-left-color: var(--orange); background: var(--white); transform: translateX(2px); }
@@ -1098,14 +1351,17 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .modal-overlay.open { opacity: 1; pointer-events: all; }
   .modal { background: var(--white); border-radius: 24px 24px 0 0; padding: 24px 24px calc(24px + env(safe-area-inset-bottom)); width: 100%; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
   .modal-overlay.open .modal { transform: translateY(0); }
-  .modal h3 { font-family: 'Fraunces', serif; font-size: 20px; margin-bottom: 6px; }
+  .modal h3 { font-family: var(--font-display); font-size: 20px; margin-bottom: 6px; }
   .modal p { font-size: 14px; color: var(--brown-mid); margin-bottom: 20px; }
-  .modal textarea { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 12px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--brown); background: var(--cream); resize: none; height: 100px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
-  .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,84,58,0.1); }
+  .modal textarea { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 12px 14px; font-family: var(--font-sans); font-size: 14px; color: var(--brown); background: var(--cream); resize: none; height: 100px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
+  .verify-code { width: 100%; border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 14px; font-family: var(--font-mono); font-size: 28px; font-weight: 600; letter-spacing: 0.4em; text-align: center; color: var(--brown); background: var(--cream); outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
+  .verify-code:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px var(--orange-glow-15); }
+  .modal textarea:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 3px rgba(230,78,26,0.1); }
   .modal-actions { display: flex; gap: 10px; }
-  .modal-cancel { flex: 1; padding: 13px; background: var(--cream); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; cursor: pointer; color: var(--brown); }
-  .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; color: #fff; transition: background 0.15s; }
-  .modal-submit:hover { background: var(--orange-light); }
+  .modal-cancel { flex: 1; padding: 13px; background: var(--cream); border: none; border-radius: 12px; font-family: var(--font-sans); font-size: 15px; font-weight: 500; cursor: pointer; color: var(--brown); }
+  .modal-submit { flex: 2; padding: 13px; background: var(--orange); border: none; border-radius: var(--r-md); font-family: var(--font-sans); font-size: 15px; font-weight: 700; cursor: pointer; color: #fff; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
+  .modal-submit:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
+  .modal-submit:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
   .toast { position: fixed; bottom: calc(80px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%) translateY(20px); background: var(--brown); color: #fff; border-radius: 20px; padding: 10px 20px; font-size: 14px; font-weight: 500; opacity: 0; transition: all 0.3s; z-index: 300; white-space: nowrap; }
   .reminder-banner { display: flex; align-items: center; gap: 12px; background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 14px; padding: 12px 16px; margin: 8px 16px; cursor: pointer; transition: box-shadow 0.15s; }
   .reminder-banner:hover { box-shadow: 0 4px 16px rgba(34,197,94,0.15); }
@@ -1121,13 +1377,13 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .escalation-banner .esc-sub { font-family: var(--font-sans); font-size: 12px; color: #b45309; line-height: 1.4; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .toast.green { background: var(--green); }
-  .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: 'Inter', sans-serif; font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
+  .social-proof { display: flex; align-items: center; gap: 5px; font-size: 12px; font-family: var(--font-sans); font-weight: 500; color: var(--brown-mid); margin-bottom: 14px; opacity: 0.7; }
   .social-proof .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0; animation: pulse-green 2s infinite; }
   @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(42,157,92,0.4); } 50% { box-shadow: 0 0 0 5px rgba(42,157,92,0); } }
   .predict-section { width: 100%; max-width: 380px; margin-top: 4px; }
-  .predict-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.6; margin-bottom: 8px; text-align: left; padding-left: 2px; }
+  .predict-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.7; margin-bottom: 8px; text-align: left; padding-left: 2px; }
   .predict-grid { display: flex; flex-direction: column; gap: 8px; }
-  .predict-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 10px 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; }
+  .predict-btn { background: var(--white); border: 1.5px solid var(--cream-dark); border-radius: 12px; padding: 10px 14px; font-family: var(--font-sans); font-size: 13px; font-weight: 600; color: var(--brown); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; }
   .predict-btn:hover { border-color: var(--orange); box-shadow: 0 2px 12px rgba(0,0,0,0.10); }
   .predict-btn .predict-icon { font-size: 16px; flex-shrink: 0; }
   .predict-tag { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: var(--orange); color: #fff; border-radius: 8px; padding: 2px 7px; flex-shrink: 0; }
@@ -1144,9 +1400,9 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .logo-strip::after { right: 0; background: linear-gradient(to left, var(--white), transparent); }
   .logo-track { display: flex; align-items: center; gap: 44px; width: max-content; animation: logoScroll 60s linear infinite; }
   .logo-track:hover { animation-play-state: paused; }
-  .logo-text { font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--brown); opacity: 0.3; white-space: nowrap; flex-shrink: 0; user-select: none; }
+  .logo-text { font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brown); opacity: 0.32; white-space: nowrap; flex-shrink: 0; user-select: none; }
   .logo-dot { width: 4px; height: 4px; background: var(--brown); border-radius: 50%; opacity: 0.15; flex-shrink: 0; }
-  .strip-label { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.45; white-space: nowrap; flex-shrink: 0; }
+  .strip-label { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brown-mid); opacity: 0.5; white-space: nowrap; flex-shrink: 0; }
   @keyframes logoScroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
   .video-row{display:flex;flex-direction:column;gap:8px;margin-top:-4px;padding-left:42px}
   .chat-video-card{background:var(--white);border:1.5px solid var(--cream-dark);border-radius:16px;overflow:hidden;cursor:pointer;transition:box-shadow 0.2s;max-width:320px}
@@ -1163,62 +1419,34 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .cv-modal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--brown-mid);padding:4px;line-height:1}
   .cv-modal-body{background:#000}
   .cv-modal-body iframe,.cv-modal-body video{display:block;width:100%;aspect-ratio:16/9}
-  .video-pill{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;border:none;border-radius:20px;padding:10px 16px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;transition:background 0.15s;box-shadow:0 2px 12px rgba(232,87,60,0.25)}
+  .video-pill{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;border:none;border-radius:20px;padding:10px 16px;font-family:var(--font-sans);font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;transition:transform var(--t-fast),box-shadow var(--t-mid);box-shadow:var(--btn-offset)}
   .video-pill:hover{background:var(--orange-light)}
   .video-pill-row{display:flex;padding-left:42px;margin-top:-4px}
 
-  /* ─── SHIFT CHECK ─── */
-  .shift-check-btn {
-    display: flex; align-items: center; gap: 6px;
-    background: none; border: 1px solid var(--cream-dark);
-    border-radius: 20px; padding: 8px 16px;
-    font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
-    color: var(--brown-mid); cursor: pointer; margin-top: 4px;
-    transition: border-color 0.15s, color 0.15s;
+  /* ─── TIP OF THE DAY (editorial footnote) ─── */
+  .tip-note {
+    width: 100%; max-width: 420px; margin: 18px auto 0;
+    text-align: center; cursor: pointer; position: relative; z-index: 1;
+    opacity: 0; animation: staggerIn 0.6s var(--ease) 0.55s forwards;
   }
-  .shift-check-btn:hover { border-color: var(--orange); color: var(--brown); }
-  .shift-check-btn .sc-icon { font-size: 14px; }
-
-  .sc-step { padding: 16px 0; border-bottom: 1px solid var(--cream-dark); }
-  .sc-step:last-child { border-bottom: none; }
-  .sc-step-label { font-size: 15px; font-weight: 600; color: var(--brown); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-  .sc-step-label .sc-emoji { font-size: 18px; }
-  .sc-options { display: flex; gap: 8px; }
-  .sc-opt {
-    flex: 1; padding: 10px 8px; border-radius: 10px; border: 2px solid var(--cream-dark);
-    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700;
-    cursor: pointer; text-align: center; transition: all 0.15s; background: var(--white);
+  .tip-eyebrow { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  .tip-rule { flex: 1; height: 1px; background: var(--cream-dark); }
+  .tip-key {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--brown-mid); white-space: nowrap;
   }
-  .sc-opt:hover { border-color: var(--orange); }
-  .sc-opt.selected-green { background: #dcfce7; border-color: #16a34a; color: #166534; }
-  .sc-opt.selected-amber { background: #fef9c3; border-color: #ca8a04; color: #854d0e; }
-  .sc-opt.selected-red { background: #fee2e2; border-color: #dc2626; color: #991b1b; }
-  .sc-progress { height: 3px; background: var(--cream-dark); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
-  .sc-progress-fill { height: 100%; background: var(--orange); border-radius: 2px; transition: width 0.3s ease; }
-  .sc-summary { text-align: center; padding: 8px 0 4px; }
-  .sc-summary-icon { font-size: 40px; margin-bottom: 8px; }
-  .sc-summary-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; margin-bottom: 6px; }
-  .sc-summary-sub { font-size: 14px; color: var(--brown-mid); margin-bottom: 16px; line-height: 1.5; }
-  .sc-issues-list { text-align: left; margin-bottom: 16px; }
-  .sc-issue-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fee2e2; border-radius: 8px; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #991b1b; }
-  .sc-issue-item.amber { background: #fef9c3; color: #854d0e; }
-  .sc-fix-btn { width: 100%; padding: 13px; background: var(--orange); color: #fff; border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
-  .sc-done-btn { width: 100%; padding: 11px; background: var(--cream); color: var(--brown); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; }
-
-  /* ─── TIP OF THE DAY ─── */
-  .tip-card {
-    width: 100%; max-width: 380px; background: var(--white);
-    border: 2px solid var(--cream-dark); border-radius: 16px;
-    padding: 14px 16px; cursor: pointer; text-align: left;
-    transition: border-color 0.2s, box-shadow 0.2s; margin-top: 8px;
-    box-shadow: var(--shadow);
+  .tip-key .tip-product { color: var(--orange); }
+  .tip-text {
+    font-family: var(--font-sans); font-size: 14px; font-weight: 500;
+    color: var(--brown-mid); line-height: 1.55; max-width: 340px; margin: 0 auto;
   }
-  .tip-card:hover { border-color: var(--orange); box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
-  .tip-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .tip-badge { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); background: rgba(232,87,60,0.10); border-radius: 6px; padding: 2px 7px; }
-  .tip-product { font-size: 11px; color: var(--brown-mid); font-weight: 500; }
-  .tip-text { font-size: 13px; font-weight: 600; color: var(--brown); line-height: 1.45; }
-  .tip-cta { font-size: 12px; color: var(--orange); font-weight: 600; margin-top: 6px; }
+  .tip-cta {
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; color: var(--orange);
+    margin-top: 12px; opacity: 0.65; transition: opacity var(--t-mid);
+  }
+  .tip-note:hover .tip-cta { opacity: 1; }
 
   /* ─── NPS WIDGET ─── */
   .nps-wrap { padding-left: 42px; margin-top: -4px; }
@@ -1229,13 +1457,15 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   .nps-label { font-size: 10px; color: var(--brown-mid); font-weight: 500; }
   .nps-row { display: flex; gap: 4px; margin-bottom: 10px; }
   .nps-btn { flex: 1; height: 32px; border-radius: 8px; border: 1.5px solid var(--cream-dark); background: var(--white); font-size: 12px; font-weight: 600; color: var(--brown); cursor: pointer; transition: all 0.15s; padding: 0; min-width: 0; }
-  .nps-btn:hover { border-color: var(--orange); color: var(--orange); background: rgba(232,87,60,0.06); }
+  .nps-btn:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-glow-08); }
   .nps-btn.selected { background: var(--orange); border-color: var(--orange); color: #fff; }
   .nps-comment { display: none; margin-top: 6px; }
   .nps-comment.show { display: flex; gap: 6px; }
-  .nps-input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--brown); outline: none; background: var(--cream); transition: border-color 0.15s; }
+  .nps-input { flex: 1; padding: 8px 10px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: var(--font-sans); font-size: 13px; color: var(--brown); outline: none; background: var(--cream); transition: border-color 0.15s; }
   .nps-input:focus { border-color: var(--orange); background: #fff; }
-  .nps-send { padding: 8px 14px; background: var(--orange); border: none; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  .nps-send { padding: 8px 14px; background: var(--orange); border: none; border-radius: var(--r-sm); color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; box-shadow: var(--btn-offset); transition: transform var(--t-fast), box-shadow var(--t-fast); }
+  .nps-send:hover { transform: translateY(-1px); box-shadow: var(--btn-offset-hover); }
+  .nps-send:active { transform: translateY(2px); box-shadow: var(--btn-offset-active); }
   .nps-done { font-size: 13px; color: var(--green); font-weight: 600; display: none; align-items: center; gap: 6px; padding-top: 4px; }
   .nps-done.show { display: flex; }
 </style>
@@ -1244,10 +1474,14 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 
 <!-- ─── GATE ─── -->
 <div id="gate">
+  <div class="gate-bg"></div>
+  <div class="gate-scrim"></div>
   <div class="gate-card">
     <img class="gate-logo" id="gateWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
-    <h2>Fix it fast.</h2>
+    <div class="gate-eyebrow"><span class="ge-dot"></span>AN <span class="accent">AI KNOWLEDGE BASE</span> FOR HOSPITALITY</div>
+    <h2>Ask your business<br><span class="accent">anything.</span></h2>
     <p>{{WELCOME_MSG}}</p>
+    <div class="gate-caps">HANDBOOKS &middot; SOPs &middot; SUPPLIERS &middot; ROTAS &middot; TECH</div>
     <input class="gate-input" type="text" id="gateName" placeholder="Your name" autocomplete="given-name">
 
     <!-- Venue autocomplete -->
@@ -1274,133 +1508,47 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <header>
     <a href="https://stackedchat.io" style="display:flex;flex-direction:column;align-items:flex-start;text-decoration:none;gap:2px;">
       <img class="header-logo" id="headerIcon" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
-      <span style="font-family:'Righteous',sans-serif;font-size:12px;letter-spacing:0.04em;text-transform:uppercase;color:var(--orange);padding-left:1px;margin-top:2px;">CHAT</span>
+      <span style="font-family:var(--font-mono);font-size:10px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--orange);padding-left:2px;margin-top:3px;">CHAT</span>
     </a>
     <div class="header-actions">
       <div class="user-chip"><div class="dot"></div><span id="userLabel">You</span></div>
+      <button class="icon-btn" id="adminBtn" onclick="requireAdminVerify(openAdmin)" title="Admin" style="display:none">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </button>
       <button class="icon-btn" onclick="openHistory()" title="Chat history">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/></svg>
       </button>
       <button class="icon-btn" onclick="openTopics()" title="Topics">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
+      <button class="icon-btn" onclick="signOut()" title="Sign out">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
     </div>
   </header>
 
-  <div class="logo-strip">
-    <div class="logo-track">
-      <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
-      <span class="logo-text">Square</span><span class="logo-dot"></span>
-      <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
-      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
-      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
-      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
-      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
-      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
-      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
-      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
-      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
-      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
-      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
-      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
-      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
-      <span class="logo-text">Collins</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
-      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
-      <span class="logo-text">Airship</span><span class="logo-dot"></span>
-      <span class="logo-text">Stampede</span><span class="logo-dot"></span>
-      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
-      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
-      <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
-      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
-      <span class="logo-text">Mews</span><span class="logo-dot"></span>
-      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
-      <span class="logo-text">Planday</span><span class="logo-dot"></span>
-      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
-      <span class="logo-text">Sona</span><span class="logo-dot"></span>
-      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
-      <span class="logo-text">Nory</span><span class="logo-dot"></span>
-      <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
-      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
-      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
-      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
-      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
-      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
-      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
-      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
-      <span class="logo-text">Lightspeed</span><span class="logo-dot"></span>
-      <span class="logo-text">Square</span><span class="logo-dot"></span>
-      <span class="logo-text">Tevalis</span><span class="logo-dot"></span>
-      <span class="logo-text">Zonal</span><span class="logo-dot"></span>
-      <span class="logo-text">ICRTouch</span><span class="logo-dot"></span>
-      <span class="logo-text">Dojo</span><span class="logo-dot"></span>
-      <span class="logo-text">Worldpay</span><span class="logo-dot"></span>
-      <span class="logo-text">SumUp</span><span class="logo-dot"></span>
-      <span class="logo-text">Zettle</span><span class="logo-dot"></span>
-      <span class="logo-text">Deputy</span><span class="logo-dot"></span>
-      <span class="logo-text">Fourth</span><span class="logo-dot"></span>
-      <span class="logo-text">Rotaready</span><span class="logo-dot"></span>
-      <span class="logo-text">OpenTable</span><span class="logo-dot"></span>
-      <span class="logo-text">ResDiary</span><span class="logo-dot"></span>
-      <span class="logo-text">SevenRooms</span><span class="logo-dot"></span>
-      <span class="logo-text">Collins</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliverect</span><span class="logo-dot"></span>
-      <span class="logo-text">Flipdish</span><span class="logo-dot"></span>
-      <span class="logo-text">Deliveroo</span><span class="logo-dot"></span>
-      <span class="logo-text">Airship</span><span class="logo-dot"></span>
-      <span class="logo-text">Stampede</span><span class="logo-dot"></span>
-      <span class="logo-text">Nutritics</span><span class="logo-dot"></span>
-      <span class="logo-text">Marketman</span><span class="logo-dot"></span>
-      <span class="logo-text">Apicbase</span><span class="logo-dot"></span>
-      <span class="logo-text">Crunchtime</span><span class="logo-dot"></span>
-      <span class="logo-text">Mews</span><span class="logo-dot"></span>
-      <span class="logo-text">Winnow</span><span class="logo-dot"></span>
-      <span class="logo-text">Planday</span><span class="logo-dot"></span>
-      <span class="logo-text">Bizimply</span><span class="logo-dot"></span>
-      <span class="logo-text">Sona</span><span class="logo-dot"></span>
-      <span class="logo-text">Tenzo</span><span class="logo-dot"></span>
-      <span class="logo-text">Nory</span><span class="logo-dot"></span>
-      <span class="logo-text">Giftpro</span><span class="logo-dot"></span>
-      <span class="logo-text">Sky Business</span><span class="logo-dot"></span>
-      <span class="logo-text">EPOS Now</span><span class="logo-dot"></span>
-      <span class="logo-text">Stripe</span><span class="logo-dot"></span>
-      <span class="logo-text">Adyen</span><span class="logo-dot"></span>
-      <span class="logo-text">S4Labour</span><span class="logo-dot"></span>
-      <span class="logo-text">Uber Eats</span><span class="logo-dot"></span>
-      <span class="logo-text">Just Eat</span><span class="logo-dot"></span>
-    </div>
-  </div>
 
   <main>
-    <div id="shiftReminder" style="display:none" class="reminder-banner" onclick="dismissReminder()">
-      <div class="rem-icon">☀️</div>
-      <div class="rem-body">
-        <div class="rem-title">Good morning — time for your shift check</div>
-        <div class="rem-sub">Tap to run through your systems before service</div>
-      </div>
-      <div class="rem-cta">Start →</div>
-    </div>
     <div id="messages">
       <div class="welcome" id="welcome">
-        <img class="welcome-wordmark" id="welcomeWordmark" src="{{LOGO_URL}}" alt="{{BOT_NAME}}">
-        <div class="social-proof"><div class="pulse"></div><span id="socialProofText">Hospitality tech support, powered by AI</span></div>
-        <h2>{{WELCOME_HEADING}}</h2>
-        <div class="carousel-wrap" id="carouselWrap">
-          <div class="carousel-track" id="carouselTrack"></div>
-          <div class="carousel-dots" id="carouselDots"></div>
-        </div>
-        <div class="tip-card" id="tipCard" onclick="fireTip()" style="display:none">
-          <div class="tip-header"><span class="tip-badge">Tip of the day</span><span class="tip-product" id="tipProduct"></span></div>
-          <div class="tip-text" id="tipText"></div>
-          <div class="tip-cta">Tap to explore &rarr;</div>
-        </div>
+        <h2 id="welcomeGreeting">Hi there.</h2>
+        <p id="welcomeSub">How can I help you today?</p>
       </div>
     </div>
   </main>
 
+  <div id="attachPreview" class="attach-preview" style="display:none"></div>
   <div class="input-bar">
-    <textarea id="input" placeholder="Describe your tech issue&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+    <input type="file" id="kbFile" accept=".pdf,.doc,.docx,.txt,.csv,.md,.png,.jpg,.jpeg,.webp" style="display:none" onchange="handleKbUpload(this.files)" multiple>
+    <input type="file" id="vidFile" accept="video/*" style="display:none" onchange="handleVideoUpload(this.files)" multiple>
+    <input type="file" id="chatImgFile" accept="image/*" style="display:none" onchange="handleChatImage(this.files)">
+    <button id="kbAdd" onclick="requireAdminVerify(function(){document.getElementById('kbFile').click();})" title="Add to knowledge base" style="display:none">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button id="attachBtn" onclick="document.getElementById('chatImgFile').click()" title="Attach a photo">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+    </button>
+    <textarea id="input" placeholder="Ask anything about your business&hellip;" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
     <button id="mic" onclick="toggleMic()" title="Voice input">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8"/></svg>
     </button>
@@ -1425,40 +1573,82 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
   <div class="drawer-header"><span>Common topics</span><button class="drawer-close" onclick="closeTopics()">&times;</button></div>
   <div class="drawer-body">
     <div class="topics-list">
-      <button class="topic-chip" onclick="quickSend('EPOS system frozen or crashed'); closeTopics()">&#x1F4BB; EPOS frozen or crashed</button>
-      <button class="topic-chip" onclick="quickSend('Payment terminal offline or not processing'); closeTopics()">&#x1F4B3; Payment terminal issues</button>
-      <button class="topic-chip" onclick="quickSend('WiFi or network connectivity problem'); closeTopics()">&#x1F4F6; WiFi / network down</button>
-      <button class="topic-chip" onclick="quickSend('Kitchen printer not printing or offline'); closeTopics()">&#x1F5A8;&#xFE0F; Kitchen printer offline</button>
-      <button class="topic-chip" onclick="quickSend('Contactless payments not working'); closeTopics()">&#x1F4F1; Contactless not working</button>
-      <button class="topic-chip" onclick="quickSend('EPOS running slowly or lagging'); closeTopics()">&#x1F40C; EPOS slow or lagging</button>
-      <button class="topic-chip" onclick="quickSend('Staff cannot log in to the system'); closeTopics()">&#x1F512; Login / access issues</button>
-      <button class="topic-chip" onclick="quickSend('Card reader not connecting to EPOS'); closeTopics()">&#x1F517; Card reader not connecting</button>
+      <button class="topic-chip" onclick="quickSend('What is our refund and returns policy?'); closeTopics()">&#x1F4D6; Refund &amp; returns policy</button>
+      <button class="topic-chip" onclick="quickSend('When do our supplier deliveries arrive?'); closeTopics()">&#x1F377; Supplier delivery times</button>
+      <button class="topic-chip" onclick="quickSend('What allergens are in our menu items?'); closeTopics()">&#x1F957; Allergens in our menu</button>
+      <button class="topic-chip" onclick="quickSend('What is the opening and closing checklist?'); closeTopics()">&#x1F4CB; Opening &amp; closing checklist</button>
+      <button class="topic-chip" onclick="quickSend('How do I request holiday or time off?'); closeTopics()">&#x1F5D3;&#xFE0F; Request holiday / time off</button>
+      <button class="topic-chip" onclick="quickSend('What is the uniform and dress code?'); closeTopics()">&#x1F455; Uniform &amp; dress code</button>
+      <button class="topic-chip" onclick="quickSend('My payment terminal is offline'); closeTopics()">&#x1F4B3; Payment terminal offline</button>
+      <button class="topic-chip" onclick="quickSend('My EPOS system has frozen or crashed'); closeTopics()">&#x1F4BB; EPOS frozen or crashed</button>
     </div>
   </div>
 </div>
 
-<!-- ─── SHIFT CHECK DRAWER ─── -->
-<div class="drawer-overlay" id="scOverlay" onclick="closeShiftCheck()"></div>
-<div class="drawer" id="scDrawer">
+<!-- ─── ADMIN DRAWER (scoped analytics + knowledge) ─── -->
+<div class="drawer-overlay" id="adminOverlay" onclick="closeAdmin()"></div>
+<div class="drawer" id="adminDrawer">
   <div class="drawer-handle"></div>
-  <div class="drawer-header">
-    <span id="scDrawerTitle">Shift check</span>
-    <button class="drawer-close" onclick="closeShiftCheck()">&times;</button>
-  </div>
-  <div class="drawer-body" id="scBody">
-    <!-- injected by JS -->
+  <div class="drawer-header"><span>Admin</span><button class="drawer-close" onclick="closeAdmin()">&times;</button></div>
+  <div class="drawer-body" id="adminBody"><div class="empty-history">Loading&hellip;</div></div>
+</div>
+
+<!-- ─── TEAM DRAWER (admin manage-team) ─── -->
+<div class="drawer-overlay" id="teamOverlay" onclick="closeTeam()"></div>
+<div class="drawer" id="teamDrawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-header"><span>Your team</span><button class="drawer-close" onclick="closeTeam()">&times;</button></div>
+  <div class="drawer-body" id="teamBody"><div class="empty-history">Loading&hellip;</div></div>
+</div>
+
+
+<!-- ─── ADMIN VERIFY MODAL (email code) ─── -->
+<div class="modal-overlay" id="verifyOverlay">
+  <div class="modal">
+    <h3>Confirm it&#39;s you</h3>
+    <div id="verifyStep1">
+      <p>Managing knowledge is admin-only. We&#39;ll email a verification code to <strong id="verifyEmail"></strong> to confirm it&#39;s you.</p>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeVerify()">Cancel</button>
+        <button class="modal-submit" id="verifySendBtn" onclick="sendAuthCode()">Send code</button>
+      </div>
+    </div>
+    <div id="verifyStep2" style="display:none">
+      <p>Enter the code we just emailed you.</p>
+      <input class="verify-code" id="verifyCodeInput" inputmode="numeric" maxlength="8" placeholder="00000000" autocomplete="one-time-code">
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="sendAuthCode()">Resend</button>
+        <button class="modal-submit" onclick="verifyAuthCode()">Verify</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<!-- ─── TICKET MODAL ─── -->
-<div class="modal-overlay" id="ticketOverlay">
+<!-- ─── ADD DISH IMAGE MODAL ─── -->
+<div class="modal-overlay" id="imgAddOverlay">
   <div class="modal">
-    <h3>Raise a support ticket</h3>
-    <p>We'll look into this and get back to you. Add any extra detail below.</p>
-    <textarea id="ticketNote" placeholder="Any extra context that might help&hellip;"></textarea>
+    <h3>Add a dish image</h3>
+    <p>Upload a photo and name it, so the team can ask the bot to show it.</p>
+    <input class="gate-input" id="imgTitle" type="text" placeholder="Name (e.g. Margherita Pizza)">
+    <input class="gate-input" id="imgDesc" type="text" placeholder="Short description (optional)">
+    <input class="gate-input" id="imgFile" type="file" accept="image/*" style="padding:9px 12px">
     <div class="modal-actions">
-      <button class="modal-cancel" onclick="closeTicket()">Cancel</button>
-      <button class="modal-submit" onclick="submitTicket()">Submit ticket</button>
+      <button class="modal-cancel" onclick="closeImgAdd()">Cancel</button>
+      <button class="modal-submit" onclick="submitImage()">Add image</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── ADD VIDEO LINK MODAL ─── -->
+<div class="modal-overlay" id="vidLinkOverlay">
+  <div class="modal">
+    <h3>Add a video link</h3>
+    <p>Paste a YouTube, Vimeo or video URL &mdash; no size limit, ideal for longer training videos.</p>
+    <input class="gate-input" id="vidLinkUrl" type="url" placeholder="https://youtube.com/watch?v=&hellip;">
+    <input class="gate-input" id="vidLinkTitle" type="text" placeholder="Title (optional)">
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeVideoLink()">Cancel</button>
+      <button class="modal-submit" onclick="handleVideoLink()">Add video</button>
     </div>
   </div>
 </div>
@@ -1479,6 +1669,11 @@ const SUPABASE_URL = 'https://yuzlfocqovwhqdpitvxj.supabase.co';
 // Preset venue — injected server-side when page is served via /chat/:slug
 const PRESET_VENUE_ID = '{{VENUE_ID}}';
 const PRESET_VENUE_NAME = '{{VENUE_NAME}}';
+// ── GATE HERO BACKGROUND ──────────────────────────────────────────────────
+// Paste a hosted image URL here for a full-bleed photo behind the gate
+// (a cream scrim keeps the card readable). Leave '' for the brand-gradient
+// fallback. Use a direct image link (.jpg/.png/.webp), e.g. a raw GitHub URL.
+const GATE_BG_URL = 'https://raw.githubusercontent.com/TOT-STACKED/stacked-chat/main/ChatGPT%20Image%20May%2018%2C%202026%2C%2002_05_23%20PM.png';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
 const ICON_URL = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iODgiIHZpZXdCb3g9IjAgMCA1NiA4OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTU1LjQxNTIgNjIuOTkzNUM1NS40MzM0IDY2LjczMTcgNTQuOTA2MSA3MC4wODA5IDUzLjg0MDcgNzMuMDMzNkM1Mi43NzE2IDc1Ljk5IDUxLjEwOTcgNzguNTI0NiA0OC44NTUyIDgwLjY0MUM0Ni41OTcgODIuNzU3NCA0My43MzUxIDg0LjM3OTIgNDAuMjYyMyA4NS40OTkyQzM2Ljc4OTYgODYuNjE5MiAzMi42NTUgODcuMTkwMiAyNy44NjIyIDg3LjIxMkMyMy4wNjk0IDg3LjIzMDIgMTguOTE2NiA4Ni42OTU2IDE1LjQxMTEgODUuNjA0N0MxMS45MDIgODQuNTEzOCA5LjAyNTYxIDgyLjkxNzQgNi43NzgzMSA4MC44MTkyQzQuNTMxMDEgNzguNzI0NiAyLjg1ODI2IDc2LjIwMDkgMS43NjczNCA3My4yNTU0QzAuNjc2NDIxIDcwLjMxIDAuMTIwMDUxIDY2Ljk2ODEgMC4xMDU1MDYgNjMuMjI5OUw0Ljk4MTQ1ZS0wNSA0OS45ODYxQy0wLjAwNzIyMyA0OC40MDQzIDAuNzgxODc3IDQ3LjYxMTUgMi4zNjAwOCA0Ny42MDQyTDExLjkwNTYgNDcuNTY0MkMxMi41MDkzIDQ4LjE2MDYgMTMuMTcxMSA0OC43MDYxIDEzLjg4MDIgNDkuMjA0M0MxNS44NjkzIDUwLjU5NyAxOC4yOTg0IDUxLjUyNzkgMjEuMTY3NiA1MS45OTdDMjQuMDMzMSA1Mi40NjI1IDI3LjM0MjIgNTIuNDI2MSAzMS4wOTEzIDUxLjg4MDdDMzQuODQ0MSA1MS4zMzUyIDM4LjAxNSA1MC40MzM0IDQwLjYxMTQgNDkuMTcxNUM0MS42ODc4IDQ4LjY0NzkgNDIuNjczMyA0OC4wNjYxIDQzLjU2NzggNDcuNDI5N0w1Mi45MzE2IDQ3LjM4OTdDNTQuNTEzNCA0Ny4zODI0IDU1LjMwNjEgNDguMTY3OSA1NS4zMTM0IDQ5Ljc0OTdMNTUuNDE1MiA2Mi45OTM1WiIgZmlsbD0iI0U2NTQzQSIvPgo8cGF0aCBkPSJNNDMuNTY5NCA0Ny40MzA3QzQyLjY3NDggNDguMDY3IDQxLjY4OTQgNDguNjQ4OSA0MC42MTMgNDkuMTcyNUMzOC4wMTY2IDUwLjQzNDMgMzQuODQ1NyA1MS4zMzYyIDMxLjA5MjkgNTEuODgxNkMyNy4zNDM4IDUyLjQyNzEgMjQuMDM0NiA1Mi40NjM0IDIxLjE2OTIgNTEuOTk4QzE4LjMgNTEuNTI4OSAxNS44NzA5IDUwLjU5OCAxMy44ODE4IDQ5LjIwNTJDMTMuMTcyNyA0OC43MDcgMTIuNTEwOSA0OC4xNjE2IDExLjkwNzIgNDcuNTY1Mkw0My41Njk0IDQ3LjQzMDdaIiBmaWxsPSIjQjczNTFGIi8+CjxwYXRoIGQ9Ik00OS44NjA5IDM3LjkxNjVDNDkuMzUxOCA0MC4zNDU3IDQ4LjMzIDQyLjUxMyA0Ni43OTkxIDQ0LjQyMjFDNDUuOTAwOSA0NS41MzQ4IDQ0LjgyNDUgNDYuNTM4NSA0My41NjYzIDQ3LjQyOTRMMTEuOTA0MSA0Ny41NjM5QzEwLjgwNTkgNDYuNDgzOSA5Ljg3ODYzIDQ1LjI0MDMgOS4xMjIyNiA0My44MzY2QzcuOTQwNDMgNDEuNjQ3NSA3LjEzNjc4IDM5LjA5NDcgNi43MTQ5NiAzNi4xNjc0TDUuMTY5NDkgMjUuODEwOUM0Ljk5MTMgMjQuNTc0NiA1LjUxODU4IDIzLjg2NTUgNi43NTQ5NiAyMy42ODczTDEyLjI2NDEgMjIuODg3M0MxMy4xMjIzIDIzLjUyMzYgMTQuMTAwNSAyNC4wODczIDE1LjE5MTQgMjQuNTc4MkMxNy4yODYgMjUuNTIgMTkuODIwNiAyNi4xNjM3IDIyLjc5ODggMjYuNTEyOEMyNS43NzM0IDI2Ljg1ODIgMjguMzgwNyAyNi44MTQ2IDMwLjYyMDcgMjYuMzgxOUMzMi44NjA3IDI1Ljk0NTUgMzQuNzU4OSAyNS4xNTY0IDM2LjMxODkgMjQuMDE0NkMzNy44NzUzIDIyLjg2OTEgMzkuMDk3MiAyMS40MjE4IDM5Ljk4NDQgMTkuNjY5MUM0MC4xMjYzIDE5LjM4NTQgNDAuMjYwOCAxOS4wOTgxIDQwLjM4MDggMTguOEw0Ni4zMjI3IDE3LjkzODFDNDcuNTU5MSAxNy43NTYzIDQ4LjI2NDUgMTguMjg3MiA0OC40NDY0IDE5LjUyMzZMNDkuOTg4MiAyOS44ODAxQzUwLjQxMzYgMzIuODAzNyA1MC4zNyAzNS40ODM4IDQ5Ljg2MDkgMzcuOTE2NVoiIGZpbGw9IiNFNjU0M0EiLz4KPHBhdGggZD0iTTQwLjM4MTMgMTguODAwOEM0MC4yNjEzIDE5LjA5OSA0MC4xMjY4IDE5LjM4NjIgMzkuOTg1IDE5LjY2OTlDMzkuMDk3NyAyMS40MjI2IDM3Ljg3NTkgMjIuODY5OSAzNi4zMTk1IDI0LjAxNTRDMzQuNzU5NSAyNS4xNTcyIDMyLjg2MTMgMjUuOTQ2MyAzMC42MjEyIDI2LjM4MjdDMjguMzgxMiAyNi44MTU0IDI1Ljc3MzkgMjYuODU5MSAyMi43OTkzIDI2LjUxMzZDMTkuODIxMSAyNi4xNjQ1IDE3LjI4NjUgMjUuNTIwOSAxNS4xOTIgMjQuNTc5QzE0LjEwMSAyNC4wODgxIDEzLjEyMjggMjMuNTI0NSAxMi4yNjQ2IDIyLjg4ODFMNDAuMzgxMyAxOC44MDA4WiIgZmlsbD0iI0I3MzUxRiIvPgo8cGF0aCBkPSJNNDIuNjUwNCA1LjMzMTI4TDQxLjcxOTQgMTMuNTU2OEM0MS40OTA0IDE1LjUwNTkgNDEuMDQ2NyAxNy4yNTUxIDQwLjM4MTIgMTguODAwNUwxMi4yNjQ2IDIyLjg4NzlDMTEuNDc5MSAyMi4zMDYgMTAuNzg4MiAyMS42NjI0IDEwLjE5NTQgMjAuOTYwNkM4Ljk1OTA3IDE5LjQ5MTQgOC4xMTE3OCAxNy44MDA1IDcuNjUzNiAxNS44OTE0QzcuMTk5MDUgMTMuOTc4NyA3LjEwODEzIDExLjg2NTkgNy4zNzcyMyA5LjU0MjI0TDguMzA4MTUgMS4zMTY2OUM4LjQyNDUxIDAuMzM0ODYyIDguOTczNjEgLTAuMDk3ODY5OSA5Ljk1MTggMC4wMTg0OTUxTDQxLjM0ODUgMy42ODc2M0M0Mi4zMzA0IDMuODAwMzYgNDIuNzYzMSA0LjM0OTQ1IDQyLjY1MDQgNS4zMzEyOFoiIGZpbGw9IiNFNjU0M0EiLz4KPC9zdmc+Cg==';
 
@@ -1498,11 +1693,10 @@ let dropdownBlurTimeout = null;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  renderCarousel();
-  renderQuickBtns();
-  loadSocialProof();
-  loadPredictiveFixes();
-  renderTipOfTheDay();
+  if (GATE_BG_URL) {
+    document.documentElement.style.setProperty('--gate-bg', 'url("' + GATE_BG_URL + '")');
+    document.getElementById('gate').classList.add('has-bg');
+  }
 
   // If this is a branded slug page, hide the venue picker and show a locked badge
   if (PRESET_VENUE_ID && PRESET_VENUE_NAME) {
@@ -1521,30 +1715,7 @@ window.addEventListener('DOMContentLoaded', () => {
     user = JSON.parse(saved);
     showApp();
   }
-  checkShiftReminder();
 });
-
-function checkShiftReminder() {
-  const hour = new Date().getHours();
-  if (hour < 7 || hour >= 11) return; // only show 7am–11am
-  const today = new Date().toDateString();
-  const lastCheck = localStorage.getItem('stacked_last_shift_check');
-  if (lastCheck === today) return; // already done today
-  const banner = document.getElementById('shiftReminder');
-  if (banner) banner.style.display = 'flex';
-}
-
-function dismissReminder() {
-  const banner = document.getElementById('shiftReminder');
-  if (banner) banner.style.display = 'none';
-  openShiftCheck();
-}
-
-function markShiftCheckDone() {
-  localStorage.setItem('stacked_last_shift_check', new Date().toDateString());
-  const banner = document.getElementById('shiftReminder');
-  if (banner) banner.style.display = 'none';
-}
 
 // ─── VENUE AUTOCOMPLETE ───────────────────────────────────────────────────
 async function handleVenueInput(val) {
@@ -1647,8 +1818,8 @@ async function submitGate() {
     user = { name, venue: selectedVenueName, venue_id: venueId, phone, email };
     localStorage.setItem('stacked_user', JSON.stringify(user));
 
-    // Save lead and venue member in parallel
-    await Promise.all([
+    // Save lead and venue member in parallel; capture the assigned role.
+    const [, memberRes] = await Promise.all([
       fetch(SERVER_URL + '/save-lead', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, venue: selectedVenueName, venue_id: venueId, phone, email })
@@ -1658,6 +1829,11 @@ async function submitGate() {
         body: JSON.stringify({ venue_id: venueId, name, email, phone })
       })
     ]);
+    try {
+      const md = await memberRes.json();
+      user.role = (md && md.role) ? md.role : 'staff';
+      localStorage.setItem('stacked_user', JSON.stringify(user));
+    } catch(e) { /* role optional */ }
   } catch(e) {
     // Fail gracefully - still let them in
     user = { name, venue: selectedVenueName, venue_id: null, phone, email };
@@ -1670,6 +1846,11 @@ async function submitGate() {
 function showApp() {
   document.getElementById('gate').classList.add('hidden');
   document.getElementById('userLabel').textContent = user.name.split(' ')[0];
+  const isAdmin = user && user.role === 'admin';
+  const adminBtn = document.getElementById('adminBtn');
+  if (adminBtn) adminBtn.style.display = isAdmin ? 'flex' : 'none';
+  const kbAdd = document.getElementById('kbAdd');
+  if (kbAdd) kbAdd.style.display = isAdmin ? 'flex' : 'none';
   personaliseWelcome();
   loadHistory();
 }
@@ -1709,10 +1890,27 @@ async function loadSocialProof() {
   }
 }
 
+const WELCOME_LINES = [
+  'How can I help you today?',
+  'What do you need to know?',
+  'Ask me anything about your business.',
+  'What can I dig up for you?',
+  'Need a hand? Just ask.',
+  'Your knowledge, on tap.',
+  "What's the question?",
+  'Ready when you are.',
+  "Let's get you sorted.",
+  'Handbooks, suppliers, tech \\u2014 fire away.',
+  'What\\'s playing up today?',
+  'Go on, ask me something.'
+];
 function personaliseWelcome() {
   if (!user) return;
-  const el = document.getElementById('welcomeVenue');
-  if (el) el.textContent = user.venue ? 'Tech support for ' + user.venue + '.' : 'Ask anything about your hospitality tech.';
+  const first = ((user.name || '').trim().split(' ')[0] || 'there').replace(/[<>&]/g, '');
+  const g = document.getElementById('welcomeGreeting');
+  if (g) g.innerHTML = 'Hi <span class="accent">' + first + '</span>.';
+  const s = document.getElementById('welcomeSub');
+  if (s) s.textContent = WELCOME_LINES[Math.floor(Math.random() * WELCOME_LINES.length)];
 }
 
 const TIME_ISSUES = {
@@ -1775,88 +1973,48 @@ function renderQuickBtns() {
   ).join('');
 }
 
-// ─── CAROUSEL ─────────────────────────────────────────────────────────────
-const CAROUSEL_CARDS = [
-  { color: 'orange', emoji: '💻', label: 'EPOS crashed mid-service?', sub: 'We\\'ll walk you through a fix in seconds', msg: 'My EPOS has crashed mid-service', tap: 'Tap to get help →' },
-  { color: 'purple', emoji: '💳', label: 'Payment terminal offline?', sub: 'Step-by-step troubleshooting, right now', msg: 'My payment terminal is offline', tap: 'Tap to fix it →' },
-  { color: 'green', emoji: '📶', label: 'WiFi down in your venue?', sub: 'Get your systems back online fast', msg: 'WiFi is down in my venue', tap: 'Tap to diagnose →' },
-  { color: 'orange', emoji: '🖨️', label: 'Kitchen printer not working?', sub: 'Orders not reaching the kitchen? Let\\'s fix it', msg: 'Kitchen printer not receiving orders', tap: 'Tap to troubleshoot →' },
-  { color: 'purple', emoji: '📅', label: 'Reservation system issues?', sub: 'Bookings not syncing? We can help', msg: 'My reservation system is not working', tap: 'Tap to get help →' },
-  { color: 'green', emoji: '🔒', label: 'Staff can\\'t log in?', sub: 'Access issues sorted in minutes', msg: 'Staff cannot log in to the system', tap: 'Tap to fix it →' },
-  { color: 'purple', emoji: '⭐', label: 'Rate your tech stack', sub: 'Share your NPS score to help other operators build theirs', msg: 'I\\'d like to rate my tech vendors', tap: 'Tap to rate →' },
+// ─── ASK ROTATOR (kinetic one-liner) ──────────────────────────────────────
+const ASK_PROMPTS = [
+  'How do I reset the card terminal?',
+  'My EPOS has crashed mid-service',
+  'The kitchen printer isn\\'t receiving orders',
+  'WiFi is down across the venue',
+  'What time does the wine delivery arrive?',
+  'A guest is asking about allergens',
+  'Staff can\\'t log in to the system',
+  'Contactless payments aren\\'t working',
+  'How do I run the end-of-day report?',
+  'The reservation system isn\\'t syncing',
 ];
 
-let _carouselIdx = 0;
-let _carouselTimer = null;
+let _askIdx = 0;
+let _askTimer = null;
 
 function renderCarousel() {
-  const track = document.getElementById('carouselTrack');
-  const dots = document.getElementById('carouselDots');
-  if (!track || !dots) return;
-  // Shuffle and pick 4
-  const cards = [...CAROUSEL_CARDS].sort(() => Math.random() - 0.5).slice(0, 4);
-  track.innerHTML = cards.map((c, i) =>
-    '<div class="carousel-card ' + c.color + (i === 0 ? ' active' : '') + '" data-action="quickSend" data-msg="' + c.msg.replace(/"/g,'&quot;') + '">' +
-    '<div><span class="cc-emoji">' + c.emoji + '</span><div class="cc-label">' + c.label + '</div><div class="cc-sub">' + c.sub + '</div></div>' +
-    '<div class="cc-tap">' + c.tap + '</div></div>'
-  ).join('');
-  dots.innerHTML = cards.map((c, i) =>
-    '<button class="carousel-dot ' + c.color + (i === 0 ? ' active' : '') + '" data-idx="' + i + '"></button>'
-  ).join('');
-  // Dot clicks
-  dots.querySelectorAll('.carousel-dot').forEach(d => {
-    d.addEventListener('click', function() { goToCard(parseInt(this.dataset.idx), cards); });
-  });
-  _carouselIdx = 0;
-  clearInterval(_carouselTimer);
-  _carouselTimer = setInterval(() => {
-    const next = (_carouselIdx + 1) % cards.length;
-    goToCard(next, cards);
-  }, 4000);
-  initCarouselSwipe(cards);
+  const btn = document.getElementById('askRotator');
+  const txt = document.getElementById('askRotatorText');
+  if (!btn || !txt) return;
+  const prompts = [...ASK_PROMPTS].sort(() => Math.random() - 0.5);
+  _askIdx = 0;
+  const paint = () => {
+    const q = prompts[_askIdx % prompts.length];
+    txt.textContent = '\\u201C' + q + '\\u201D';
+    btn.dataset.msg = q;
+  };
+  paint();
+  clearInterval(_askTimer);
+  _askTimer = setInterval(() => {
+    btn.classList.add('swapping');
+    setTimeout(() => {
+      _askIdx = (_askIdx + 1) % prompts.length;
+      paint();
+      btn.classList.remove('swapping');
+    }, 340);
+  }, 3400);
 }
 
-function goToCard(idx, cards) {
-  const track = document.getElementById('carouselTrack');
-  const dots = document.getElementById('carouselDots');
-  if (!track) return;
-  const allCards = track.querySelectorAll('.carousel-card');
-  const allDots = dots ? dots.querySelectorAll('.carousel-dot') : [];
-  allCards.forEach((c, i) => {
-    c.classList.remove('active', 'exit');
-    if (i === _carouselIdx) c.classList.add('exit');
-    if (i === idx) setTimeout(() => c.classList.add('active'), 50);
-  });
-  allDots.forEach((d, i) => { d.classList.toggle('active', i === idx); });
-  _carouselIdx = idx;
-}
-
-// Swipe support
-function initCarouselSwipe(cards) {
-  const track = document.getElementById('carouselTrack');
-  if (!track) return;
-  let startX = 0, startY = 0, swiping = false;
-  track.addEventListener('touchstart', function(e) {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    swiping = true;
-    clearInterval(_carouselTimer);
-  }, { passive: true });
-  track.addEventListener('touchend', function(e) {
-    if (!swiping) return;
-    swiping = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx < 0) goToCard((_carouselIdx + 1) % cards.length, cards);
-      else goToCard((_carouselIdx - 1 + cards.length) % cards.length, cards);
-    }
-    _carouselTimer = setInterval(function() { goToCard((_carouselIdx + 1) % cards.length, cards); }, 4000);
-  }, { passive: true });
-}
-
-// Stop carousel when chat starts
-function stopCarousel() { clearInterval(_carouselTimer); }
+// Stop the rotator when chat starts
+function stopCarousel() { clearInterval(_askTimer); }
 
 // ─── TIPS OF THE DAY ──────────────────────────────────────────────────────
 const ALL_TIPS = [
@@ -1962,180 +2120,21 @@ function fireTip() {
   quickSend(window._currentTip.text + ' Can you tell me more about this?');
 }
 
-// ─── SHIFT CHECK ──────────────────────────────────────────────────────────
-const SC_STEPS = [
-  { id: 'epos',     emoji: '💻', label: 'EPOS / till system' },
-  { id: 'payments', emoji: '💳', label: 'Card / payment terminal' },
-  { id: 'wifi',     emoji: '📶', label: 'WiFi / internet' },
-  { id: 'printer',  emoji: '🖨️', label: 'Kitchen printer' },
-  { id: 'bookings', emoji: '📅', label: 'Booking / reservation system' },
-];
-
-let scAnswers = {};
-let scCurrentStep = 0;
-let scMode = 'steps'; // 'steps' | 'summary'
-
-function openShiftCheck() {
-  scAnswers = {};
-  scCurrentStep = 0;
-  scMode = 'steps';
-  document.getElementById('scOverlay').classList.add('open');
-  document.getElementById('scDrawer').classList.add('open');
-  renderScStep();
-}
-
-function closeShiftCheck() {
-  document.getElementById('scOverlay').classList.remove('open');
-  document.getElementById('scDrawer').classList.remove('open');
-}
-
-function renderScStep() {
-  const body = document.getElementById('scBody');
-  const title = document.getElementById('scDrawerTitle');
-  const total = SC_STEPS.length;
-
-  if (scMode === 'summary') {
-    renderScSummary();
-    return;
-  }
-
-  const step = SC_STEPS[scCurrentStep];
-  const pct = Math.round((scCurrentStep / total) * 100);
-
-  title.textContent = 'Shift check (' + (scCurrentStep + 1) + ' of ' + total + ')';
-
-  body.innerHTML =
-    '<div class="sc-progress"><div class="sc-progress-fill" style="width:' + pct + '%"></div></div>' +
-    '<div class="sc-step">' +
-    '<div class="sc-step-label"><span class="sc-emoji">' + step.emoji + '</span>' + step.label + '</div>' +
-    '<div class="sc-options">' +
-    '<button class="sc-opt" data-val="green" data-action="scAnswer">✅ All good</button>' +
-    '<button class="sc-opt" data-val="amber" data-action="scAnswer">⚠️ Slow / issue</button>' +
-    '<button class="sc-opt" data-val="red" data-action="scAnswer">🔴 Down</button>' +
-    '</div></div>';
-
-  // Highlight previously selected if user goes back (not implemented but defensive)
-  const prev = scAnswers[step.id];
-  if (prev) {
-    body.querySelectorAll('.sc-opt').forEach(btn => {
-      if (btn.dataset.val === prev) btn.classList.add('selected-' + prev);
-    });
-  }
-}
-
-function scAnswer(val) {
-  const step = SC_STEPS[scCurrentStep];
-  scAnswers[step.id] = val;
-
-  // Highlight selection briefly then advance
-  const btns = document.querySelectorAll('.sc-opt');
-  btns.forEach(b => { if (b.dataset.val === val) b.classList.add('selected-' + val); });
-
-  setTimeout(() => {
-    scCurrentStep++;
-    if (scCurrentStep >= SC_STEPS.length) {
-      scMode = 'summary';
-    }
-    renderScStep();
-  }, 280);
-}
-
 // ─── GLOBAL EVENT DELEGATION ──────────────────────────────────────────────
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const action = btn.dataset.action;
   const msg = btn.dataset.msg ? btn.dataset.msg.replace(/&quot;/g, '"') : null;
-  if (action === 'scAnswer') scAnswer(btn.dataset.val);
   if (action === 'predictSend' || action === 'quickSend') { hideWelcome(); quickSend(msg); }
+  if (action === 'setRole') setMemberRole(btn.dataset.email, btn.dataset.role);
+  if (action === 'kbRemove') kbRemove(btn.dataset.file);
+  if (action === 'kbAddClick') { closeAdmin(); const f = document.getElementById('kbFile'); if (f) f.click(); }
+  if (action === 'vidAddClick') { closeAdmin(); const vf = document.getElementById('vidFile'); if (vf) vf.click(); }
+  if (action === 'vidLinkClick') { closeAdmin(); openVideoLink(); }
+  if (action === 'imgAddClick') { closeAdmin(); openImgAdd(); }
+  if (action === 'openTeamFromAdmin') { closeAdmin(); openTeam(); }
 });
-
-function renderScSummary() {
-  const title = document.getElementById('scDrawerTitle');
-  title.textContent = 'Shift check complete';
-
-  const issues = SC_STEPS.filter(s => scAnswers[s.id] === 'red');
-  const warnings = SC_STEPS.filter(s => scAnswers[s.id] === 'amber');
-  const allGood = issues.length === 0 && warnings.length === 0;
-
-  let icon, headline, sub;
-  if (allGood) {
-    icon = '🟢';
-    headline = 'All systems go';
-    sub = 'Everything is looking good. Have a great service!';
-  } else if (issues.length > 0) {
-    icon = '🔴';
-    headline = issues.length + ' system' + (issues.length > 1 ? 's' : '') + ' need' + (issues.length === 1 ? 's' : '') + ' attention';
-    sub = 'Get these sorted before service starts.';
-  } else {
-    icon = '⚠️';
-    headline = warnings.length + ' thing' + (warnings.length > 1 ? 's' : '') + ' to keep an eye on';
-    sub = 'Not critical, but worth monitoring during service.';
-  }
-
-  let issueHTML = '';
-  issues.forEach(s => { issueHTML += '<div class="sc-issue-item"><span>' + s.emoji + '</span> ' + s.label + ' is down</div>'; });
-  warnings.forEach(s => { issueHTML += '<div class="sc-issue-item amber"><span>' + s.emoji + '</span> ' + s.label + ' has an issue</div>'; });
-
-  const hasProblems = issues.length > 0 || warnings.length > 0;
-
-  const body = document.getElementById('scBody');
-  body.innerHTML =
-    '<div class="sc-summary">' +
-    '<div class="sc-summary-icon">' + icon + '</div>' +
-    '<div class="sc-summary-title">' + headline + '</div>' +
-    '<div class="sc-summary-sub">' + sub + '</div>' +
-    '</div>' +
-    (hasProblems ? '<div class="sc-issues-list">' + issueHTML + '</div>' : '') +
-    (hasProblems
-      ? '<button class="sc-fix-btn" onclick="scGetHelp()">Get help with these issues &rarr;</button>'
-      : '') +
-    '<button class="sc-done-btn" onclick="scFinish()">' + (allGood ? 'Great, start service' : 'Dismiss') + '</button>';
-
-  // Save to Supabase
-  saveHealthCheck();
-}
-
-async function saveHealthCheck() {
-  if (!user) return;
-  try {
-    const payload = {
-      venue: user.venue,
-      venue_id: user.venue_id || null,
-      name: user.name,
-      email: user.email,
-      answers: scAnswers,
-      has_issues: SC_STEPS.some(s => scAnswers[s.id] === 'red' || scAnswers[s.id] === 'amber'),
-      checked_at: new Date().toISOString()
-    };
-    await fetch(SERVER_URL + '/health-check', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-  } catch(e) { /* fail silently */ }
-}
-
-function scGetHelp() {
-  closeShiftCheck();
-  const issues = SC_STEPS.filter(s => scAnswers[s.id] === 'red' || scAnswers[s.id] === 'amber');
-  const issueNames = issues.map(s => s.label.toLowerCase()).join(' and ');
-  hideWelcome();
-  quickSend('I just did my shift check and I have issues with my ' + issueNames + '. Can you help me troubleshoot?');
-}
-
-function scFinish() {
-  closeShiftCheck();
-  markShiftCheckDone();
-  const btn = document.getElementById('shiftCheckBtn');
-  if (btn) {
-    btn.innerHTML = '✅ Shift check done';
-    btn.style.borderColor = '#16a34a';
-    btn.style.color = '#166534';
-    btn.onclick = null;
-    btn.style.cursor = 'default';
-  }
-}
 
 let recognition = null;
 let isListening = false;
@@ -2157,25 +2156,62 @@ function toggleMic() {
   recognition.start();
 }
 
+// ── Attach a photo for the bot to read (vision) ──────────────────────────
+let pendingImage = null; // { dataUrl, data, media_type, name }
+function handleChatImage(files) {
+  const f = files && files[0]; if (!f) return;
+  if (!f.type || f.type.indexOf('image/') !== 0) { showToast('Please choose an image file'); return; }
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const img = new Image();
+    img.onload = function() {
+      const MAX = 1024;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) { if (w >= h) { h = Math.round(h * MAX / w); w = MAX; } else { w = Math.round(w * MAX / h); h = MAX; } }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      const dataUrl = cv.toDataURL('image/jpeg', 0.8);
+      pendingImage = { dataUrl: dataUrl, data: dataUrl.split(',')[1], media_type: 'image/jpeg', name: f.name || 'photo' };
+      showAttachPreview();
+    };
+    img.onerror = function() { showToast('Could not read that image'); };
+    img.src = e.target.result;
+  };
+  reader.onerror = function() { showToast('Could not read that file'); };
+  reader.readAsDataURL(f);
+  document.getElementById('chatImgFile').value = '';
+}
+function showAttachPreview() {
+  const el = document.getElementById('attachPreview');
+  const btn = document.getElementById('attachBtn');
+  if (!el) return;
+  if (!pendingImage) { el.style.display = 'none'; el.innerHTML = ''; if (btn) btn.classList.remove('has'); return; }
+  el.style.display = 'flex';
+  el.innerHTML = '<div class="attach-chip"><img src="' + pendingImage.dataUrl + '" alt=""><span class="ac-name">' + teamEsc(pendingImage.name) + '</span><button class="ac-x" onclick="clearAttach()" title="Remove">✕</button></div>';
+  if (btn) btn.classList.add('has');
+}
+function clearAttach() { pendingImage = null; showAttachPreview(); }
+
 async function sendMessage() {
   const input = document.getElementById('input');
   const text = input.value.trim();
-  if (!text) return;
+  const img = pendingImage;
+  if (!text && !img) return;
   hideWelcome();
   input.value = ''; input.style.height = 'auto';
   document.getElementById('send').disabled = true;
-  addMessage('user', text);
-  messages.push({ role: 'user', content: text });
+  addMessage('user', text, false, null, null, img ? img.dataUrl : null);
+  messages.push({ role: 'user', content: text || '📷 (image)' });
+  clearAttach();
   const typing = addTyping();
   try {
     const res = await fetch(SERVER_URL + '/chat', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, history: messages.slice(-10), venue: user?.venue, venue_id: user?.venue_id, userName: user?.name })
+      body: JSON.stringify({ message: text, history: messages.slice(-10), venue: user?.venue, venue_id: user?.venue_id, userName: user?.name, image: img ? { data: img.data, media_type: img.media_type } : null })
     });
     const data = await res.json();
     const reply = data.response || "Sorry, I couldn't get a response. Please try again.";
     const supportUrl = data.supportUrl || null;
-    const shouldEscalate = data.escalate || false;
     lastBotMsg = reply;
     typing.remove();
     let videoData = null, displayReply = reply;
@@ -2185,16 +2221,16 @@ async function sendMessage() {
       if (vtagEnd > vtagStart) { try { videoData = JSON.parse(reply.substring(vtagStart + 14, vtagEnd)); } catch(e) {} displayReply = reply.substring(0, vtagStart).trim(); }
     }
     addMessage('assistant', displayReply, true, videoData, supportUrl);
-    if (data.detectedVendor && !npsShown && (data.forceNPS || messages.filter(m=>m.role==='user').length >= 2)) {
-      npsShown = true;
-      setTimeout(() => showNPS(data.detectedVendor), 1200);
-    }
-    if (shouldEscalate) {
-      const msgs = document.getElementById('messages');
-      const banner = document.createElement('div'); banner.className = 'escalation-banner';
-      banner.innerHTML = '<div class="esc-icon">&#x1F6A8;</div><div class="esc-body"><div class="esc-title">We&#39;ve flagged this for our team</div><div class="esc-sub">A member of the Stacked team has been alerted and will follow up with you shortly.</div></div>';
-      msgs.appendChild(banner);
-      msgs.scrollTop = msgs.scrollHeight;
+    if (data.images && data.images.length) renderDishImages(data.images);
+    if (data.docFile && data.docFile.url) renderDocFile(data.docFile);
+    if (data.detectedVendor) {
+      // Explicit user request (forceNPS) always shows, so "Can I rate sky?" works
+      // even after an earlier NPS. Auto-triggered NPS still gated to once per session.
+      const shouldShow = data.forceNPS || (!npsShown && messages.filter(m=>m.role==='user').length >= 2);
+      if (shouldShow) {
+        if (!data.forceNPS) npsShown = true;
+        setTimeout(() => showNPS(data.detectedVendor), 1200);
+      }
     }
     messages.push({ role: 'assistant', content: displayReply });
     await saveConversation();
@@ -2210,7 +2246,7 @@ async function sendMessage() {
 
 function hideWelcome() { stopCarousel(); const w = document.getElementById('welcome'); if (w) w.remove(); }
 
-function addMessage(role, content, showTicket, video, supportUrl) {
+function addMessage(role, content, showTicket, video, supportUrl, userImg) {
   const msgs = document.getElementById('messages');
   const wrap = document.createElement('div'); wrap.className = 'msg ' + role;
   const avatar = document.createElement('div'); avatar.className = 'msg-avatar';
@@ -2226,7 +2262,10 @@ function addMessage(role, content, showTicket, video, supportUrl) {
       return "<a href=" + url + " target=_blank rel=noopener class=link-pill style=margin:0>" + url + "</a>";
     });
     bubble.innerHTML = t;
-  } else { bubble.textContent = content; }
+  } else {
+    if (content) bubble.textContent = content;
+    if (userImg) { const im = document.createElement('img'); im.className = 'msg-img'; im.src = userImg; im.alt = 'attached image'; bubble.appendChild(im); }
+  }
   wrap.appendChild(avatar); wrap.appendChild(bubble); msgs.appendChild(wrap);
   if (role === 'assistant' && supportUrl) {
     const pillMap = {
@@ -2267,15 +2306,6 @@ function addMessage(role, content, showTicket, video, supportUrl) {
     a.className = 'link-pill'; a.href = supportUrl; a.target = '_blank'; a.rel = 'noopener';
     a.textContent = '↗ ' + pillLabel;
     lr.appendChild(a); msgs.appendChild(lr);
-  }
-  if (role === 'assistant' && showTicket) {
-    const tr = document.createElement('div'); tr.className = 'ticket-row';
-    var tb = document.createElement('button');
-    tb.className = 'ticket-btn';
-    tb.textContent = '🎫 This didn\u2019t solve my issue \u2014 raise a ticket';
-    tb.onclick = openTicket;
-    tr.appendChild(tb);
-    msgs.appendChild(tr);
   }
   if (role === 'assistant' && video) {
     const pr = document.createElement('div'); pr.className = 'video-pill-row';
@@ -2358,20 +2388,361 @@ function openHistory() { loadHistory(); document.getElementById('histOverlay').c
 function closeHistory() { document.getElementById('histOverlay').classList.remove('open'); document.getElementById('histDrawer').classList.remove('open'); }
 function openTopics() { document.getElementById('topicOverlay').classList.add('open'); document.getElementById('topicDrawer').classList.add('open'); }
 function closeTopics() { document.getElementById('topicOverlay').classList.remove('open'); document.getElementById('topicDrawer').classList.remove('open'); }
-function openTicket() { document.getElementById('ticketNote').value = ''; document.getElementById('ticketOverlay').classList.add('open'); }
-function closeTicket() { document.getElementById('ticketOverlay').classList.remove('open'); }
 
-async function submitTicket() {
-  const note = document.getElementById('ticketNote').value.trim();
-  const issue = messages.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
+// ─── TEAM (admin manage-team) ─────────────────────────────────────────────
+function teamEsc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function openTeam() { loadTeam(); document.getElementById('teamOverlay').classList.add('open'); document.getElementById('teamDrawer').classList.add('open'); }
+function closeTeam() { document.getElementById('teamOverlay').classList.remove('open'); document.getElementById('teamDrawer').classList.remove('open'); }
+async function loadTeam() {
+  const body = document.getElementById('teamBody');
+  if (!body) return;
+  if (!user || !user.venue_id) { body.innerHTML = '<div class="empty-history">No team to manage yet.</div>'; return; }
+  body.innerHTML = '<div class="empty-history">Loading&hellip;</div>';
   try {
-    await fetch(SERVER_URL + '/save-ticket', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: user.email, name: user.name, venue: user.venue, venue_id: user.venue_id || null, issue: 'Last question: ' + issue + (note ? ' | Extra detail: ' + note : ''), conversation: messages, status: 'open' })
-    });
-    closeTicket();
-    showToast("✓ Ticket raised — we'll be in touch!", "green");
-  } catch(e) { closeTicket(); showToast('Something went wrong, please try again.'); }
+    const r = await fetch(SERVER_URL + '/team-list', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id }) });
+    const data = await r.json();
+    const members = (data && data.members) || [];
+    if (!members.length) { body.innerHTML = '<div class="empty-history">No team members yet.</div>'; return; }
+    const isAdmin = user.role === 'admin';
+    const note = isAdmin
+      ? '<div class="team-note">Admins can add knowledge and manage the team. Promote a teammate to admin below.</div>'
+      : '<div class="team-note">Only admins can manage the team or add knowledge.</div>';
+    const rows = members.map(function(m) {
+      const me = (m.email || '').toLowerCase() === (user.email || '').toLowerCase();
+      const initial = ((m.name || m.email || '?').trim()[0] || '?').toUpperCase();
+      const roleLabel = m.role === 'admin' ? 'ADMIN' : 'STAFF';
+      let action = '';
+      if (me) {
+        action = '<span class="team-you">You</span>';
+      } else if (isAdmin) {
+        action = m.role === 'admin'
+          ? '<button class="team-action" data-action="setRole" data-email="' + teamEsc(m.email) + '" data-role="staff">Make staff</button>'
+          : '<button class="team-action" data-action="setRole" data-email="' + teamEsc(m.email) + '" data-role="admin">Make admin</button>';
+      }
+      return '<div class="team-item"><div class="team-av">' + teamEsc(initial) + '</div>' +
+        '<div class="team-meta"><div class="team-name">' + teamEsc(m.name || '\\u2014') + '</div>' +
+        '<div class="team-email">' + teamEsc(m.email || '') + '</div></div>' +
+        '<span class="team-role ' + (m.role === 'admin' ? 'admin' : 'staff') + '">' + roleLabel + '</span>' + action + '</div>';
+    }).join('');
+    body.innerHTML = note + rows;
+  } catch(e) { body.innerHTML = '<div class="empty-history">Couldn\\'t load team.</div>'; }
+}
+async function setMemberRole(email, role) {
+  if (!user || !user.venue_id) return;
+  try {
+    const r = await fetch(SERVER_URL + '/set-role', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, target_email: email, role: role, token: getAuthToken() }) });
+    const data = await r.json();
+    if (!data || !data.ok) { showToast((data && data.error) || 'Could not update role'); return; }
+    showToast('Role updated', 'green');
+    loadTeam();
+  } catch(e) { showToast('Could not update role'); }
+}
+
+// ─── SIGN OUT ─────────────────────────────────────────────────────────────
+function signOut() {
+  if (!confirm('Sign out of Stacked Chat?')) return;
+  localStorage.removeItem('stacked_user');
+  localStorage.removeItem('stacked_auth');
+  location.reload();
+}
+
+// ─── ADMIN EMAIL VERIFICATION (real login for admin powers) ───────────────
+let _pendingAdminAction = null;
+function getAuthToken() {
+  try {
+    const a = JSON.parse(localStorage.getItem('stacked_auth') || 'null');
+    if (a && a.token && a.email && user && a.email.toLowerCase() === (user.email || '').toLowerCase() && (Date.now() - (a.ts || 0) < 12 * 60 * 60 * 1000)) return a.token;
+  } catch(e) {}
+  return null;
+}
+function requireAdminVerify(fn) {
+  if (getAuthToken()) { fn(); return; }
+  _pendingAdminAction = fn;
+  openVerify();
+}
+function openVerify() {
+  if (!user) return;
+  document.getElementById('verifyEmail').textContent = user.email || 'your email';
+  document.getElementById('verifyStep1').style.display = 'block';
+  document.getElementById('verifyStep2').style.display = 'none';
+  document.getElementById('verifyCodeInput').value = '';
+  const b = document.getElementById('verifySendBtn'); if (b) { b.disabled = false; b.textContent = 'Send code'; }
+  document.getElementById('verifyOverlay').classList.add('open');
+}
+function closeVerify() { document.getElementById('verifyOverlay').classList.remove('open'); }
+async function sendAuthCode() {
+  if (!user || !user.email) return;
+  const btn = document.getElementById('verifySendBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Sending\\u2026'; }
+  try {
+    const r = await fetch(SUPABASE_URL + '/auth/v1/otp', { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY}, body: JSON.stringify({ email: user.email, create_user: true }) });
+    if (!r.ok) { const e = await r.json().catch(function(){return {};}); showToast(e.msg || 'Could not send code'); if (btn) { btn.disabled = false; btn.textContent = 'Send code'; } return; }
+    document.getElementById('verifyStep1').style.display = 'none';
+    document.getElementById('verifyStep2').style.display = 'block';
+    document.getElementById('verifyCodeInput').focus();
+  } catch(e) { showToast('Could not send code'); if (btn) { btn.disabled = false; btn.textContent = 'Send code'; } }
+}
+async function verifyAuthCode() {
+  const code = (document.getElementById('verifyCodeInput').value || '').trim();
+  if (code.length < 6) { showToast('Enter the code we emailed you'); return; }
+  // New users verify with type 'signup', existing users with 'email' — try both.
+  let auth = null;
+  for (const t of ['email', 'signup', 'magiclink']) {
+    try {
+      const r = await fetch(SUPABASE_URL + '/auth/v1/verify', { method:'POST', headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY}, body: JSON.stringify({ email: user.email, token: code, type: t }) });
+      const d = await r.json();
+      if (r.ok && d && d.access_token) { auth = d; break; }
+    } catch(e) {}
+  }
+  if (!auth) { showToast('That code didn\\'t work \\u2014 try again'); return; }
+  localStorage.setItem('stacked_auth', JSON.stringify({ email: user.email, token: auth.access_token, ts: Date.now() }));
+  closeVerify();
+  showToast('Verified \\u2713', 'green');
+  const fn = _pendingAdminAction; _pendingAdminAction = null; if (fn) fn();
+}
+
+// ─── ADD KNOWLEDGE ("+", admins only) ─────────────────────────────────────
+async function extractPdf(file) {
+  if (typeof pdfjsLib === 'undefined') throw new Error('PDF reader not loaded');
+  try { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; } catch(e) {}
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let out = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    out += tc.items.map(function(it){ return it.str; }).join(' ') + '\\n';
+  }
+  return out;
+}
+async function extractDocx(file) {
+  if (typeof mammoth === 'undefined') throw new Error('Doc reader not loaded');
+  const buf = await file.arrayBuffer();
+  const res = await mammoth.extractRawText({ arrayBuffer: buf });
+  return res.value || '';
+}
+async function extractImage(file) {
+  if (typeof Tesseract === 'undefined') throw new Error('Image reader not loaded');
+  const out = await Tesseract.recognize(file, 'eng');
+  return (out && out.data && out.data.text) ? out.data.text : '';
+}
+async function handleKbUpload(files) {
+  if (!files || !files.length) return;
+  if (!user || user.role !== 'admin') { showToast('Only admins can add knowledge'); return; }
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const nm = file.name.toLowerCase();
+    const isImage = /\\.(png|jpe?g|webp|gif|bmp)$/i.test(nm);
+    try {
+      showToast('Reading ' + file.name + '\\u2026');
+      let text = '';
+      if (nm.endsWith('.pdf')) text = await extractPdf(file);
+      else if (nm.endsWith('.docx') || nm.endsWith('.doc')) text = await extractDocx(file);
+      else if (isImage) { showToast('Reading text from ' + file.name + ' \\u2014 this can take a few seconds\\u2026'); try { text = await extractImage(file); } catch(e) { text = ''; } }
+      else text = await file.text();
+      text = (text || '').trim();
+
+      // For images, store the actual picture so the bot can DISPLAY it on request
+      // (not just answer from its OCR text). Reuses the menu-image library.
+      let imageStored = false;
+      if (isImage) {
+        try {
+          showToast('Saving image\\u2026');
+          const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          const path = 'images/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
+          const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'image/png', 'x-upsert':'true' }, body: file });
+          if (up.ok) {
+            const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+            const ir = await fetch(SERVER_URL + '/kb-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: file.name, description: text.slice(0, 300), venue_id: user.venue_id, token: getAuthToken() }) });
+            const id = await ir.json();
+            imageStored = !!(id && id.ok);
+          }
+        } catch(e) {}
+      }
+
+      // Keep the ORIGINAL file too, so the bot can hand over a shareable
+      // download link (e.g. forward a PDF to your boss) — not just the text.
+      let fileUrl = null;
+      try {
+        const safeD = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const dpath = 'docs/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safeD;
+        const dup = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + dpath, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert':'true' }, body: file });
+        if (dup.ok) fileUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + dpath;
+      } catch(e) {}
+
+      // Store the extracted text as a knowledge doc when there is enough to be useful.
+      let docStored = false;
+      if (text && text.length >= 10) {
+        const r = await fetch(SERVER_URL + '/kb-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ filename: file.name, content: text, venue_id: user.venue_id, token: getAuthToken(), file_url: fileUrl }) });
+        const data = await r.json();
+        docStored = !!(data && data.ok);
+      }
+
+      if (imageStored || docStored) {
+        hideWelcome();
+        let msg;
+        if (isImage && imageStored && docStored) msg = '\\u2705 Added **' + file.name + '** \\u2014 I can answer from it and show it when you ask.';
+        else if (isImage && imageStored) msg = '\\u2705 Added **' + file.name + '** \\u2014 ask to see it any time.';
+        else msg = '\\u2705 Added **' + file.name + '** to your knowledge base. I can answer questions from it now.';
+        addMessage('assistant', msg, false);
+        messages.push({ role:'assistant', content:'Added ' + file.name + '.' });
+      } else {
+        showToast('Could not add ' + file.name + ' \\u2014 nothing readable and image could not be saved');
+      }
+    } catch(e) { showToast('Could not add ' + file.name); }
+  }
+  const f = document.getElementById('kbFile'); if (f) f.value = '';
+}
+async function handleVideoUpload(files) {
+  if (!files || !files.length) return;
+  if (!user || user.role !== 'admin') { showToast('Only admins can add videos'); return; }
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    if (!file.type || file.type.indexOf('video') !== 0) { showToast('Not a video: ' + file.name); continue; }
+    if (file.size > 50 * 1024 * 1024) { showToast(file.name + ' is over 50MB \\u2014 too large'); continue; }
+    try {
+      showToast('Uploading ' + file.name + '\\u2026');
+      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
+      const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'video/mp4', 'x-upsert': 'true' },
+        body: file
+      });
+      if (!up.ok) { showToast('Video storage not set up yet'); continue; }
+      const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+      const r = await fetch(SERVER_URL + '/kb-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: file.name.replace(/\\.[^.]+$/, ''), venue_id: user.venue_id, token: getAuthToken() }) });
+      const data = await r.json();
+      if (data && data.ok) {
+        hideWelcome();
+        addMessage('assistant', '\\u2705 Added video **' + file.name + '** to your knowledge base.', false);
+      } else { showToast((data && data.error) || ('Could not add ' + file.name)); }
+    } catch(e) { showToast('Could not upload ' + file.name); }
+  }
+  const vf = document.getElementById('vidFile'); if (vf) vf.value = '';
+}
+function openVideoLink() {
+  document.getElementById('vidLinkUrl').value = '';
+  document.getElementById('vidLinkTitle').value = '';
+  document.getElementById('vidLinkOverlay').classList.add('open');
+}
+function closeVideoLink() { document.getElementById('vidLinkOverlay').classList.remove('open'); }
+async function handleVideoLink() {
+  const link = (document.getElementById('vidLinkUrl').value || '').trim();
+  const title = (document.getElementById('vidLinkTitle').value || '').trim();
+  if (!/^https?:\\/\\//i.test(link)) { showToast('Paste a valid video URL'); return; }
+  try {
+    const r = await fetch(SERVER_URL + '/kb-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: link, title: title || 'Video', venue_id: user.venue_id, token: getAuthToken() }) });
+    const d = await r.json();
+    if (!d || !d.ok) { showToast((d && d.error) || 'Could not add video'); return; }
+    closeVideoLink();
+    showToast('Video added', 'green');
+    hideWelcome();
+    addMessage('assistant', '\\u2705 Added a video to your knowledge base.', false);
+  } catch(e) { showToast('Could not add video'); }
+}
+
+// ─── DISH / MENU IMAGES (admin uploads named photos; bot shows them) ──────
+function renderDishImages(imgs) {
+  const msgs = document.getElementById('messages');
+  if (!msgs) return;
+  imgs.forEach(function(im) {
+    const row = document.createElement('div');
+    row.className = 'dish-img-row';
+    row.innerHTML = '<div class="dish-img-card"><img src="' + teamEsc(im.url) + '" alt="' + teamEsc(im.title || '') + '" loading="lazy"><div class="dish-img-cap">' + teamEsc(im.title || '') + '</div></div>';
+    msgs.appendChild(row);
+  });
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function renderDocFile(doc) {
+  const msgs = document.getElementById('messages');
+  if (!msgs || !doc || !doc.url) return;
+  const row = document.createElement('div');
+  row.className = 'doc-file-row';
+  const a = document.createElement('a');
+  a.className = 'doc-file-pill';
+  a.href = doc.url; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('download', '');
+  a.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span>Open / share &mdash; ' + teamEsc(doc.filename || 'document') + '</span>';
+  row.appendChild(a);
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+function openImgAdd() {
+  document.getElementById('imgTitle').value = '';
+  document.getElementById('imgDesc').value = '';
+  const f = document.getElementById('imgFile'); if (f) f.value = '';
+  document.getElementById('imgAddOverlay').classList.add('open');
+}
+function closeImgAdd() { document.getElementById('imgAddOverlay').classList.remove('open'); }
+async function submitImage() {
+  const title = (document.getElementById('imgTitle').value || '').trim();
+  const desc = (document.getElementById('imgDesc').value || '').trim();
+  const fileEl = document.getElementById('imgFile');
+  const file = fileEl && fileEl.files && fileEl.files[0];
+  if (!title) { showToast('Give the image a name'); return; }
+  if (!file) { showToast('Choose a photo'); return; }
+  if (file.size > 10 * 1024 * 1024) { showToast('Image is over 10MB \\u2014 too large'); return; }
+  try {
+    showToast('Uploading ' + file.name + '\\u2026');
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = 'images/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
+    const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'image/jpeg', 'x-upsert':'true' }, body: file });
+    if (!up.ok) { showToast('Image storage not set up yet'); return; }
+    const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+    const r = await fetch(SERVER_URL + '/kb-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: title, description: desc, venue_id: user.venue_id, token: getAuthToken() }) });
+    const d = await r.json();
+    if (!d || !d.ok) { showToast((d && d.error) || 'Could not add image'); return; }
+    closeImgAdd();
+    showToast('Image added', 'green');
+    hideWelcome();
+    addMessage('assistant', '\\u2705 Added **' + title + '** to your menu images \\u2014 ask to see it any time.', false);
+  } catch(e) { showToast('Could not add image'); }
+}
+
+// ─── ADMIN PANEL (scoped analytics + knowledge, admins only) ──────────────
+function openAdmin() { loadAdmin(); document.getElementById('adminOverlay').classList.add('open'); document.getElementById('adminDrawer').classList.add('open'); }
+function closeAdmin() { document.getElementById('adminOverlay').classList.remove('open'); document.getElementById('adminDrawer').classList.remove('open'); }
+async function loadAdmin() {
+  const bodyEl = document.getElementById('adminBody');
+  if (!bodyEl) return;
+  if (!user || !user.venue_id) { bodyEl.innerHTML = '<div class="empty-history">No workspace yet.</div>'; return; }
+  bodyEl.innerHTML = '<div class="empty-history">Loading&hellip;</div>';
+  try {
+    const r = await fetch(SERVER_URL + '/admin-summary', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, email: user.email }) });
+    const d = await r.json();
+    if (!d || !d.ok) { bodyEl.innerHTML = '<div class="empty-history">' + teamEsc((d && d.error) || 'Could not load admin') + '</div>'; return; }
+    const s = d.stats || {};
+    const card = function(n, l) { return '<div class="stat-card"><div class="stat-num">' + n + '</div><div class="stat-label">' + l + '</div></div>'; };
+    let stats = '<div class="stat-grid">' +
+      card(s.documents || 0, 'Documents') +
+      card(s.questions || 0, 'Questions asked') +
+      card(s.conversations || 0, 'Conversations') +
+      card(s.team || 0, 'Team members') +
+      (s.npsCount ? card((s.avgNps != null ? s.avgNps : '\\u2013') + '<span class="accent">/10</span>', 'Avg NPS (' + s.npsCount + ')') : '') +
+      '</div>';
+    const docs = d.docs || [];
+    let kb = '<div class="admin-section-label">Knowledge</div>';
+    if (!docs.length) {
+      kb += '<div class="team-note">No documents yet. Add a handbook, SOP or policy with the button below.</div>';
+    } else {
+      kb += docs.map(function(doc) {
+        const ext = ((doc.filename.split('.').pop()) || 'DOC').toUpperCase().slice(0, 4);
+        return '<div class="kb-row"><div class="kb-icon">' + teamEsc(ext) + '</div><div class="kb-name">' + teamEsc(doc.filename) + '</div><span class="kb-chunks">' + (doc.chunks || 0) + '</span><button class="kb-del" data-action="kbRemove" data-file="' + teamEsc(doc.filename) + '" title="Remove">\\u2715</button></div>';
+      }).join('');
+    }
+    const buttons = '<div class="admin-btn-row"><button class="admin-cta primary" data-action="kbAddClick">+ Add doc</button><button class="admin-cta primary" data-action="imgAddClick">+ Add image</button><button class="admin-cta primary" data-action="vidAddClick">+ Upload video</button><button class="admin-cta primary" data-action="vidLinkClick">+ Video link</button><button class="admin-cta ghost" data-action="openTeamFromAdmin">Manage team</button></div>';
+    bodyEl.innerHTML = '<div class="admin-section-label">Overview</div>' + stats + kb + buttons;
+  } catch(e) { bodyEl.innerHTML = '<div class="empty-history">Could not load admin.</div>'; }
+}
+async function kbRemove(filename) {
+  if (!confirm('Remove \"' + filename + '\" from your knowledge base?')) return;
+  try {
+    const r = await fetch(SERVER_URL + '/kb-remove', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, filename: filename, token: getAuthToken() }) });
+    const d = await r.json();
+    if (!d || !d.ok) { showToast((d && d.error) || 'Could not remove'); return; }
+    showToast('Removed', 'green');
+    loadAdmin();
+  } catch(e) { showToast('Could not remove'); }
 }
 
 function showToast(msg, type = '') {
@@ -3995,6 +4366,41 @@ button { font-family: inherit; cursor: pointer; }
 </body>
 </html>`;
 
+// ─── ADMIN LOGIN GATE ──────────────────────────────────────────────────────
+const ADMIN_LOGIN_PAGE = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Stacked · Team login</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#EDEBE5;font-family:system-ui,'Segoe UI',sans-serif;color:#211D18}
+  .box{background:#fff;border:1px solid #D6D2C8;border-radius:18px;padding:34px 32px;width:340px;box-shadow:0 8px 30px rgba(0,0,0,.06);text-align:center}
+  .em{font-size:11px;letter-spacing:2.5px;text-transform:uppercase;color:#E64E1A;font-weight:700;margin-bottom:6px}
+  h1{font-size:21px;margin:0 0 4px;letter-spacing:-.4px}
+  p{font-size:13px;color:#736C61;margin:0 0 20px}
+  input{width:100%;box-sizing:border-box;padding:12px 14px;border:1.5px solid #D6D2C8;border-radius:10px;font-size:15px;margin-bottom:12px;outline:none}
+  input:focus{border-color:#E64E1A}
+  button{width:100%;padding:12px;background:#E64E1A;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+  button:hover{background:#cf4316}
+  .err{color:#dc2626;font-size:13px;min-height:18px;margin-top:8px}
+</style></head><body>
+  <div class="box">
+    <div class="em">Stacked · Industry Intelligence</div>
+    <h1>Team login</h1>
+    <p>This dashboard is for the Stacked team only.</p>
+    <input id="pw" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')go()">
+    <button onclick="go()">Sign in</button>
+    <div class="err" id="err"></div>
+  </div>
+  <script>
+    async function go(){
+      const pw=document.getElementById('pw').value;
+      const err=document.getElementById('err'); err.textContent='';
+      try{
+        const r=await fetch('/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+        if(r.ok){ location.href='/admin'; } else { err.textContent='Incorrect password'; }
+      }catch(e){ err.textContent='Something went wrong, try again'; }
+    }
+    document.getElementById('pw').focus();
+  </script>
+</body></html>`;
+
 // ─── ADMIN PAGE ────────────────────────────────────────────────────────────
 const ADMIN_PAGE = `<!DOCTYPE html>
 <html lang="en">
@@ -4004,96 +4410,190 @@ const ADMIN_PAGE = `<!DOCTYPE html>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iODgiIHZpZXdCb3g9IjAgMCA1NiA4OCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNNTUuNDE1MiA2Mi45OTM1QzU1LjQzMzQgNjYuNzMxNyA1NC45MDYxIDcwLjA4MDkgNTMuODQwNyA3My4wMzM2QzUyLjc3MTYgNzUuOTkgNTEuMTA5NyA3OC41MjQ2IDQ4Ljg1NTIgODAuNjQxQzQ2LjU5NyA4Mi43NTc0IDQzLjczNTEgODQuMzc5MiA0MC4yNjIzIDg1LjQ5OTJDMzYuNzg5NiA4Ni42MTkyIDMyLjY1NSA4Ny4xOTAyIDI3Ljg2MjIgODcuMjEyQzIzLjA2OTQgODcuMjMwMiAxOC45MTY2IDg2LjY5NTYgMTUuNDExMSA4NS42MDQ3QzExLjkwMiA4NC41MTM4IDkuMDI1NjEgODIuOTE3NCA2Ljc3ODMxIDgwLjgxOTJDNC41MzEwMSA3OC43MjQ2IDIuODU4MjYgNzYuMjAwOSAxLjc2NzM0IDczLjI1NTRDMC42NzY0MjEgNzAuMzEgMC4xMjAwNTEgNjYuOTY4MSAwLjEwNTUwNiA2My4yMjk5TDQuOTgxNDVlLTA1IDQ5Ljk4NjFDLTAuMDA3MjIzIDQ4LjQwNDMgMC43ODE4NzcgNDcuNjExNSAyLjM2MDA4IDQ3LjYwNDJMMTEuOTA1NiA0Ny41NjQyQzEyLjUwOTMgNDguMTYwNiAxMy4xNzExIDQ4LjcwNjEgMTMuODgwMiA0OS4yMDQzQzE1Ljg2OTMgNTAuNTk3IDE4LjI5ODQgNTEuNTI3OSAyMS4xNjc2IDUxLjk5N0MyNC4wMzMxIDUyLjQ2MjUgMjcuMzQyMiA1Mi40MjYxIDMxLjA5MTMgNTEuODgwN0MzNC44NDQxIDUxLjMzNTIgMzguMDE1IDUwLjQzMzQgNDAuNjExNCA0OS4xNzE1QzQxLjY4NzggNDguNjQ3OSA0Mi42NzMzIDQ4LjA2NjEgNDMuNTY3OCA0Ny40Mjk3TDUyLjkzMTYgNDcuMzg5N0M1NC41MTM0IDQ3LjM4MjQgNTUuMzA2MSA0OC4xNjc5IDU1LjMxMzQgNDkuNzQ5N0w1NS40MTUyIDYyLjk5MzVaIiBmaWxsPSIjRTY1NDNBIi8+PHBhdGggZD0iTTQzLjU2OTQgNDcuNDMwN0M0Mi42NzQ4IDQ4LjA2NyA0MS42ODk0IDQ4LjY0ODkgNDAuNjEzIDQ5LjE3MjVDMzguMDE2NiA1MC40MzQzIDM0Ljg0NTcgNTEuMzM2MiAzMS4wOTI5IDUxLjg4MTZDMjcuMzQzOCA1Mi40MjcxIDI0LjAzNDYgNTIuNDYzNCAyMS4xNjkyIDUxLjk5OEMxOC4zIDUxLjUyODkgMTUuODcwOSA1MC41OTggMTMuODgxOCA0OS4yMDUyQzEzLjE3MjcgNDguNzA3IDEyLjUxMDkgNDguMTYxNiAxMS45MDcyIDQ3LjU2NTJMNDMuNTY5NCA0Ny40MzA3WiIgZmlsbD0iI0I3MzUxRiIvPjxwYXRoIGQ9Ik00OS44NjA5IDM3LjkxNjVDNDkuMzUxOCA0MC4zNDU3IDQ4LjMzIDQyLjUxMyA0Ni43OTkxIDQ0LjQyMjFDNDUuOTAwOSA0NS41MzQ4IDQ0LjgyNDUgNDYuNTM4NSA0My41NjYzIDQ3LjQyOTRMMTEuOTA0MSA0Ny41NjM5QzEwLjgwNTkgNDYuNDgzOSA5Ljg3ODYzIDQ1LjI0MDMgOS4xMjIyNiA0My44MzY2QzcuOTQwNDMgNDEuNjQ3NSA3LjEzNjc4IDM5LjA5NDcgNi43MTQ5NiAzNi4xNjc0TDUuMTY5NDkgMjUuODEwOUM0Ljk5MTMgMjQuNTc0NiA1LjUxODU4IDIzLjg2NTUgNi43NTQ5NiAyMy42ODczTDEyLjI2NDEgMjIuODg3M0MxMy4xMjIzIDIzLjUyMzYgMTQuMTAwNSAyNC4wODczIDE1LjE5MTQgMjQuNTc4MkMxNy4yODYgMjUuNTIgMTkuODIwNiAyNi4xNjM3IDIyLjc5ODggMjYuNTEyOEMyNS43NzM0IDI2Ljg1ODIgMjguMzgwNyAyNi44MTQ2IDMwLjYyMDcgMjYuMzgxOUMzMi44NjA3IDI1Ljk0NTUgMzQuNzU4OSAyNS4xNTY0IDM2LjMxODkgMjQuMDE0NkMzNy44NzUzIDIyLjg2OTEgMzkuMDk3MiAyMS40MjE4IDM5Ljk4NDQgMTkuNjY5MUM0MC4xMjYzIDE5LjM4NTQgNDAuMjYwOCAxOS4wOTgxIDQwLjM4MDggMTguOEw0Ni4zMjI3IDE3LjkzODFDNDcuNTU5MSAxNy43NTYzIDQ4LjI2NDUgMTguMjg3MiA0OC40NDY0IDE5LjUyMzZMNDkuOTg4MiAyOS44ODAxQzUwLjQxMzYgMzIuODAzNyA1MC4zNyAzNS40ODM4IDQ5Ljg2MDkgMzcuOTE2NVoiIGZpbGw9IiNFNjU0M0EiLz48cGF0aCBkPSJNNDAuMzgxMyAxOC44MDA4QzQwLjI2MTMgMTkuMDk5IDQwLjEyNjggMTkuMzg2MiAzOS45ODUgMTkuNjY5OUMzOS4wOTc3IDIxLjQyMjYgMzcuODc1OSAyMi44Njk5IDM2LjMxOTUgMjQuMDE1NEMzNC43NTk1IDI1LjE1NzIgMzIuODYxMyAyNS45NDYzIDMwLjYyMTIgMjYuMzgyN0MyOC4zODEyIDI2LjgxNTQgMjUuNzczOSAyNi44NTkxIDIyLjc5OTMgMjYuNTEzNkMxOS44MjExIDI2LjE2NDUgMTcuMjg2NSAyNS41MjA5IDE1LjE5MiAyNC41NzlDMTQuMTAxIDI0LjA4ODEgMTMuMTIyOCAyMy41MjQ1IDEyLjI2NDYgMjIuODg4MUw0MC4zODEzIDE4LjgwMDhaIiBmaWxsPSIjQjczNTFGIi8+PHBhdGggZD0iTTQyLjY1MDQgNS4zMzEyOEw0MS43MTk0IDEzLjU1NjhDNDEuNDkwNCAxNS41MDU5IDQxLjA0NjcgMTcuMjU1MSA0MC4zODEyIDE4LjgwMDVMMTIuMjY0NiAyMi44ODc5QzExLjQ3OTEgMjIuMzA2IDEwLjc4ODIgMjEuNjYyNCAxMC4xOTU0IDIwLjk2MDZDOC45NTkwNyAxOS40OTE0IDguMTExNzggMTcuODAwNSA3LjY1MzYgMTUuODkxNEM3LjE5OTA1IDEzLjk3ODcgNy4xMDgxMyAxMS44NjU5IDcuMzc3MjMgOS41NDIyNEw4LjMwODE1IDEuMzE2NjlDOC40MjQ1MSAwLjMzNDg2MiA4Ljk3MzYxIC0wLjA5Nzg2OTkgOS45NTE4IDAuMDE4NDk1MUw0MS4zNDg1IDMuNjg3NjNDNDIuMzMwNCAzLjgwMDM2IDQyLjc2MzEgNC4zNDk0NSA0Mi42NTA0IDUuMzMxMjhaIiBmaWxsPSIjRTY1NDNBIi8+PC9zdmc+Cg==">
 <title>Stacked Chat &mdash; Admin</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>if(typeof pdfjsLib!=='undefined')pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --orange:#E8622A;--orange-dark:#C44E1C;
-  --bg:#F7EDE0;--surface:#FFFFFF;--surface2:#F0E4D4;
-  --border:#E2D4C0;--border2:#D0C0A8;
-  --text:#1A1100;--text2:#6A5545;--text3:#A08870;
-  --green:#16a34a;--red:#dc2626;
-  --blue:var(--orange);
+  /* Legacy admin tokens (light theme) */
+  --blue:#E8573C;--bg:#EDEBE5;--surface:#ffffff;--surface2:#F5F3EF;--border:#D6D2C8;--border2:#C8C4BA;--text:#1A1A1A;--text2:#6B6867;--text3:#A8A49C;--green:#16a34a;--red:#dc2626;
+  /* Stacked design-system tokens — see colors_and_type.css */
+  --ink-900:#0A0A0A;--ink-800:#131313;--ink-700:#1D1D1D;
+  --fg:#F4EFE6;--fg-muted:#928A7C;--fg-dim:#555048;
+  --stacked-orange-500:#E87830;--stacked-orange-700:#A34F15;
+  --stacked-green-500:#3BD36F;--stacked-green-700:#1E8A44;
+  --stacked-amber-500:#F5A524;--stacked-red-500:#E5484D;
+  --stacked-purple-500:#C7B3F2;--stacked-purple-700:#1D1340;
+  --font-sans:'Geist',ui-sans-serif,system-ui,sans-serif;
+  --font-display:'Fraunces','Fraunces Placeholder',ui-serif,Georgia,serif;
+  --font-mono:'Geist Mono',ui-monospace,'SF Mono',monospace;
+  --ease:cubic-bezier(0.2,0.8,0.2,1);
 }
-body{background:var(--bg);font-family:'DM Sans',system-ui,sans-serif;color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;-webkit-font-smoothing:antialiased}
-header{background:var(--surface);border-bottom:1px solid var(--border);height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:100;box-shadow:0 1px 3px rgba(26,17,0,.06)}
-.header-left{display:flex;align-items:center;gap:20px}
-.wordmark{height:30px;max-width:180px;object-fit:contain;filter:brightness(0) saturate(100%) invert(44%) sepia(73%) saturate(700%) hue-rotate(334deg) brightness(107%)}
-.divider{width:1px;height:20px;background:var(--border)}
+body{background:var(--bg);font-family:'Inter',system-ui,sans-serif;color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+header{background:var(--surface);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;position:sticky;top:0;z-index:100}
+.header-left{display:flex;align-items:center;gap:16px}
+.wordmark{height:32px;max-width:200px;object-fit:contain;filter: brightness(0) saturate(100%) invert(44%) sepia(73%) saturate(700%) hue-rotate(334deg) brightness(107%);}
+.divider{width:1px;height:20px;background:var(--border2)}
 .header-nav{display:flex;align-items:center;gap:2px}
-.nav-item{padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;transition:all 0.12s;letter-spacing:0.01em}
+.nav-item{padding:5px 9px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;font-family:inherit;transition:all 0.1s;white-space:nowrap}
 .nav-item:hover{background:var(--surface2);color:var(--text)}
-.nav-item.active{background:var(--orange);color:#fff;font-weight:600}
-.nav-divider{width:1px;height:16px;background:var(--border);margin:0 6px}
-.sub-tab-bar{display:flex;gap:2px;margin:0 0 24px;border-bottom:1px solid var(--border);padding-bottom:0}
-.sub-tab{padding:8px 16px;border-radius:6px 6px 0 0;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:1px solid transparent;border-bottom:none;background:none;font-family:inherit;transition:all 0.12s;margin-bottom:-1px}
+.nav-item.active{background:var(--surface2);color:var(--text);font-weight:600}
+.nav-toggle{display:none;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 14px;cursor:pointer;color:var(--text);font-family:inherit;font-size:14px;font-weight:600;align-items:center;justify-content:center;gap:6px;height:38px;flex-shrink:0;transition:all 0.15s;line-height:1}
+.nav-toggle:hover{background:#FFF3EE;border-color:var(--blue);color:var(--blue)}
+.nav-toggle .x{display:none}
+.nav-toggle.open{background:var(--blue);border-color:var(--blue);color:#fff}
+.nav-toggle.open .bars{display:none}
+.nav-toggle.open .x{display:inline}
+.vlb{width:100%;border-collapse:collapse}
+.vlb th{text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)}
+.vlb th.r,.vlb td.r{text-align:right}
+.vlb td{padding:11px 14px;border-bottom:1px solid var(--surface2);font-size:13px;vertical-align:middle}
+.vlb tr.vr{cursor:pointer}
+.vlb tr.vr:hover{background:var(--surface2)}
+.vlb tr.vr.sel{background:#FFF3EE;box-shadow:inset 3px 0 0 var(--blue)}
+.npsp{display:inline-block;font-weight:700;font-size:12px;padding:2px 8px;border-radius:20px;font-variant-numeric:tabular-nums}
+.npsp.g{background:#E3F3E9;color:#16834a}.npsp.a{background:#FBEFD9;color:#b9750f}.npsp.r{background:#FBE3DF;color:#c0392b}
+.blk2{font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:700;margin:15px 0 9px}
+.vbar{height:8px;background:var(--surface2);border-radius:4px;overflow:hidden}.vbar i{display:block;height:100%;border-radius:4px}
+.vq{font-size:12px;color:var(--text2);background:var(--surface2);border-radius:6px;padding:7px 10px;margin-bottom:5px;border-left:2px solid #F8DBCC;line-height:1.4}
+.kwcloud{display:flex;flex-wrap:wrap;gap:7px 9px;align-items:center;padding:6px 4px}
+.kwchip{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 11px;color:var(--text);line-height:1.2}
+.kwchip b{color:var(--blue);font-weight:700;font-size:.8em;margin-left:2px}
+.nav-divider{width:1px;height:16px;background:var(--border2);margin:0 4px}
+.sub-tab-bar{display:flex;gap:4px;margin:16px 0 20px;border-bottom:1px solid var(--border);padding-bottom:0}
+.sub-tab{padding:7px 14px;border-radius:6px 6px 0 0;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;border:1px solid transparent;border-bottom:none;background:none;font-family:inherit;transition:all 0.1s;margin-bottom:-1px}
 .sub-tab:hover{color:var(--text);background:var(--surface2)}
 .sub-tab.active{background:var(--surface);color:var(--text);font-weight:600;border-color:var(--border);border-bottom-color:var(--surface)}
 .header-right{display:flex;align-items:center;gap:10px}
 .update-text{font-size:12px;color:var(--text3)}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-family:inherit;transition:all 0.12s}
-.btn:hover{border-color:var(--orange);color:var(--orange)}
-.btn-primary{background:var(--orange);color:#fff;border-color:var(--orange);font-weight:600}
-.btn-primary:hover{background:var(--orange-dark);border-color:var(--orange-dark);color:#fff}
-.container{max-width:1280px;margin:0 auto;padding:28px 28px}
-.page-header{margin-bottom:24px;display:flex;align-items:flex-start;justify-content:space-between}
-.page-title{font-size:20px;font-weight:700;color:var(--text);font-family:'Archivo Black',system-ui,sans-serif;letter-spacing:-0.01em}
-.page-sub{font-size:13px;color:var(--text3);margin-top:3px;font-weight:400}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-family:inherit;transition:all 0.1s}
+.btn:hover{border-color:var(--blue);color:var(--blue)}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-primary:hover{background:#0d8ae6;border-color:#0d8ae6;color:#fff}
+.container{max-width:1280px;margin:0 auto;padding:24px}
+.page-header{margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+.page-title{font-size:18px;font-weight:600;color:var(--text)}
+.page-sub{font-size:13px;color:var(--text3);margin-top:2px}
 .tab-panel{display:none}.tab-panel.active{display:block}
-.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px 22px}
-.kpi-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:8px}
-.kpi-value{font-size:30px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-0.5px;font-family:'Archivo Black',system-ui,sans-serif}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px}
+.kpi-label{font-size:12px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px}
+.kpi-value{font-size:28px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-0.5px}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-@media(max-width:900px){.grid-2,.kpi-grid{grid-template-columns:1fr}}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px}
-.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+/* ─── Responsive (tablet / mobile) ─── */
+@media (max-width: 1024px){
+  .container{padding:18px 16px}
+  .kpi-grid{grid-template-columns:repeat(2,1fr) !important}
+  .grid-2{grid-template-columns:1fr !important}
+}
+@media (max-width: 900px){
+  header{padding:10px 14px;height:auto;min-height:auto;flex-wrap:wrap;gap:8px;position:sticky;top:0}
+  .header-left{display:flex !important;align-items:center !important;justify-content:space-between !important;gap:10px;width:100%;min-width:0;flex-wrap:nowrap}
+  .header-right{display:flex;justify-content:flex-start;align-items:center;width:100%;gap:8px;font-size:12px}
+  .nav-toggle{display:inline-flex !important;flex-shrink:0}
+  .divider{display:none}
+  .wordmark{height:24px}
+  /* nav becomes a dropdown panel below the header, hidden by default */
+  .header-nav{display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:0 8px 24px rgba(0,0,0,0.08);flex-direction:column;align-items:stretch;gap:0;padding:8px 12px 12px;z-index:99}
+  .header-nav.open{display:flex}
+  .nav-divider{display:none}
+  .nav-item{width:100%;text-align:left;padding:11px 14px;font-size:14px;border-radius:8px;font-weight:500;white-space:nowrap}
+  .nav-item.active{background:#FFF3EE;color:var(--blue)}
+  header{position:sticky;top:0}
+  .container{padding:14px 14px 60px}
+  .page-header{flex-direction:column;align-items:flex-start;gap:10px;margin-bottom:14px}
+  .page-header > .btn,.page-header > button{align-self:stretch}
+  .page-title{font-size:18px !important}
+  .card{border-radius:12px}
+  /* tables that need scrolling get a wrapper with overflow-x */
+  .card > div{max-width:100%}
+  #signupsTable,#convsTable,#npsTable{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  #signupsTable table,#convsTable table,#npsTable table{min-width:560px}
+  /* vendor leaderboard + detail panel: stack with inline-style override */
+  .tab-panel .grid-2[style*="1.55fr"],.tab-panel .grid-2[style*="1fr 1fr"]{grid-template-columns:1fr !important}
+  /* vendor leaderboard fits natively — table responsive, no horizontal scroll */
+  #vendorTable{overflow-x:visible}
+  #vendorTable .vlb{width:100%;table-layout:auto}
+  #vendorTable .vlb th,#vendorTable .vlb td{padding:10px 10px}
+  /* detail panel padding tighter on mobile */
+  #vendorDetail{padding:0}
+  .vbar{height:7px}
+}
+@media (max-width: 600px){
+  .container{padding:12px 10px 60px}
+  .kpi-grid{grid-template-columns:1fr 1fr !important;gap:10px}
+  .kpi{padding:12px 14px}
+  .kpi-value{font-size:22px !important}
+  .kpi-label{font-size:10.5px}
+  .nav-item{font-size:12px;padding:5px 9px}
+  .update-text{display:none}
+  .card-header{padding:12px 14px;flex-wrap:wrap;gap:6px}
+  .card-title{font-size:13px !important}
+  .card-meta{font-size:10px}
+  th{font-size:9.5px !important;padding:8px 10px !important}
+  /* vendor leaderboard on phone: hide Category + Convos columns, keep Vendor + Mentions + NPS */
+  #vendorTable .vlb th:nth-child(2),#vendorTable .vlb td:nth-child(2){display:none}
+  #vendorTable .vlb th:nth-child(4),#vendorTable .vlb td:nth-child(4){display:none}
+  #vendorTable .vlb th{padding:8px 8px !important}
+  #vendorTable .vlb td{padding:11px 8px !important}
+  /* vendor detail: tighter NPS rows, smaller labels */
+  #vendorDetail{font-size:12px}
+  #vendorDetail > div:first-child > div:first-child{font-size:16px !important}
+  .blk2{margin:12px 0 7px !important}
+  .vq{font-size:11.5px;padding:6px 9px}
+  td{padding:9px 10px !important;font-size:12px}
+  .kwchip{font-size:11px !important}
+  .conv-item{padding:10px 12px}
+  /* gaps tab: keep 3 KPIs but smaller */
+  #tab-gaps .kpi-grid{grid-template-columns:repeat(3,1fr) !important;gap:6px}
+  #tab-gaps .kpi{padding:9px 10px}
+  #tab-gaps .kpi-value{font-size:18px !important}
+}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)}
 .card-title{font-size:13px;font-weight:600;color:var(--text)}
 .card-meta{font-size:12px;color:var(--text3)}
-.data-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)}
+.data-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border)}
 .data-row:last-child{border-bottom:none}
 .rank{font-size:11px;font-weight:600;color:var(--text3);width:20px;flex-shrink:0;text-align:right}
-.rank.hi{color:var(--orange)}
+.rank.hi{color:var(--blue)}
 .data-label{font-size:13px;font-weight:500;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:capitalize}
 .bar-outer{width:80px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;flex-shrink:0}
-.bar-inner{height:100%;border-radius:2px;background:var(--orange);transition:width 0.6s ease}
-.bar-inner.alt{background:#b0a090}
+.bar-inner{height:100%;border-radius:2px;background:var(--blue);transition:width 0.6s ease}
+.bar-inner.alt{background:#64748b}
 .data-count{font-size:12px;font-weight:600;color:var(--text2);width:24px;text-align:right;flex-shrink:0}
 .chart-wrap{position:relative;height:200px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 thead tr{border-bottom:1px solid var(--border)}
-th{text-align:left;padding:9px 14px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;white-space:nowrap}
-td{padding:11px 14px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
+th{text-align:left;padding:8px 12px;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.05em;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}
 tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:var(--surface2)}
 .td-primary{color:var(--text);font-weight:500}
 .td-muted{font-size:12px;color:var(--text3);margin-top:2px}
 .td-truncate{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;letter-spacing:0.02em}
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;letter-spacing:0.02em}
 .badge.open{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
 .badge.closed{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
 .badge.escalated{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
-.close-btn{padding:4px 10px;font-size:11px;font-weight:600;border-radius:5px;border:1px solid var(--green);color:var(--green);background:none;cursor:pointer;font-family:inherit;transition:all 0.12s}
+.close-btn{padding:4px 10px;font-size:11px;font-weight:600;border-radius:4px;border:1px solid var(--green);color:var(--green);background:none;cursor:pointer;font-family:inherit;transition:all 0.1s}
 .close-btn:hover{background:var(--green);color:#fff}
-.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:18px;flex-wrap:wrap}
-.filter-btn{padding:6px 13px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-family:inherit;transition:all 0.12s}
-.filter-btn:hover{border-color:var(--orange);color:var(--orange)}
-.filter-btn.active{background:var(--orange);color:#fff;border-color:var(--orange)}
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.filter-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font-family:inherit;transition:all 0.1s}
+.filter-btn:hover{border-color:var(--blue);color:var(--blue)}
+.filter-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
 .filter-btn.red-active.active{background:var(--red);border-color:var(--red)}
 .kpi.red .kpi-value{color:var(--red)}
-.conv-thread{display:none;margin-top:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:240px;overflow-y:auto}
+.conv-thread{display:none;margin-top:8px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:240px;overflow-y:auto}
 .conv-item.open .conv-thread{display:block}
-.conv-item{cursor:pointer;padding:12px 0;border-bottom:1px solid var(--border)}
+.conv-item{cursor:pointer;padding:10px 0;border-bottom:1px solid var(--border)}
 .conv-item:last-child{border-bottom:none}
 .thread-msg{display:flex;gap:8px;margin-bottom:8px}
 .thread-msg:last-child{margin-bottom:0}
 .thread-role{font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);width:44px;flex-shrink:0;padding-top:2px}
-.thread-role.user{color:var(--orange)}
+.thread-role.user{color:var(--blue)}
 .thread-content{font-size:12px;color:var(--text2);line-height:1.5}
-.venue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-.venue-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px}
+.venue-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.venue-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px}
 .venue-card-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .venue-pill{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
 .venue-stats{display:flex;gap:16px;margin-top:8px}
@@ -4101,71 +4601,76 @@ tbody tr:hover td{background:var(--surface2)}
 .venue-stat-num{font-size:18px;font-weight:700;color:var(--text);line-height:1}
 .venue-stat-label{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:0.05em}
 .venue-last{font-size:11px;color:var(--text3);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.conv-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.conv-item:last-child{border-bottom:none}
 .conv-top{display:flex;align-items:center;gap:8px;margin-bottom:3px}
 .conv-name{font-size:13px;font-weight:600;color:var(--text)}
 .conv-venue{font-size:11px;background:var(--surface2);color:var(--text3);padding:1px 7px;border-radius:4px;border:1px solid var(--border)}
 .conv-date{font-size:11px;color:var(--text3);margin-left:auto}
 .conv-preview{font-size:12px;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.drop-zone{border:2px dashed var(--border2);border-radius:10px;padding:36px;text-align:center;cursor:pointer;transition:all 0.15s}
-.drop-zone:hover,.drop-zone.dragging{border-color:var(--orange);background:#FFF5EE}
+.drop-zone{border:1px dashed var(--border2);border-radius:8px;padding:32px;text-align:center;cursor:pointer;transition:all 0.15s}
+.drop-zone:hover,.drop-zone.dragging{border-color:var(--blue);background:#FFF0EE}
 .drop-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px;margin-top:8px}
 .drop-sub{font-size:12px;color:var(--text3)}
-.doc-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)}
+.doc-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
 .doc-row:last-child{border-bottom:none}
 .doc-left{display:flex;align-items:center;gap:10px}
-.doc-icon{width:30px;height:30px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.doc-icon{width:28px;height:28px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
 .doc-name{font-size:13px;font-weight:500;color:var(--text)}
 .doc-date{font-size:11px;color:var(--text3);margin-top:1px}
 .doc-right{display:flex;align-items:center;gap:8px}
-.badge-indexed{font-size:11px;font-weight:600;color:var(--green);background:#dcfce7;border:1px solid #bbf7d0;padding:2px 8px;border-radius:5px}
-.btn-del{padding:4px 10px;font-size:11px;font-weight:500;border:1px solid var(--border2);border-radius:5px;background:none;color:var(--text3);cursor:pointer;font-family:inherit;transition:all 0.12s}
+.badge-indexed{font-size:11px;font-weight:600;color:var(--green);background:#dcfce7;border:1px solid #bbf7d0;padding:2px 8px;border-radius:4px}
+.btn-del{padding:4px 10px;font-size:11px;font-weight:500;border:1px solid var(--border2);border-radius:4px;background:none;color:var(--text3);cursor:pointer;font-family:inherit;transition:all 0.1s}
 .btn-del:hover{border-color:var(--red);color:var(--red)}
-.upload-item{padding:9px 13px;background:var(--surface2);border-radius:7px;font-size:12px;margin-bottom:6px;border:1px solid var(--border)}
+.upload-item{padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:12px;margin-bottom:6px;border:1px solid var(--border)}
 .prog-wrap{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
-.prog-bar{height:100%;background:var(--orange);width:0;border-radius:2px;transition:width 0.3s}
-.toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:11px 18px;border-radius:8px;font-size:13px;font-weight:500;transform:translateY(60px);opacity:0;transition:all 0.25s;z-index:999;box-shadow:0 4px 16px rgba(26,17,0,.18)}
+.prog-bar{height:100%;background:var(--blue);width:0;border-radius:2px;transition:width 0.3s}
+.toast{position:fixed;bottom:20px;right:20px;background:#1e293b;color:#fff;padding:10px 16px;border-radius:6px;font-size:13px;font-weight:500;transform:translateY(60px);opacity:0;transition:all 0.25s;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,0.15)}
 .toast.show{transform:translateY(0);opacity:1}
-.toast.green{background:#166534}
+.toast.green{background:var(--green)}
 .toast.red{background:var(--red)}
-.empty{text-align:center;padding:40px 16px;color:var(--text3);font-size:13px}
-.shimmer{display:inline-block;height:28px;width:48px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200%;animation:shimmer 1.2s infinite;border-radius:5px}
+.empty{text-align:center;padding:32px 16px;color:var(--text3);font-size:13px}
+.shimmer{display:inline-block;height:28px;width:48px;background:linear-gradient(90deg,var(--surface2) 25%,var(--border) 50%,var(--surface2) 75%);background-size:200%;animation:shimmer 1.2s infinite;border-radius:4px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .video-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
-.video-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:box-shadow .15s}
-.video-card:hover{box-shadow:0 4px 16px rgba(26,17,0,.08)}
-.video-drop-zone{border:2px dashed var(--border2);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:16px}
-.video-drop-zone:hover,.video-drop-zone.drag-over{border-color:var(--orange);background:#FFF5EE}
+.video-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:box-shadow .15s}
+.video-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.video-drop-zone{border:2px dashed var(--border2);border-radius:8px;padding:32px;text-align:center;cursor:pointer;transition:all .15s;margin-bottom:16px}
+.video-drop-zone:hover,.video-drop-zone.drag-over{border-color:var(--blue);background:#FFF0EE}
 .video-thumb{width:100%;aspect-ratio:16/9;object-fit:cover;background:#000;display:block;cursor:pointer}
 .video-thumb-empty{width:100%;aspect-ratio:16/9;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:36px;cursor:pointer}
-.video-info{padding:14px}
+.video-info{padding:12px}
 .video-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .video-desc{font-size:11px;color:var(--text3);margin-bottom:8px}
 .video-footer{display:flex;align-items:center;justify-content:space-between}
 .vbadge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase}
 .vbadge.youtube{background:#fee2e2;color:#dc2626}.vbadge.mp4{background:#dbeafe;color:#1d4ed8}
-.vmodal{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.vmodal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
 .vmodal-box{background:var(--surface);border-radius:12px;overflow:hidden;width:100%;max-width:860px}
-.vmodal-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.vmodal-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
 .vmodal-title{font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:12px}
 .vmodal-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--text3);padding:4px 8px;line-height:1}
 .vmodal-body{background:#000}
 .vmodal-body iframe,.vmodal-body video{display:block;width:100%;aspect-ratio:16/9}
-input[type=text],input[type=url],input[type=email],textarea,select{font-family:'DM Sans',system-ui,sans-serif}
 </style>
 </head>
 <body>
 <header>
   <div class="header-left">
     <img class="wordmark" src="https://raw.githubusercontent.com/TOT-STACKED/toast-support-bot/main/assets/Stacked%20(3).svg" alt="Stacked">
+    <button class="nav-toggle" id="navToggle" onclick="toggleNav()" aria-label="Menu"><span class="bars">&#9776; Menu</span><span class="x">&times; Close</span></button>
     <div class="divider"></div>
-    <nav class="header-nav">
+    <nav class="header-nav" id="headerNav">
       <button class="nav-item active" onclick="showTab('dashboard')">Dashboard</button>
       <div class="nav-divider"></div>
-      <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
-      <button class="nav-item" onclick="showTab('venues')">Venues</button>
+      <button class="nav-item" onclick="showTab('vendors')">Vendors</button>
+      <button class="nav-item" onclick="showTab('questions')">Questions</button>
+      <button class="nav-item" onclick="showTab('gaps')">Gaps</button>
+      <button class="nav-item" onclick="showTab('adoption')">Adoption</button>
       <div class="nav-divider"></div>
+      <button class="nav-item" onclick="showTab('signups')">Sign-ups</button>
+      <button class="nav-item" onclick="showTab('conversations')">Conversations</button>
       <button class="nav-item" onclick="showTab('content')">Content</button>
-      <button class="nav-item" onclick="showTab('surveys')">Surveys</button>
     </nav>
   </div>
   <div class="header-right">
@@ -4194,18 +4699,94 @@ input[type=text],input[type=url],input[type=email],textarea,select{font-family:'
     <div class="card"><div class="card-header"><span class="card-title">Recent conversations</span><button class="btn" onclick="showTab('conversations')">View all &rarr;</button></div><div id="recentConvs"><div class="empty">No conversations yet</div></div></div>
   </div>
 
+  <div class="tab-panel" id="tab-vendors">
+    <div class="page-header">
+      <div><div class="page-title">Vendor Intelligence</div><div class="page-sub">What operators experience across your tech partners &mdash; aggregated &amp; anonymised across all venues</div></div>
+      <button class="btn" onclick="exportVendorCSV()">&#x2193; Export CSV</button>
+    </div>
+    <div class="grid-2" style="grid-template-columns:1.55fr 1fr;align-items:start">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Tech partner leaderboard</span><span class="card-meta">Ranked by mentions</span></div>
+        <div id="vendorTable"><div class="empty">Loading&hellip;</div></div>
+      </div>
+      <div class="card" style="padding:18px 20px"><div id="vendorDetail"><div class="empty">Select a vendor to drill in</div></div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-questions">
+    <div class="page-header">
+      <div><div class="page-title">Operator Questions</div><div class="page-sub">What UK hospitality is asking &mdash; themes &amp; trending terms across all venues, anonymised</div></div>
+      <button class="btn" onclick="exportQuestionsCSV()">&#x2193; Export CSV</button>
+    </div>
+    <div class="grid-2" style="grid-template-columns:1fr 1fr;align-items:start">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Question themes</span><span class="card-meta">By category</span></div>
+        <div id="qThemes"><div class="empty">Loading&hellip;</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Trending terms</span><span class="card-meta">Most-used words in questions</span></div>
+        <div id="qKeywords"><div class="empty">Loading&hellip;</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-gaps">
+    <div class="page-header">
+      <div><div class="page-title">Knowledge Gaps</div><div class="page-sub">Questions the bot couldn&rsquo;t fully answer &mdash; your content &amp; product to-do list</div></div>
+      <button class="btn" onclick="exportGapsCSV()">&#x2193; Export CSV</button>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="kpi-label">Unanswered questions</div><div class="kpi-value" id="gapTotal"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Of all questions</div><div class="kpi-value" id="gapPct"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Showing</div><div class="kpi-value" id="gapShown"><span class="shimmer"></span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Recent unanswered questions</span><span class="card-meta">Add the missing knowledge to close these</span></div>
+      <div id="gapsList"><div class="empty">Loading&hellip;</div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-adoption">
+    <div class="page-header">
+      <div><div class="page-title">Adoption</div><div class="page-sub">How Stacked Chat is spreading across operators</div></div>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi"><div class="kpi-label">Total venues</div><div class="kpi-value" id="adTotal"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Active (30 days)</div><div class="kpi-value" id="adActive"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">New (30 days)</div><div class="kpi-value" id="adNew"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Avg questions / venue</div><div class="kpi-value" id="adAvg"><span class="shimmer"></span></div></div>
+    </div>
+    <div class="grid-2" style="align-items:start">
+      <div class="card">
+        <div class="card-header"><span class="card-title">Venues onboarded</span><span class="card-meta">Last 6 months</span></div>
+        <div id="adOnboard"><div class="empty">Loading&hellip;</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title">Most active venues</span><span class="card-meta">By messages</span></div>
+        <div id="adTopVenues"><div class="empty">Loading&hellip;</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tab-signups">
+    <div class="page-header">
+      <div><div class="page-title">Sign-ups</div><div class="page-sub">Everyone who has signed in to Stacked Chat &mdash; with their contact details</div></div>
+      <button class="btn" onclick="exportSignupsCSV()">&#x2193; Export CSV</button>
+    </div>
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="kpi-label">Total sign-ups</div><div class="kpi-value" id="suTotal"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Last 30 days</div><div class="kpi-value" id="suRecent"><span class="shimmer"></span></div></div>
+      <div class="kpi"><div class="kpi-label">Most recent</div><div class="kpi-value" id="suLatest" style="font-size:18px;padding-top:4px"><span class="shimmer"></span></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">All sign-ups</span><span class="card-meta">Newest first</span></div>
+      <div id="signupsTable"><div class="empty">Loading&hellip;</div></div>
+    </div>
+  </div>
 
   <div class="tab-panel" id="tab-conversations">
     <div class="page-header"><div><div class="page-title">Conversations</div><div class="page-sub" id="convCount">&mdash;</div></div></div>
     <div class="card"><div id="convsTable"><div class="empty">Loading...</div></div></div>
-  </div>
-
-  <div class="tab-panel" id="tab-venues">
-    <div class="page-header">
-      <div><div class="page-title">Venues</div><div class="page-sub" id="venueCount">&mdash;</div></div>
-      <button class="btn btn-primary" onclick="showBrandingModal()">+ Set up branding</button>
-    </div>
-    <div id="venueGrid" class="venue-grid"><div class="empty">Loading...</div></div>
   </div>
 
   <!-- Branding Modal -->
@@ -4357,19 +4938,6 @@ input[type=text],input[type=url],input[type=email],textarea,select{font-family:'
     <!-- ── KNOWLEDGE BASE PANEL ──────────────────────────────────── -->
     <div id="contentDocs" style="display:none">
     <div class="card" style="margin-bottom:16px">
-      <div class="card-header">
-        <span class="card-title"><svg width="16" height="16" viewBox="0 0 87.3 78" style="vertical-align:-2px;margin-right:6px" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg> Google Drive / Docs</span>
-        <span class="card-meta">Paste a sharing link — imports Google Docs, Sheets, or Drive files</span>
-      </div>
-      <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <input id="driveUrl" type="url" placeholder="https://docs.google.com/document/d/..." style="flex:2;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-        <input id="driveName" type="text" placeholder="Label (optional)" style="flex:1;min-width:160px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
-        <button class="btn btn-primary" id="driveBtn" onclick="importDriveDoc()">&#x2B07; Import</button>
-      </div>
-      <div style="font-size:12px;color:var(--text3)">File must be shared as <strong>Anyone with the link can view</strong>. Supports Google Docs, Sheets (imported as CSV text), and shared Drive files.</div>
-      <div id="driveStatus" style="margin-top:8px;font-size:13px;color:var(--text3)"></div>
-    </div>
-    <div class="card" style="margin-bottom:16px">
       <div class="card-header"><span class="card-title">&#x1F310; Scrape vendor help centres</span><span class="card-meta">Fetch and index docs directly from vendor support sites</span></div>
       <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
         <input id="scrapeUrl" type="url" placeholder="https://help.lightspeedhq.com/hc/en-gb/articles/..." style="flex:2;min-width:240px;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">
@@ -4403,9 +4971,9 @@ input[type=text],input[type=url],input[type=email],textarea,select{font-family:'
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropFiles(event)">
         <div style="font-size:28px">&#x1F4C4;</div>
         <div class="drop-title">Drop files to index</div>
-        <div class="drop-sub">Supports .txt, .md and .pdf &mdash; up to 10MB each</div>
+        <div class="drop-sub">Supports .txt and .md &mdash; up to 10MB each</div>
       </div>
-      <input type="file" id="fileInput" multiple accept=".txt,.md,.pdf" style="display:none" onchange="handleFiles(this.files)">
+      <input type="file" id="fileInput" multiple accept=".txt,.md" style="display:none" onchange="handleFiles(this.files)">
       <div id="uploadList" style="margin-top:12px"></div>
       <div style="margin-top:16px;margin-bottom:8px;display:flex;gap:8px">
         <input type="text" id="docSearch" placeholder="Search knowledge base..." oninput="filterDocs(this.value)" style="flex:1;padding:8px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);outline:none">
@@ -4416,69 +4984,6 @@ input[type=text],input[type=url],input[type=email],textarea,select{font-family:'
     </div><!-- end #contentDocs -->
 
   </div><!-- end #tab-content -->
-
-  <!-- ── SURVEYS PANEL ──────────────────────────────────────── -->
-  <div class="tab-panel" id="tab-surveys">
-    <div class="page-header">
-      <div><div class="page-title">Surveys</div><div class="page-sub">Build and share surveys to collect feedback from venues</div></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="showSurveyBuilder(null)">+ New survey</button>
-      </div>
-    </div>
-
-    <!-- Sub-tab bar -->
-    <div class="filter-bar" id="surveySubTabs">
-      <button class="filter-btn active" id="stSurveyList" onclick="showSurveySubTab('list')">All surveys</button>
-      <button class="filter-btn" id="stSurveyBuilder" onclick="showSurveySubTab('builder')">Builder</button>
-      <button class="filter-btn" id="stSurveyResults" onclick="showSurveySubTab('results')" style="display:none">Results</button>
-    </div>
-
-    <!-- Survey list -->
-    <div id="surveyListPanel">
-      <div class="card">
-        <div id="surveysTable"><div class="empty">Loading surveys...</div></div>
-      </div>
-    </div>
-
-    <!-- Survey builder -->
-    <div id="surveyBuilderPanel" style="display:none">
-      <div class="card" style="margin-bottom:16px">
-        <div class="card-header"><span class="card-title" id="builderTitle">New survey</span></div>
-        <div style="display:flex;flex-direction:column;gap:12px">
-          <input id="surveyTitle" type="text" placeholder="Survey title (required)" style="padding:10px 12px;border:1px solid var(--border2);border-radius:6px;font-size:14px;font-family:inherit;color:var(--text);background:var(--bg);width:100%">
-          <textarea id="surveyDesc" placeholder="Description (optional)" rows="2" style="padding:10px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);resize:vertical;width:100%"></textarea>
-        </div>
-      </div>
-
-      <div id="qList" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px"></div>
-
-      <div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">
-        <button class="btn" onclick="addSurveyQuestion('short_text')">+ Short text</button>
-        <button class="btn" onclick="addSurveyQuestion('long_text')">+ Long text</button>
-        <button class="btn" onclick="addSurveyQuestion('multiple_choice')">+ Multiple choice</button>
-        <button class="btn" onclick="addSurveyQuestion('rating')">+ Rating (1–5)</button>
-        <button class="btn btn-primary" id="saveSurveyBtn" onclick="saveSurvey()" style="margin-left:auto">Save survey</button>
-      </div>
-
-      <!-- Recipients section (shown after save) -->
-      <div id="surveyRecipientsSection" style="display:none">
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header"><span class="card-title">Share survey links</span><span class="card-meta">Links are unique per recipient — no login required</span></div>
-          <textarea id="recipientEmails" placeholder="Enter email addresses, one per line" rows="4" style="width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:6px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);resize:vertical;margin-bottom:10px"></textarea>
-          <button class="btn btn-primary" onclick="generateSurveyLinks()">Generate links</button>
-          <div id="generatedLinks" style="margin-top:14px"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Results view -->
-    <div id="surveyResultsPanel" style="display:none">
-      <div style="margin-bottom:12px">
-        <button class="btn" onclick="showSurveySubTab(\'list\')">&#x2190; Back to surveys</button>
-      </div>
-      <div id="surveyResultsContent"><div class="empty">Loading results...</div></div>
-    </div>
-  </div>
 
 </div>
 
@@ -4492,10 +4997,20 @@ input[type=text],input[type=url],input[type=email],textarea,select{font-family:'
 
 <script>
 function showTab(id) {
-  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','conversations','venues','content','surveys'][i]===id));
+  document.querySelectorAll('.nav-item').forEach((t,i) => t.classList.toggle('active', ['dashboard','vendors','questions','gaps','adoption','signups','conversations','content'][i]===id));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id==='tab-'+id));
   if (id==='content') loadVideos();
-  if (id==='surveys') loadSurveys();
+  // close mobile hamburger menu on tab pick
+  const nav = document.getElementById('headerNav');
+  const tog = document.getElementById('navToggle');
+  if (nav && nav.classList.contains('open')) { nav.classList.remove('open'); if (tog) tog.classList.remove('open'); }
+}
+function toggleNav() {
+  const nav = document.getElementById('headerNav');
+  const tog = document.getElementById('navToggle');
+  if (!nav) return;
+  nav.classList.toggle('open');
+  if (tog) tog.classList.toggle('open');
 }
 function showContentTab(sub) {
   const showVideos = sub === 'videos';
@@ -4534,38 +5049,6 @@ async function doScrapeUrl() {
     }
   } catch(e) { notify('Error: ' + e.message, 'red'); st.style.color='#ef4444'; st.textContent='\u274C '+e.message; }
   btn.disabled = false; btn.textContent = '\uD83D\uDCE5 Scrape';
-}
-
-async function importDriveDoc() {
-  const url = document.getElementById('driveUrl').value.trim();
-  const name = document.getElementById('driveName').value.trim();
-  const status = document.getElementById('driveStatus');
-  const btn = document.getElementById('driveBtn');
-  if (!url) { notify('Paste a Google Drive or Docs link', 'red'); return; }
-  btn.disabled = true; btn.textContent = 'Importing...';
-  status.style.color = 'var(--text3)';
-  status.textContent = 'Fetching from Google Drive...';
-  try {
-    const r = await fetch('/scrape', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ url, vendor: name || undefined }) });
-    const data = await r.json();
-    if (data.ok) {
-      status.style.color = 'var(--green,#22c55e)';
-      status.textContent = '✅ Indexed ' + data.chunks + ' chunks (' + Math.round((data.chars||0)/1000) + 'k chars) as "' + data.filename + '"';
-      notify('Google Drive doc imported!', 'green');
-      document.getElementById('driveUrl').value = '';
-      document.getElementById('driveName').value = '';
-      setTimeout(loadAnalytics, 1000);
-    } else {
-      status.style.color = '#ef4444';
-      status.textContent = '❌ ' + (data.error || 'Import failed');
-      notify('Import failed', 'red');
-    }
-  } catch(e) {
-    status.style.color = '#ef4444';
-    status.textContent = '❌ ' + e.message;
-    notify('Import failed', 'red');
-  }
-  btn.disabled = false; btn.textContent = '⬇ Import';
 }
 
 async function quickScrape(url, vendor, btn) {
@@ -4668,95 +5151,213 @@ async function loadAnalytics() {
         '<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--red);margin-right:4px"></span>Detractors (0-6)</span>' +
         '</div>';
     }
-    renderVenues(a.venueStats || []);
+    renderVendorIntel(a.vendorIntel || []);
+    renderOperatorQuestions(a.topTopics || [], a.topKeywords || []);
+    renderKnowledgeGaps(a.knowledgeGaps || [], a.knowledgeGapCount || 0, a.totalMessages || 0);
+    renderAdoption(a.adoption || {});
+    renderSignups(a.leads || []);
     renderDocs(a.docs);
   } catch(e) { notify('Failed: '+e.message,'red'); console.error(e); }
 }
 
+// ── Vendor Intelligence (Phase 1) ─────────────────────────────────────────
+function renderVendorIntel(vis){
+  window._vendorIntel = vis || [];
+  const t = document.getElementById('vendorTable');
+  if(!t) return;
+  if(!vis || !vis.length){
+    t.innerHTML = '<div class="empty">No vendor mentions yet &mdash; this populates as operators chat about their tech.</div>';
+    const d=document.getElementById('vendorDetail'); if(d) d.innerHTML='<div class="empty">No data yet</div>';
+    return;
+  }
+  const cls = a => a==null ? '' : (a>=8?'g':(a>=6?'a':'r'));
+  t.innerHTML = '<table class="vlb"><thead><tr><th>Vendor</th><th>Category</th><th class="r">Mentions</th><th class="r">Convos</th><th class="r">Avg NPS</th></tr></thead><tbody>' +
+    vis.map(function(v,i){
+      const avg = v.nps ? v.nps.avg : null;
+      const pill = avg==null ? '<span style="color:var(--text3)">&mdash;</span>' : '<span class="npsp '+cls(parseFloat(avg))+'">'+avg+'</span>';
+      return '<tr class="vr'+(i===0?' sel':'')+'" onclick="selectVendor('+i+',this)"><td><strong>'+esc(v.vendor)+'</strong></td><td style="color:var(--text2);font-size:11px;text-transform:uppercase">'+esc(v.category)+'</td><td class="r">'+v.mentions+'</td><td class="r">'+v.conversations+'</td><td class="r">'+pill+'</td></tr>';
+    }).join('') + '</tbody></table>';
+  selectVendor(0);
+}
+function selectVendor(i, el){
+  const vis = window._vendorIntel || []; const v = vis[i]; if(!v) return;
+  if(el){ document.querySelectorAll('.vlb tr.vr').forEach(function(r){r.classList.remove('sel');}); el.classList.add('sel'); }
+  let html = '<div style="display:flex;align-items:baseline;justify-content:space-between"><div style="font-size:18px;font-weight:700">'+esc(v.vendor)+'</div><div style="font-size:11px;color:var(--text3);text-transform:uppercase">'+esc(v.category)+' &middot; '+v.mentions+' mentions</div></div>';
+  html += '<div style="font-size:11px;color:var(--text3);margin-bottom:8px">Anonymised insight from '+v.conversations+' conversation'+(v.conversations!==1?'s':'')+'</div>';
+  if(v.nps){
+    const tot = v.nps.count || 1;
+    const r = function(lab,val,col){ return '<div style="display:flex;align-items:center;gap:8px;font-size:11.5px;margin-bottom:5px"><span style="width:64px;color:var(--text2)">'+lab+'</span><span class="vbar" style="flex:1"><i style="width:'+Math.round(val/tot*100)+'%;background:'+col+'"></i></span><span style="width:32px;text-align:right;font-weight:600">'+Math.round(val/tot*100)+'%</span></div>'; };
+    html += '<div class="blk2">NPS &middot; '+v.nps.count+' responses &middot; avg '+v.nps.avg+'/10</div>';
+    html += r('Promoters',v.nps.promoters,'#16a34a') + r('Passive',v.nps.passive,'#C77A12') + r('Detractors',v.nps.detractors,'#dc2626');
+  }
+  if(v.problems && v.problems.length){
+    const max = v.problems[0].count || 1;
+    html += '<div class="blk2">Most common problems</div>';
+    html += v.problems.map(function(p){ return '<div style="display:flex;align-items:center;gap:9px;font-size:12px;margin-bottom:6px"><span style="flex-basis:150px;flex-shrink:0">'+esc(p.label)+'</span><span class="vbar" style="flex:1"><i style="width:'+Math.round(p.count/max*100)+'%;background:var(--blue)"></i></span><span style="width:26px;text-align:right;color:var(--text2);font-size:11px">'+p.count+'</span></div>'; }).join('');
+  }
+  if(v.samples && v.samples.length){
+    html += '<div class="blk2">Sample questions (anonymised)</div>';
+    html += v.samples.map(function(s){ return '<div class="vq">'+esc(s)+'</div>'; }).join('');
+  }
+  if(!v.nps && (!v.problems || !v.problems.length)){
+    html += '<div class="empty" style="margin-top:14px">Mentions logged, but not enough detail yet for a breakdown.</div>';
+  }
+  document.getElementById('vendorDetail').innerHTML = html;
+}
+// ── Operator Questions (Phase 2) ──────────────────────────────────────────
+function renderOperatorQuestions(topTopics, topKeywords){
+  window._topKeywords = topKeywords || [];
+  const th = document.getElementById('qThemes');
+  if(th){
+    if(!topTopics || !topTopics.length){ th.innerHTML='<div class="empty">No question themes yet</div>'; }
+    else {
+      const max = topTopics[0][1] || 1;
+      th.innerHTML = topTopics.map(function(t,i){
+        const pct = Math.round(t[1]/max*100);
+        return '<div class="data-row"><span class="rank'+(i<3?' hi':'')+'">'+(i+1)+'</span><span class="data-label">'+esc(t[0])+'</span><div class="bar-outer"><div class="bar-inner alt" style="width:'+pct+'%"></div></div><span class="data-count">'+t[1]+'</span></div>';
+      }).join('');
+    }
+  }
+  const kw = document.getElementById('qKeywords');
+  if(kw){
+    if(!topKeywords || !topKeywords.length){ kw.innerHTML='<div class="empty">No terms yet &mdash; populates as operators ask questions</div>'; }
+    else {
+      const max = topKeywords[0].count || 1;
+      kw.innerHTML = '<div class="kwcloud">' + topKeywords.map(function(k){
+        const scale = 0.8 + (k.count/max)*0.9; // 0.8–1.7em
+        return '<span class="kwchip" style="font-size:'+scale.toFixed(2)+'em" title="'+k.count+' mentions">'+esc(k.word)+' <b>'+k.count+'</b></span>';
+      }).join('') + '</div>';
+    }
+  }
+}
+// ── Sign-ups (who has signed in, with contact details) ───────────────────
+function renderSignups(leads){
+  window._signups = leads || [];
+  const d30 = Date.now() - 30*24*3600*1000;
+  const recent = (leads || []).filter(function(l){ try { return new Date(l.created_at).getTime() > d30; } catch(e){ return false; } }).length;
+  const set = function(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('suTotal', (leads ? leads.length : 0).toLocaleString());
+  set('suRecent', recent.toLocaleString());
+  if(leads && leads.length){
+    const latest = leads[0];
+    set('suLatest', (latest.name || 'Unknown') + ' · ' + new Date(latest.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short'}));
+  } else { set('suLatest', '—'); }
+  const t = document.getElementById('signupsTable');
+  if(!t) return;
+  if(!leads || !leads.length){ t.innerHTML='<div class="empty">No sign-ups yet</div>'; return; }
+  t.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+    '<thead><tr>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Date</th>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Name</th>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Venue</th>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Email</th>' +
+      '<th style="text-align:left;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--text3);font-weight:600;padding:9px 14px;border-bottom:1px solid var(--border)">Phone</th>' +
+    '</tr></thead><tbody>' +
+    leads.map(function(l){
+      const d = l.created_at ? new Date(l.created_at) : null;
+      const ds = d ? d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'}) + ' &middot; ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '&mdash;';
+      const cell = 'padding:11px 14px;border-bottom:1px solid var(--surface2)';
+      return '<tr>' +
+        '<td style="'+cell+';color:var(--text2);font-size:12px">'+ds+'</td>' +
+        '<td style="'+cell+'"><strong>'+esc(l.name || '—')+'</strong></td>' +
+        '<td style="'+cell+'">'+esc(l.venue || '—')+'</td>' +
+        '<td style="'+cell+';font-size:12px">'+esc(l.email || '—')+'</td>' +
+        '<td style="'+cell+';font-size:12px;color:var(--text2)">'+esc(l.phone || '—')+'</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
+}
+function exportSignupsCSV(){
+  const leads = window._signups || [];
+  if(!leads.length){ notify('No sign-ups to export','red'); return; }
+  const rows = [['Date','Name','Venue','Email','Phone']];
+  leads.forEach(function(l){
+    const d = l.created_at ? new Date(l.created_at).toISOString() : '';
+    rows.push([d, l.name||'', l.venue||'', l.email||'', l.phone||'']);
+  });
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'stacked-signups.csv'; a.click();
+  notify('Exported sign-ups CSV','green');
+}
+
+// ── Adoption (Phase 4) ────────────────────────────────────────────────────
+function renderAdoption(ad){
+  const set = function(id,val){ const el=document.getElementById(id); if(el) el.textContent=val; };
+  set('adTotal', (ad.totalVenues||0).toLocaleString());
+  set('adActive', (ad.activeCount||0).toLocaleString());
+  set('adNew', (ad.newThisMonth||0).toLocaleString());
+  set('adAvg', (ad.avgQuestionsPerVenue||0).toLocaleString());
+  const ob = document.getElementById('adOnboard');
+  if(ob){
+    const onb = ad.onboarding || [];
+    const max = Math.max(1, ...onb.map(function(o){return o.count;}));
+    if(!onb.length){ ob.innerHTML='<div class="empty">No venues yet</div>'; }
+    else ob.innerHTML = onb.map(function(o){
+      return '<div class="data-row"><span class="data-label" style="min-width:60px">'+esc(o.month)+'</span><div class="bar-outer"><div class="bar-inner alt" style="width:'+Math.round(o.count/max*100)+'%"></div></div><span class="data-count">'+o.count+'</span></div>';
+    }).join('');
+  }
+  const tv = document.getElementById('adTopVenues');
+  if(tv){
+    const vs = ad.topVenues || [];
+    if(!vs.length){ tv.innerHTML='<div class="empty">No venue activity yet</div>'; return; }
+    tv.innerHTML = '<table class="vlb"><thead><tr><th>Venue</th><th class="r">Chats</th><th class="r">Messages</th><th class="r">Status</th></tr></thead><tbody>' +
+      vs.map(function(v){
+        const badge = v.active ? '<span class="npsp g">Active</span>' : '<span class="npsp" style="background:var(--surface2);color:var(--text3)">Dormant</span>';
+        return '<tr><td><strong>'+esc(v.venue||'Unknown')+'</strong></td><td class="r">'+v.convs+'</td><td class="r">'+v.msgs+'</td><td class="r">'+badge+'</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+}
+
+// ── Knowledge Gaps (Phase 3) ──────────────────────────────────────────────
+function renderKnowledgeGaps(gaps, total, totalQs){
+  window._gaps = gaps || [];
+  const gt = document.getElementById('gapTotal'); if(gt) gt.textContent = (total||0).toLocaleString();
+  const gp = document.getElementById('gapPct'); if(gp) gp.textContent = (totalQs>0 ? Math.round((total/totalQs)*100) : 0) + '%';
+  const gs = document.getElementById('gapShown'); if(gs) gs.textContent = (gaps?gaps.length:0).toLocaleString();
+  const el = document.getElementById('gapsList'); if(!el) return;
+  if(!gaps || !gaps.length){ el.innerHTML = '<div class="empty">No knowledge gaps detected &mdash; the bot is answering everything from the knowledge base. 🎉</div>'; return; }
+  el.innerHTML = gaps.map(function(g){
+    const d = g.when ? new Date(g.when).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
+    return '<div class="conv-item"><div class="conv-top"><span class="conv-name" style="font-weight:500">'+esc(g.question)+'</span><span class="conv-date">'+d+'</span></div></div>';
+  }).join('');
+}
+function exportGapsCSV(){
+  const gaps = window._gaps || [];
+  if(!gaps.length){ notify('No knowledge gaps to export','red'); return; }
+  const rows = [['Unanswered question','Date']];
+  gaps.forEach(function(g){ rows.push([g.question, g.when ? new Date(g.when).toLocaleDateString('en-GB') : '']); });
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'stacked-knowledge-gaps.csv'; a.click();
+  notify('Exported knowledge gaps CSV','green');
+}
+function exportQuestionsCSV(){
+  const kws = window._topKeywords || [];
+  if(!kws.length){ notify('No question data to export yet','red'); return; }
+  const rows = [['Term','Mentions']];
+  kws.forEach(function(k){ rows.push([k.word,k.count]); });
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'stacked-operator-questions.csv'; a.click();
+  notify('Exported operator questions CSV','green');
+}
+function exportVendorCSV(){
+  const vis = window._vendorIntel || [];
+  if(!vis.length){ notify('No vendor data to export yet','red'); return; }
+  const rows = [['Vendor','Category','Mentions','Conversations','Avg NPS','NPS responses','Top problems']];
+  vis.forEach(function(v){ rows.push([v.vendor,v.category,v.mentions,v.conversations,v.nps?v.nps.avg:'',v.nps?v.nps.count:'',(v.problems||[]).map(function(p){return p.label;}).join('; ')]); });
+  const csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'stacked-vendor-intelligence.csv'; a.click();
+  notify('Exported vendor intelligence CSV','green');
+}
+
 function toggleConv(el) { el.classList.toggle('open'); }
 function imgErr(el) { el.style.display='none'; }
-function renderTicketTable(tickets) {
-  const tt=document.getElementById('ticketsTable');
-  if(!tickets.length){tt.innerHTML='<div class="empty">No tickets found</div>';return;}
-  tt.innerHTML='<table><thead><tr><th>User</th><th>Venue</th><th>Issue</th><th>Status</th><th>Date</th><th></th></tr></thead><tbody>'+
-    tickets.map(t=>{
-      const isEsc=t.escalated;
-      const statusBadge=isEsc?'<span class="badge escalated">&#x26A0; Escalated</span>':'<span class="badge '+(t.status||'open')+'">'+esc(t.status||'open')+'</span>';
-      return '<tr'+(isEsc?' style="background:#fff5f5"':'')+'><td><div class="td-primary">'+esc(t.name||'Unknown')+'</div><div class="td-muted">'+esc(t.email||'')+'</div></td>'+
-        '<td>'+esc(t.venue||'&mdash;')+'</td>'+
-        '<td class="td-truncate">'+esc(t.issue||'&mdash;')+'</td>'+
-        '<td>'+statusBadge+'</td>'+
-        '<td>'+new Date(t.created_at).toLocaleDateString('en-GB')+'</td>'+
-        '<td>'+(t.status==='open'?'<button class="close-btn" onclick="closeTicket('+t.id+')">Close</button>':'')+'</td></tr>';
-    }).join('')+'</tbody></table>';
-}
-function filterTickets(filter, btn) {
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  if(btn) btn.classList.add('active');
-  const all = window._allTickets || [];
-  let filtered = all;
-  if(filter==='open') filtered = all.filter(t=>t.status==='open');
-  else if(filter==='closed') filtered = all.filter(t=>t.status==='closed');
-  else if(filter==='escalated') filtered = all.filter(t=>t.escalated);
-  document.getElementById('ticketCount').textContent = filtered.length + ' ticket' + (filtered.length!==1?'s':'') + (filter!=='all'?' ('+filter+')':'');
-  renderTicketTable(filtered);
-}
-function renderVenues(venues) {
-  const el=document.getElementById('venueGrid');
-  const vc=document.getElementById('venueCount');
-  if(vc) vc.textContent = venues.length + ' venue' + (venues.length!==1?'s':'') + ' active';
-  if(!venues||!venues.length){if(el)el.innerHTML='<div class="empty">No venues yet</div>';return;}
-  el.innerHTML=venues.map(v=>{
-    const lastD = new Date(v.lastSeen).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-    const escPart = v.escalated ? '<span style="color:var(--red);font-size:11px;font-weight:600;margin-left:4px">&#x26A0; '+v.escalated+' escalated</span>' : '';
-    return '<div class="venue-card" data-vname="'+esc(v.venue)+'">'+
-      '<div class="venue-card-name">&#x1F3E2; '+esc(v.venue)+escPart+'</div>'+
-      '<div class="venue-stats">'+
-        '<div class="venue-stat"><div class="venue-stat-num">'+v.convs+'</div><div class="venue-stat-label">Chats</div></div>'+
-        '<div class="venue-stat"><div class="venue-stat-num">'+v.msgs+'</div><div class="venue-stat-label">Messages</div></div>'+
-        '<div class="venue-stat"><div class="venue-stat-num">'+(v.tickets||0)+'</div><div class="venue-stat-label">Tickets</div></div>'+
-      '</div>'+
-      '<div class="venue-last" style="display:flex;align-items:center;justify-content:space-between">'+
-        '<span>Last active: '+lastD+'</span>'+
-        '<button class="btn" style="font-size:11px;padding:2px 10px" data-vname="'+esc(v.venue)+'" onclick="generateVenueToken(this.dataset.vname,this)">Copy link</button>'+
-      '</div>'+
-      '</div>';
-  }).join('');
-  // Load actual venue records for branding links
-  fetch('/venues/all').then(r=>r.json()).then(function(venueDbs){
-    venueDbs.forEach(function(vdb){
-      if(!vdb.slug)return;
-      const cards=el.querySelectorAll('.venue-card');
-      cards.forEach(function(card){
-        if(card.querySelector('.venue-card-name').textContent.trim().replace(/[^\w\s]/g,'').trim().toLowerCase()===vdb.name.toLowerCase()){
-          const branded=vdb.primary_color||vdb.logo_url||vdb.bot_name;
-          const link='stackedchat.io/chat/'+vdb.slug;
-          let extra='<div class="venue-last" style="margin-top:4px;display:flex;align-items:center;gap:8px">';
-          extra+='<a href="https://'+link+'" target="_blank" style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:600">/chat/'+vdb.slug+' &rarr;</a>';
-          if(branded)extra+='<span style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px;background:#dcfce7;color:#166534;border:1px solid #bbf7d0">Branded</span>';
-          extra+='<button class="btn" style="font-size:11px;padding:2px 8px" data-vid="'+vdb.id+'" onclick="generateVenueToken(this.dataset.vid,this)">Copy link</button>';
-          extra+='</div>';
-          card.insertAdjacentHTML('beforeend',extra);
-        }
-      });
-    });
-  }).catch(function(){});
-}
-
-async function generateVenueToken(name,btn){
-  btn.disabled=true;btn.textContent='Generating...';
-  try{
-    const r=await fetch('/venues/generate-token-by-name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
-    const d=await r.json();
-    if(d.token){
-      const url=window.location.origin+'/venue-dashboard/'+d.token;
-      await navigator.clipboard.writeText(url);
-      btn.textContent='Copied!';btn.style.background='var(--green)';btn.style.color='#fff';
-      setTimeout(()=>{btn.textContent='Copy link';btn.style.background='';btn.style.color='';btn.disabled=false;},3000);
-    }else{notify('Could not generate link: '+(d.error||'unknown'),'red');btn.textContent='Copy link';btn.disabled=false;}
-  }catch(e){notify('Error: '+e.message,'red');btn.textContent='Copy link';btn.disabled=false;}
-}
-
 var allDocs=[];
 function filterDocs(q){var f=q?allDocs.filter(function(d){return d.filename.toLowerCase().includes(q.toLowerCase());}):allDocs;var c=document.getElementById('docCount');if(c)c.textContent=f.length+' / '+allDocs.length+' docs';renderDocList(f);}
 function renderDocs(docs){allDocs=docs||[];var c=document.getElementById('docCount');if(c)c.textContent=allDocs.length+' docs';renderDocList(allDocs);}
@@ -4764,12 +5365,10 @@ function renderDocs(docs){allDocs=docs||[];var c=document.getElementById('docCou
 function renderDocList(docs){const dl=document.getElementById('docList');if(!docs||!docs.length){dl.innerHTML='<div class="empty">No documents uploaded yet</div>';return;}dl.innerHTML=docs.map(d=>{const fn=esc(d.filename),date=new Date(d.created_at).toLocaleDateString('en-GB'),jfn=JSON.stringify(d.filename);return '<div class="doc-row"><div class="doc-left"><div class="doc-icon">&#x1F4C4;</div><div><div class="doc-name">'+fn+'</div><div class="doc-date">'+date+'</div></div></div><div class="doc-right"><span class="badge-indexed">Indexed</span><button class="btn-del" onclick="deleteDoc('+jfn+',this)">Delete</button></div></div>';}).join('');}
 
 async function deleteDoc(fn,btn){if(!confirm('Delete "'+fn+'"?'))return;btn.disabled=true;btn.textContent='Deleting...';try{const r=await fetch('/documents?filename='+encodeURIComponent(fn),{method:'DELETE'});const d=await r.json();if(d.ok){notify(fn+' deleted','green');btn.closest('.doc-row').remove();setTimeout(loadAnalytics,500);}else{notify('Delete failed','red');btn.disabled=false;btn.textContent='Delete';}}catch(e){notify('Error: '+e.message,'red');btn.disabled=false;}}
-async function closeTicket(id){await fetch('/ticket/'+id+'/close',{method:'POST'});notify('Ticket closed','green');loadAnalytics();}
 function dragOver(e){e.preventDefault();document.getElementById('dropZone').classList.add('dragging');}
 function dragLeave(){document.getElementById('dropZone').classList.remove('dragging');}
 function dropFiles(e){e.preventDefault();document.getElementById('dropZone').classList.remove('dragging');handleFiles(e.dataTransfer.files);}
-async function extractPdfText(file){if(typeof pdfjsLib==='undefined')throw new Error('PDF.js not loaded');const buf=await file.arrayBuffer();const pdf=await pdfjsLib.getDocument({data:buf}).promise;let out='';for(let i=1;i<=pdf.numPages;i++){const page=await pdf.getPage(i);const content=await page.getTextContent();out+=content.items.map(s=>s.str).join(' ')+'\\n';}return out;}
-async function handleFiles(files){const ul=document.getElementById('uploadList');for(const file of files){const id='pb_'+file.name.replace(/\W/g,'');const item=document.createElement('div');item.className='upload-item';item.innerHTML='<div><strong>'+esc(file.name)+'</strong> <span style="color:#94a3b8">'+(file.size/1024).toFixed(0)+' KB</span><div class="prog-wrap"><div class="prog-bar" id="'+id+'"></div></div></div>';ul.appendChild(item);try{let text;if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){text=await extractPdfText(file);}else{text=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(file);});}const pb=document.getElementById(id);if(pb)pb.style.width='50%';await fetch('/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:file.name,content:text})});if(pb)pb.style.width='100%';item.innerHTML+=' <span style="color:#16a34a;font-size:12px;font-weight:600">&#x2713; Indexed</span>';notify(file.name+' indexed!','green');setTimeout(loadAnalytics,1000);}catch(e){item.innerHTML+=' <span style="color:#dc2626;font-size:12px">Failed</span>';notify('Failed: '+file.name,'red');}}}
+async function handleFiles(files){const ul=document.getElementById('uploadList');for(const file of files){const id='pb_'+file.name.replace(/\\W/g,'');const item=document.createElement('div');item.className='upload-item';item.innerHTML='<div><strong>'+esc(file.name)+'</strong> <span style="color:#94a3b8">'+(file.size/1024).toFixed(0)+' KB</span><div class="prog-wrap"><div class="prog-bar" id="'+id+'"></div></div></div>';ul.appendChild(item);try{const text=await new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(file);});const pb=document.getElementById(id);if(pb)pb.style.width='50%';await fetch('/upload',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({filename:file.name,content:text})});if(pb)pb.style.width='100%';item.innerHTML+=' <span style="color:#16a34a;font-size:12px;font-weight:600">&#x2713; Indexed</span>';notify(file.name+' indexed!','green');setTimeout(loadAnalytics,1000);}catch(e){item.innerHTML+=' <span style="color:#dc2626;font-size:12px">Failed</span>';notify('Failed: '+file.name,'red');}}}
 function notify(msg,type=''){const t=document.getElementById('toast');t.textContent=msg;t.className='toast '+type+' show';setTimeout(()=>t.className='toast',3500);}
 
 function vDragOver(e){e.preventDefault();document.getElementById('videoDrop').classList.add('drag-over');}
@@ -5002,243 +5601,6 @@ async function saveBranding() {
 loadAnalytics();
 loadVideos();
 setInterval(loadAnalytics,60000);
-
-// ─── SURVEYS ────────────────────────────────────────────────────────────────
-let _activeSurveyId = null;
-let _qCounter = 0;
-
-function showSurveySubTab(sub) {
-  document.getElementById('surveyListPanel').style.display = sub==='list' ? '' : 'none';
-  document.getElementById('surveyBuilderPanel').style.display = sub==='builder' ? '' : 'none';
-  document.getElementById('surveyResultsPanel').style.display = sub==='results' ? '' : 'none';
-  document.getElementById('stSurveyList').classList.toggle('active', sub==='list');
-  document.getElementById('stSurveyBuilder').classList.toggle('active', sub==='builder');
-  document.getElementById('stSurveyResults').classList.toggle('active', sub==='results');
-}
-
-async function loadSurveys() {
-  const el = document.getElementById('surveysTable');
-  el.innerHTML = '<div class="empty">Loading...</div>';
-  try {
-    const r = await fetch('/surveys');
-    const surveys = await r.json();
-    if (!surveys.length) { el.innerHTML = '<div class="empty">No surveys yet — click <strong>+ New survey</strong> to get started.</div>'; return; }
-    el.innerHTML = '<table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3)"><th style="padding:8px 12px;text-align:left">Title</th><th style="padding:8px 12px;text-align:left">Status</th><th style="padding:8px 12px;text-align:left">Questions</th><th style="padding:8px 12px;text-align:left">Responses</th><th style="padding:8px 12px;text-align:left">Created</th><th style="padding:8px 12px"></th></tr></thead><tbody id="surveyRows"></tbody></table>';
-    const tbody = document.getElementById('surveyRows');
-    surveys.forEach(s => {
-      const statusColour = s.status==='active' ? '#16a34a' : s.status==='closed' ? '#6b7280' : '#d97706';
-      const tr = document.createElement('tr');
-      tr.style.cssText = 'border-top:1px solid var(--border);font-size:13px';
-      tr.innerHTML = '<td style="padding:10px 12px;font-weight:600">'+esc(s.title)+'</td>'
-        +'<td style="padding:10px 12px"><span style="background:'+(s.status==='active'?'#dcfce7':s.status==='closed'?'#f3f4f6':'#fef3c7')+';color:'+statusColour+';border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;text-transform:uppercase">'+s.status+'</span></td>'
-        +'<td style="padding:10px 12px;color:var(--text2)">'+s.question_count+'</td>'
-        +'<td style="padding:10px 12px;color:var(--text2)">'+s.responded+' / '+s.total_recipients+'</td>'
-        +'<td style="padding:10px 12px;color:var(--text3)">'+new Date(s.created_at).toLocaleDateString('en-GB')+'</td>'
-        +'<td style="padding:10px 12px;text-align:right;white-space:nowrap;display:flex;gap:6px;justify-content:flex-end">'
-        +'<button class="btn" data-sid="'+s.id+'" data-stitle="'+esc(s.title)+'" onclick="viewSurveyLinks(this.dataset.sid,this.dataset.stitle)">Links</button>'
-        +'<button class="btn" data-sid="'+s.id+'" onclick="openSurveyResults(this.dataset.sid)">Results</button>'
-        +'<button class="btn" data-sid="'+s.id+'" onclick="deleteSurvey(this.dataset.sid,this)" style="color:#dc2626">Delete</button>'
-        +'</td>';
-      tbody.appendChild(tr);
-    });
-  } catch(e) { el.innerHTML = '<div class="empty">Failed to load surveys: '+esc(e.message)+'</div>'; }
-}
-
-function showSurveyBuilder(survey) {
-  _activeSurveyId = survey ? survey.id : null;
-  document.getElementById('builderTitle').textContent = survey ? 'Edit survey' : 'New survey';
-  document.getElementById('surveyTitle').value = survey ? survey.title : '';
-  document.getElementById('surveyDesc').value = survey ? (survey.description||'') : '';
-  document.getElementById('qList').innerHTML = '';
-  document.getElementById('surveyRecipientsSection').style.display = 'none';
-  document.getElementById('generatedLinks').innerHTML = '';
-  _qCounter = 0;
-  if (survey && survey.questions) survey.questions.forEach(q => addSurveyQuestion(q.type, q));
-  else addSurveyQuestion('short_text');
-  document.getElementById('stSurveyResults').style.display = 'none';
-  showSurveySubTab('builder');
-}
-
-function removeQuestion(el) { el.closest('[data-qid]').remove(); }
-
-function addSurveyQuestion(type, q) {
-  const id = 'q_'+(_qCounter++);
-  const label = q ? esc(q.label) : '';
-  const required = q && q.required;
-  let extra = '';
-  if (type==='multiple_choice') {
-    const opts = q && q.options ? q.options : ['',''];
-    extra = '<div class="mc-options" id="mc_'+id+'">'+opts.map((o,i)=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" placeholder="Option '+(i+1)+'" value="'+esc(o)+'" style="flex:1;padding:7px 10px;border:1px solid var(--border2);border-radius:5px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)"></div>').join('')+'</div>'
-      +'<button class="btn" style="margin-top:4px;font-size:12px" data-mcid="mc_'+id+'" onclick="addMcOption(this.dataset.mcid)">+ Add option</button>';
-  }
-  if (type==='rating') extra = '<div style="font-size:12px;color:var(--text3);margin-top:4px">Respondents will see: 1 · 2 · 3 · 4 · 5</div>';
-  const typeLabel = {short_text:'Short text',long_text:'Long text',multiple_choice:'Multiple choice',rating:'Rating 1–5'}[type]||type;
-  const card = document.createElement('div');
-  card.className = 'card';
-  card.dataset.type = type;
-  card.dataset.qid = id;
-  card.innerHTML = '<div style="display:flex;gap:10px;align-items:flex-start">'
-    +'<div style="flex:1">'
-    +'<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:6px">'+typeLabel+'</div>'
-    +'<input type="text" class="q-label" placeholder="Question text (required)" value="'+label+'" style="width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:5px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);margin-bottom:8px">'
-    +extra
-    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer;margin-top:6px"><input type="checkbox" class="q-required"'+(required?' checked':'')+'> Required</label>'
-    +'</div>'
-    +'<button onclick="removeQuestion(this)" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--text3);padding:0 4px;line-height:1;flex-shrink:0">&times;</button>'
-    +'</div>';
-  document.getElementById('qList').appendChild(card);
-}
-
-function addMcOption(containerId) {
-  const c = document.getElementById(containerId);
-  const i = c.querySelectorAll('input').length;
-  const row = document.createElement('div');
-  row.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
-  row.innerHTML = '<input type="text" placeholder="Option '+(i+1)+'" style="flex:1;padding:7px 10px;border:1px solid var(--border2);border-radius:5px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg)">';
-  c.appendChild(row);
-}
-
-async function saveSurvey() {
-  const title = document.getElementById('surveyTitle').value.trim();
-  if (!title) { notify('Add a survey title', 'red'); return; }
-  const questions = [];
-  let valid = true;
-  document.querySelectorAll('#qList [data-qid]').forEach((card,i) => {
-    const lbl = card.querySelector('.q-label').value.trim();
-    if (!lbl) { notify('Fill in all question labels', 'red'); valid=false; return; }
-    const type = card.dataset.type;
-    const required = card.querySelector('.q-required').checked;
-    let options = null;
-    if (type==='multiple_choice') {
-      options = Array.from(card.querySelectorAll('.mc-options input')).map(x=>x.value.trim()).filter(Boolean);
-      if (options.length < 2) { notify('Multiple choice needs at least 2 options', 'red'); valid=false; return; }
-    }
-    questions.push({ label:lbl, type, required, options, position:i });
-  });
-  if (!valid || !questions.length) { if(questions.length===0) notify('Add at least one question','red'); return; }
-  const btn = document.getElementById('saveSurveyBtn');
-  btn.disabled=true; btn.textContent='Saving...';
-  try {
-    const r = await fetch(_activeSurveyId ? '/surveys/'+_activeSurveyId : '/surveys', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ title, description: document.getElementById('surveyDesc').value.trim(), questions })
-    });
-    const d = await r.json();
-    if (d.ok) {
-      _activeSurveyId = d.id;
-      notify('Survey saved!', 'green');
-      document.getElementById('surveyRecipientsSection').style.display = '';
-    } else { notify('Error: '+(d.error||'unknown'), 'red'); }
-  } catch(e) { notify('Error: '+e.message, 'red'); }
-  btn.disabled=false; btn.textContent='Save survey';
-}
-
-async function generateSurveyLinks() {
-  if (!_activeSurveyId) { notify('Save the survey first', 'red'); return; }
-  const raw = document.getElementById('recipientEmails').value;
-  const emails = raw.split(/[\\n,]+/).map(e=>e.trim()).filter(e=>e.includes('@'));
-  if (!emails.length) { notify('Enter at least one valid email address', 'red'); return; }
-  const recipients = emails.map(e => ({email:e, name:''}));
-  try {
-    const r = await fetch('/surveys/'+_activeSurveyId+'/recipients', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ recipients })
-    });
-    const d = await r.json();
-    if (!d.ok) { notify('Error: '+(d.error||'unknown'), 'red'); return; }
-    const el = document.getElementById('generatedLinks');
-    el.innerHTML = d.links.map(l=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">'
-      +'<span style="flex:1;color:var(--text2)">'+esc(l.email)+'</span>'
-      +'<code style="flex:2;font-size:11px;background:var(--surface2);padding:3px 6px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(l.url)+'</code>'
-      +'<button class="btn" data-url="'+esc(l.url)+'" onclick="copyLink(this.dataset.url,this)">Copy</button>'
-      +'</div>').join('');
-    notify(d.links.length+' link'+(d.links.length===1?'':'s')+' generated!', 'green');
-    document.getElementById('recipientEmails').value = '';
-  } catch(e) { notify('Error: '+e.message, 'red'); }
-}
-
-function copyLink(url, btn) {
-  navigator.clipboard.writeText(url).then(() => { notify('Link copied!', 'green'); btn.textContent='Copied ✓'; setTimeout(()=>{btn.textContent='Copy';},2000); });
-}
-
-async function viewSurveyLinks(surveyId, title) {
-  try {
-    const r = await fetch('/surveys/'+surveyId+'/recipients');
-    const d = await r.json();
-    if (!d.ok) { notify('Could not load links', 'red'); return; }
-    document.getElementById('vmodalTitle').textContent = 'Survey links — '+title;
-    const body = document.getElementById('vmodalBody');
-    body.style.cssText = 'padding:16px;background:var(--bg);max-height:70vh;overflow-y:auto';
-    if (!d.recipients.length) {
-      body.innerHTML = '<div style="color:var(--text3);font-size:13px">No links generated yet. Open the survey builder and generate links.</div>';
-    } else {
-      body.innerHTML = d.recipients.map(l=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px">'
-        +'<span style="flex:1;color:var(--text2)">'+esc(l.email)+(l.responded_at?'<span style="color:#16a34a;font-size:11px;margin-left:6px">✓ responded</span>':'')+'</span>'
-        +'<button class="btn" data-url="'+esc(l.url)+'" onclick="copyLink(this.dataset.url,this)">Copy link</button>'
-        +'</div>').join('');
-    }
-    document.getElementById('vmodal').style.display='';
-  } catch(e) { notify('Error: '+e.message, 'red'); }
-}
-
-async function openSurveyResults(surveyId) {
-  _activeSurveyId = surveyId;
-  document.getElementById('stSurveyResults').style.display='';
-  showSurveySubTab('results');
-  const el = document.getElementById('surveyResultsContent');
-  el.innerHTML = '<div class="empty">Loading...</div>';
-  try {
-    const r = await fetch('/surveys/'+surveyId+'/results');
-    const d = await r.json();
-    if (!d.ok) { el.innerHTML='<div class="empty">Error loading results</div>'; return; }
-    let html = '<div style="margin-bottom:20px"><h2 style="font-size:18px;font-weight:700;margin-bottom:4px">'+esc(d.survey.title)+'</h2>'
-      +'<div style="font-size:13px;color:var(--text3)">'+d.total_responses+' response'+(d.total_responses!==1?'s':'')+' &bull; '+d.total_recipients+' sent</div></div>';
-    d.questions.forEach(q => {
-      html += '<div class="card" style="margin-bottom:14px"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">'+({short_text:'Short text',long_text:'Long text',multiple_choice:'Multiple choice',rating:'Rating'}[q.type]||q.type)+'</div>'
-        +'<div style="font-size:15px;font-weight:600;margin-bottom:12px">'+esc(q.label)+'</div>';
-      if (q.type==='rating') {
-        const scores = q.answers.map(Number).filter(n=>n>=1&&n<=5);
-        const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '—';
-        html += '<div style="font-size:32px;font-weight:800;color:var(--blue);margin-bottom:12px">'+avg+' <span style="font-size:14px;font-weight:400;color:var(--text3)">avg from '+scores.length+' response'+(scores.length!==1?'s':'')+'</span></div>';
-        [1,2,3,4,5].forEach(v => {
-          const c = scores.filter(s=>s===v).length;
-          const pct = scores.length ? Math.round(c/scores.length*100) : 0;
-          html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;font-size:13px"><span style="width:14px;text-align:right;color:var(--text3)">'+v+'</span><div style="flex:1;height:8px;background:var(--border);border-radius:4px"><div style="height:8px;background:var(--blue);border-radius:4px;width:'+pct+'%"></div></div><span style="width:32px;color:var(--text3)">'+c+'</span></div>';
-        });
-      } else if (q.type==='multiple_choice') {
-        const counts = {};
-        q.answers.forEach(a=>{ counts[a]=(counts[a]||0)+1; });
-        const total = q.answers.length || 1;
-        Object.entries(counts).sort((a,b)=>b[1]-a[1]).forEach(([opt,cnt])=>{
-          const pct = Math.round(cnt/total*100);
-          html += '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+esc(opt)+'</span><span style="color:var(--text3)">'+cnt+' ('+pct+'%)</span></div><div style="height:8px;background:var(--border);border-radius:4px"><div style="height:8px;background:var(--blue);border-radius:4px;width:'+pct+'%"></div></div></div>';
-        });
-        if (!q.answers.length) html += '<div style="color:var(--text3);font-size:13px">No responses yet</div>';
-      } else {
-        if (!q.answers.length) { html += '<div style="color:var(--text3);font-size:13px">No responses yet</div>'; }
-        else q.answers.forEach(a=>{ html += '<div style="padding:8px 12px;background:var(--surface2);border-radius:6px;font-size:13px;margin-bottom:6px;border:1px solid var(--border)">'+esc(a)+'</div>'; });
-      }
-      html += '</div>';
-    });
-    el.innerHTML = html;
-  } catch(e) { el.innerHTML='<div class="empty">Error: '+esc(e.message)+'</div>'; }
-}
-
-async function deleteSurvey(id, btn) {
-  if (!confirm('Delete this survey and all its responses?')) return;
-  btn.disabled=true; btn.textContent='Deleting...';
-  try {
-    const r = await fetch('/surveys/'+id, {method:'DELETE'});
-    const d = await r.json();
-    if (d.ok) { notify('Survey deleted','green'); loadSurveys(); }
-    else { notify('Error: '+(d.error||'unknown'),'red'); btn.disabled=false; btn.textContent='Delete'; }
-  } catch(e) { notify('Error: '+e.message,'red'); btn.disabled=false; btn.textContent='Delete'; }
-}
-
-loadAnalytics();
-loadVideos();
-setInterval(loadAnalytics,60000);
-
 </script>
 </body>
 </html>`;
@@ -5261,7 +5623,22 @@ const server = http.createServer(async (req, res) => {
 
   if (url === '/admin' || url === '/admin/') {
     res.writeHead(200, {'Content-Type':'text/html'});
-    res.end(ADMIN_PAGE); return;
+    res.end(isAdminAuthed(req) ? ADMIN_PAGE : ADMIN_LOGIN_PAGE); return;
+  }
+
+  if (method === 'POST' && url === '/admin-login') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', () => {
+      try {
+        const { password } = JSON.parse(body || '{}');
+        if (password === ADMIN_PW) {
+          res.writeHead(200, {'Content-Type':'application/json', 'Set-Cookie':'sa_admin=' + ADMIN_TOKEN + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000'});
+          res.end(JSON.stringify({ ok: true }));
+        } else {
+          res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false }));
+        }
+      } catch(e) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false })); }
+    }); return;
   }
 
   // Operator-facing redesign shell (sidebar + topbar, no screens yet).
@@ -5272,6 +5649,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (url === '/analytics') {
+    if (!isAdminAuthed(req)) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Not authorised'})); return; }
     const data = await getAnalytics();
     res.writeHead(200, {'Content-Type':'application/json'});
     res.end(JSON.stringify(data)); return;
@@ -5343,17 +5721,93 @@ const server = http.createServer(async (req, res) => {
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body);
+        // Self-serve roles: the FIRST member of a venue becomes its admin;
+        // everyone after is staff. Never downgrade an existing admin.
+        let role = 'staff';
+        let isReturning = false;
+        let isFirstAtVenue = false;
+        try {
+          const ex = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(payload.venue_id || '') + '&select=email,role&limit=200');
+          if (Array.isArray(ex.data)) {
+            const mine = ex.data.find(m => (m.email || '').toLowerCase() === (payload.email || '').toLowerCase());
+            if (mine) { role = mine.role || 'staff'; isReturning = true; }        // keep existing role
+            else if (ex.data.length === 0) { role = 'admin'; isFirstAtVenue = true; } // first ever member
+          }
+        } catch(e) { /* table/role lookup issue — default staff */ }
+        payload.role = role;
         // Upsert on email+venue_id to avoid duplicates
         await sbFetch('/rest/v1/venue_members?on_conflict=email,venue_id', {
           method: 'POST',
           headers: { 'Prefer': 'resolution=merge-duplicates,return=minimal' },
           body: payload
         });
+        // Fire a Slack notification once per genuinely new sign-up (not returning users).
+        if (!isReturning) {
+          let venueName = null;
+          try {
+            const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(payload.venue_id || '') + '&select=name&limit=1');
+            if (Array.isArray(vr.data) && vr.data[0]) venueName = vr.data[0].name;
+          } catch(e) {}
+          sendSlackSignupAlert({ name: payload.name, venue: venueName, email: payload.email, phone: payload.phone, role, isFirstAtVenue })
+            .catch(e => console.error('[signup-slack]', e.message));
+        }
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ok:true}));
+        res.end(JSON.stringify({ok:true, role}));
       } catch(e) {
         res.writeHead(200, {'Content-Type':'application/json'});
         res.end(JSON.stringify({ok:false,error:e.message}));
+      }
+    }); return;
+  }
+
+  // ─── TEAM: list members of a venue (manage-team) ──────────────────────────
+  if (method === 'POST' && url === '/team-list') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id } = JSON.parse(body);
+        const r = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id || '') + '&select=name,email,role,created_at&order=created_at.asc&limit=200');
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true, members: Array.isArray(r.data) ? r.data : [] }));
+      } catch(e) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message, members:[] }));
+      }
+    }); return;
+  }
+
+  // ─── TEAM: change a member's role (admin only; protect the last admin) ────
+  if (method === 'POST' && url === '/set-role') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id, target_email, role, token } = JSON.parse(body);
+        if (!venue_id || !target_email || (role !== 'admin' && role !== 'staff')) {
+          res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'bad request'})); return;
+        }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
+        const r = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const members = Array.isArray(r.data) ? r.data : [];
+        const actor = members.find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!actor || actor.role !== 'admin') {
+          res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'admins only'})); return;
+        }
+        const admins = members.filter(m => m.role === 'admin');
+        const target = members.find(m => (m.email || '').toLowerCase() === (target_email || '').toLowerCase());
+        if (role === 'staff' && target && target.role === 'admin' && admins.length <= 1) {
+          res.writeHead(409, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:"Can't remove the last admin"})); return;
+        }
+        await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&email=eq.' + encodeURIComponent(target_email), {
+          method: 'PATCH', headers: { 'Prefer':'return=minimal' }, body: { role }
+        });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true, role }));
+      } catch(e) {
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
       }
     }); return;
   }
@@ -5406,6 +5860,186 @@ const server = http.createServer(async (req, res) => {
       } catch(e) {
         res.writeHead(500, {'Content-Type':'application/json'});
         res.end(JSON.stringify({error:e.message}));
+      }
+    }); return;
+  }
+
+  // ─── KB UPLOAD (in-chat "+" — admin-only, private to the workspace) ───────
+  if (method === 'POST' && url === '/kb-upload') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { filename, content, venue_id, token, file_url } = JSON.parse(body);
+        if (!filename || !content || !venue_id) {
+          res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return;
+        }
+        // Verified-admin guard: caller must hold a valid session (email-code verified).
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!me || me.role !== 'admin') {
+          res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can add knowledge'})); return;
+        }
+        // Resolve (or create) the venue's workspace so the doc stays private to it.
+        let workspaceId = null;
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id,slug&limit=1');
+        const v = (Array.isArray(vr.data) && vr.data[0]) ? vr.data[0] : null;
+        if (v && v.workspace_id) {
+          workspaceId = v.workspace_id;
+        } else {
+          workspaceId = (v && v.slug) ? v.slug : venue_id;
+          await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body:{ workspace_id: workspaceId } });
+        }
+        const chunks = chunkText(content, filename).map(c => Object.assign(c, { workspace_id: workspaceId }));
+        // Store the original file's URL on each chunk so the bot can offer it as a
+        // shareable download link. Falls back gracefully if the file_url column
+        // hasn't been added yet (run: ALTER TABLE documents ADD COLUMN file_url text;).
+        let storeFileUrl = !!file_url;
+        for (const chunk of chunks) {
+          const bodyWithUrl = storeFileUrl ? Object.assign({}, chunk, { file_url: file_url }) : chunk;
+          const ins = await sbFetch('/rest/v1/documents', { method:'POST', headers:{'Prefer':'return=minimal'}, body: bodyWithUrl });
+          if (storeFileUrl && ins && ins.status >= 400) {
+            storeFileUrl = false; // file_url column not present — keep going without it
+            await sbFetch('/rest/v1/documents', { method:'POST', headers:{'Prefer':'return=minimal'}, body: chunk });
+          }
+        }
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true, chunks: chunks.length, workspace_id: workspaceId }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
+  // ─── ADMIN SUMMARY (scoped analytics + knowledge list, admins only) ───────
+  if (method === 'POST' && url === '/admin-summary') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id, email } = JSON.parse(body);
+        if (!venue_id || !email) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const members = Array.isArray(mem.data) ? mem.data : [];
+        const me = members.find(m => (m.email || '').toLowerCase() === String(email).toLowerCase());
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can view this'})); return; }
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
+        const ws = (Array.isArray(vr.data) && vr.data[0]) ? (vr.data[0].workspace_id || null) : null;
+        let docs = [];
+        if (ws) {
+          const d = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(ws) + '&select=filename&limit=2000');
+          const counts = {};
+          (Array.isArray(d.data) ? d.data : []).forEach(x => { counts[x.filename] = (counts[x.filename] || 0) + 1; });
+          docs = Object.keys(counts).map(f => ({ filename: f, chunks: counts[f] }));
+        }
+        const conv = await sbFetch('/rest/v1/conversations?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=messages&limit=500');
+        const convs = Array.isArray(conv.data) ? conv.data : [];
+        let questions = 0;
+        convs.forEach(c => { if (Array.isArray(c.messages)) questions += c.messages.filter(m => m.role === 'user').length; });
+        const npsR = await sbFetch('/rest/v1/nps_scores?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=score&limit=500');
+        const scores = (Array.isArray(npsR.data) ? npsR.data : []).map(x => x.score).filter(s => typeof s === 'number');
+        const avgNps = scores.length ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10 : null;
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true, workspace_id: ws, stats: { documents: docs.length, conversations: convs.length, questions: questions, team: members.length, avgNps: avgNps, npsCount: scores.length }, docs: docs }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
+  // ─── KB REMOVE (admin removes a doc from THEIR workspace only) ────────────
+  if (method === 'POST' && url === '/kb-remove') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { venue_id, filename, token } = JSON.parse(body);
+        if (!venue_id || !filename) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can remove knowledge'})); return; }
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
+        const ws = (Array.isArray(vr.data) && vr.data[0]) ? (vr.data[0].workspace_id || null) : null;
+        if (!ws) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'no workspace'})); return; }
+        // Scoped delete: only docs in this workspace with this filename.
+        await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(ws) + '&filename=eq.' + encodeURIComponent(filename), { method:'DELETE', headers:{'Prefer':'return=minimal'} });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:true }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
+  // ─── KB VIDEO (admin registers a video, scoped to their workspace) ────────
+  // File bytes are uploaded client-side to Supabase Storage; this just records
+  // the resulting URL in the videos table tagged with the workspace (tenant).
+  if (method === 'POST' && url === '/kb-video') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { url: videoUrl, title, venue_id, token } = JSON.parse(body);
+        if (!videoUrl || !venue_id) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can add videos'})); return; }
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id,slug&limit=1');
+        const v = (Array.isArray(vr.data) && vr.data[0]) ? vr.data[0] : null;
+        let workspaceId = (v && v.workspace_id) ? v.workspace_id : null;
+        if (!workspaceId) {
+          workspaceId = (v && v.slug) ? v.slug : venue_id;
+          await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body:{ workspace_id: workspaceId } });
+        }
+        let type = 'mp4', thumbnail = '', ytId = null;
+        const ytMatch = String(videoUrl).match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+        if (ytMatch) { ytId = ytMatch[1]; type = 'youtube'; thumbnail = 'https://img.youtube.com/vi/' + ytId + '/mqdefault.jpg'; }
+        const record = { url: videoUrl, title: title || 'Untitled video', description: '', type, thumbnail, tenant: workspaceId, yt_id: ytId || null };
+        const r = await sbFetch('/rest/v1/videos', { method:'POST', headers:{'Prefer':'return=minimal'}, body: record });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: r.status < 400, workspace_id: workspaceId }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
+      }
+    }); return;
+  }
+
+  // ─── KB IMAGE (dish/menu photo the bot can show — admin-only, scoped) ─────
+  if (method === 'POST' && url === '/kb-image') {
+    let body = '';
+    req.on('data', c => body += c);
+    req.on('end', async () => {
+      try {
+        const { url: imgUrl, title, description, venue_id, token } = JSON.parse(body);
+        if (!imgUrl || !venue_id || !title) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!me || me.role !== 'admin') { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Only admins can add images'})); return; }
+        const vr = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id,slug&limit=1');
+        const v = (Array.isArray(vr.data) && vr.data[0]) ? vr.data[0] : null;
+        let workspaceId = (v && v.workspace_id) ? v.workspace_id : null;
+        if (!workspaceId) {
+          workspaceId = (v && v.slug) ? v.slug : venue_id;
+          await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body:{ workspace_id: workspaceId } });
+        }
+        const r = await sbFetch('/rest/v1/images', { method:'POST', headers:{'Prefer':'return=minimal'}, body: { url: imgUrl, title: title, description: description || '', tenant: workspaceId } });
+        res.writeHead(200, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok: r.status < 400, workspace_id: workspaceId }));
+      } catch(e) {
+        res.writeHead(500, {'Content-Type':'application/json'});
+        res.end(JSON.stringify({ ok:false, error:e.message }));
       }
     }); return;
   }
@@ -5475,13 +6109,18 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ─── SAVE LEAD ─────────────────────────────────────────────────────────
+  // Note: sign-ups are read off venue_members (reliable, always written), so
+  // this endpoint is best-effort. Strip the phone field because the leads
+  // table doesn't have that column — sending it returns 400 silently.
   if (method === 'POST' && url === '/save-lead') {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body);
-        await sbFetch('/rest/v1/leads', { method: 'POST', body: payload });
+        const safe = { name: payload.name, venue: payload.venue, email: payload.email };
+        if (payload.venue_id) safe.venue_id = payload.venue_id;
+        await sbFetch('/rest/v1/leads', { method: 'POST', body: safe });
         res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:true}));
       } catch(e) { res.writeHead(500); res.end(JSON.stringify({error:e.message})); }
     }); return;
@@ -5492,9 +6131,8 @@ const server = http.createServer(async (req, res) => {
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
-      console.log('[chat] request received');
       try {
-        const { message, history = [], venue, venue_id, userName } = JSON.parse(body);
+        const { message, history = [], venue, venue_id, userName, image } = JSON.parse(body);
 
         // Fetch venue tech stack if we have a venue_id
         let techStackContext = '';
@@ -5515,11 +6153,44 @@ const server = http.createServer(async (req, res) => {
           : techStackContext;
 
         let docContext = '';
+        let docFile = null; // top source doc's shareable file link, if it has one
+        // Only attach a downloadable file when the user actually asks for one.
+        const fileIntent = /\b(pdf|document|file|doc|download|forward|share|send|email|copy|attachment)\b/i.test(message);
+        // Resolve the asker's workspace (group) so private docs stay isolated.
+        let workspaceId = null;
         try {
-          const docsR = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
+          if (venue_id) {
+            const vR = await sbFetch('/rest/v1/venues?id=eq.' + encodeURIComponent(venue_id) + '&select=workspace_id&limit=1');
+            if (Array.isArray(vR.data) && vR.data[0]) workspaceId = vR.data[0].workspace_id || null;
+          }
+        } catch(e) { /* venues.workspace_id may not exist yet */ }
+        try {
+          // Scope docs to shared (workspace_id IS NULL) + this workspace's own.
+          // IMPORTANT: there are thousands of shared chunks, so a single capped
+          // query can crowd out a tenant's few private docs. Fetch the
+          // workspace's OWN docs separately (always included) + the shared pool.
+          // Falls back to unscoped if the workspace_id column isn't there yet.
+          let docsR;
+          try {
+            const sharedR = await sbFetch('/rest/v1/documents?workspace_id=is.null&select=filename,content,file_url&limit=800');
+            if (!sharedR || (sharedR.status && sharedR.status >= 400) || !Array.isArray(sharedR.data)) throw new Error('scoped unavailable');
+            let merged = sharedR.data.map(d => Object.assign({ __own: false }, d));
+            if (workspaceId) {
+              const ownR = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(workspaceId) + '&select=filename,content,file_url&limit=400');
+              if (Array.isArray(ownR.data) && ownR.data.length) merged = ownR.data.map(d => Object.assign({ __own: true }, d)).concat(merged);
+            }
+            docsR = { data: merged };
+          } catch(scopeErr) {
+            const fb = await sbFetch('/rest/v1/documents?select=filename,content&limit=500');
+            docsR = { data: (Array.isArray(fb.data) ? fb.data : []).map(d => Object.assign({ __own: false }, d)) };
+          }
           if (Array.isArray(docsR.data) && docsR.data.length > 0) {
             const searchText = (message + ' ' + (history.slice(-2).map(m=>m.content).join(' '))).toLowerCase();
-            const searchWords = searchText.split(/[\s,?!.;:]+/).filter(w => w.length > 2);
+            // Drop common/filler words so a venue's own specific doc isn't crowded
+            // out of the results by generic shared content that merely matches
+            // words like "have", "you", "our", "got".
+            const STOP = new Set(['have','has','had','you','your','yours','our','ours','the','and','for','got','get','this','that','these','those','with','can','could','are','was','were','will','would','should','about','what','when','where','which','from','they','them','please','need','want','any','all','its','but','not','how','does','did','who','why','into','out','been','being','some','more','just','than','then','there','here','your','dont','cant','wont','were','our','use','using','one','two']);
+            const searchWords = [...new Set(searchText.split(/[\s,?!.;:()\[\]]+/).filter(w => w.length > 2 && !STOP.has(w)))];
 
             // Score each doc chunk by relevance
             const scored = docsR.data.map(d => {
@@ -5537,13 +6208,29 @@ const server = http.createServer(async (req, res) => {
                 }
                 bestSection = lines.slice(bestStart, bestStart+12).join('\n');
               }
-              return { filename: d.filename, section: bestSection, hits };
+              return { filename: d.filename, section: bestSection, hits, file_url: d.file_url || null, own: !!d.__own };
             });
 
-            const relevant = scored.filter(d => d.hits >= 1).sort((a,b) => b.hits-a.hits).slice(0, 5);
+            // Always surface the venue's OWN matching docs first (up to 3), then
+            // fill the rest from the shared pool — so a tenant's private doc can
+            // never be crowded out by the much larger shared corpus.
+            const hitDocs = scored.filter(d => d.hits >= 1).sort((a,b) => b.hits-a.hits);
+            const ownTop = hitDocs.filter(d => d.own).slice(0, 3);
+            const sharedTop = hitDocs.filter(d => !d.own).slice(0, Math.max(0, 5 - ownTop.length));
+            const relevant = ownTop.concat(sharedTop);
             if (relevant.length > 0) {
               docContext = '\n\n=== FROM KNOWLEDGE BASE ===\n' +
                 relevant.map(d => '[' + d.filename + ']\n' + d.section).join('\n\n');
+              // Only offer the downloadable file when the user actually asked for
+              // it (share/send/download a doc/pdf) — never attach it to unrelated
+              // answers. Prefer the top relevant doc's file; if a stale duplicate
+              // of the SAME file pushed the file-bearing chunk out of the top
+              // results, fall back to a matching chunk of that same filename.
+              if (fileIntent) {
+                const top = relevant[0];
+                const withFile = relevant.find(d => d.file_url) || (top && hitDocs.find(d => d.file_url && d.filename === top.filename));
+                if (withFile) docFile = { url: withFile.file_url, filename: withFile.filename };
+              }
             }
           }
         } catch(e) { /* no docs */ }
@@ -5552,6 +6239,7 @@ const server = http.createServer(async (req, res) => {
         // NPS detection: only use USER messages (not bot replies which mention many vendors)
         let vendorContext = '';
         let detectedVendor = null;
+        let npsForced = false;
         try {
           const userMsgsLower = (message + ' ' + (history.slice(-4).filter(m=>m.role==='user').map(m=>m.content).join(' '))).toLowerCase();
           // Also build a broader context including bot replies for knowledge injection (not NPS)
@@ -5579,13 +6267,24 @@ const server = http.createServer(async (req, res) => {
             const found = vendorNames.find(v => userMsgsLower.includes(v));
             if (found) detectedVendor = found;
           }
-          // Last resort: check the bot's most recent reply for a single clear vendor
-          // (only if user didn't name one — avoids the multi-vendor suggestion problem)
+          // NOTE: do NOT auto-detect NPS from the bot's previous reply. If the bot
+          // mentioned a vendor in passing (e.g. "Have you tried Stampede?") that is
+          // not a signal the user wants to rate it — only USER mentions/intent count.
+          // This previously triggered an unrelated Stampede NPS when the user was
+          // actually asking about SKY WiFi.
+          // List-free NPS: if the bot just asked which vendor to rate, the
+          // user's reply IS the vendor — allow ANY vendor, no allow-list.
           if (!detectedVendor && history.length > 0) {
-            const lastBotReply = (history.filter(m=>m.role==='assistant').slice(-1)[0]?.content || '').toLowerCase();
-            const botVendors = Object.entries(VENDOR_PROFILES).filter(([key]) => lastBotReply.includes(key));
-            // Only use bot reply if exactly 1 vendor is strongly referenced (not a list of suggestions)
-            if (botVendors.length === 1) detectedVendor = botVendors[0][0];
+            const lastBot = (history.filter(m=>m.role==='assistant').slice(-1)[0]?.content || '').toLowerCase();
+            const askedToRate = /(which|what)[^.?!]{0,50}(vendor|product|tool|system|supplier)[^.?!]{0,50}(rate|rating|review|feedback|nps)/.test(lastBot)
+                              || /(rate|rating|review|feedback|nps)[^.?!]{0,50}(which|what)[^.?!]{0,30}(vendor|product|tool|system|supplier)/.test(lastBot);
+            const v = message.trim()
+              .replace(/^(the |my |it'?s? |rate |i'?(d| would)? ?(like|want)? ?to ?rate ?|let'?s ?rate ?)/i,'')
+              .replace(/[.!?,]+$/,'').trim();
+            if (askedToRate && v && v.length <= 40 && v.split(/\s+/).length <= 5) {
+              detectedVendor = v.toLowerCase();
+              npsForced = true;
+            }
           }
         } catch(e) {}
 
@@ -5593,7 +6292,17 @@ const server = http.createServer(async (req, res) => {
         let videoContext = '';
         let preloadedVideos = [];
         try {
-          const allVidsR = await sbFetch('/rest/v1/videos?select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200');
+          // Scope videos to shared (tenant null/'stacked') + this workspace's own.
+          let allVidsR;
+          try {
+            const vq = workspaceId
+              ? '/rest/v1/videos?or=(tenant.is.null,tenant.eq.stacked,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200'
+              : '/rest/v1/videos?or=(tenant.is.null,tenant.eq.stacked)&select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200';
+            allVidsR = await sbFetch(vq);
+            if (!allVidsR || (allVidsR.status && allVidsR.status >= 400) || !Array.isArray(allVidsR.data)) throw new Error('scoped videos unavailable');
+          } catch(ve) {
+            allVidsR = await sbFetch('/rest/v1/videos?select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200');
+          }
           if (Array.isArray(allVidsR.data) && allVidsR.data.length > 0) {
             preloadedVideos = allVidsR.data;
             // Score against user message only — not history or AI reply — to stay specific
@@ -5617,11 +6326,57 @@ const server = http.createServer(async (req, res) => {
           }
         } catch(e) {}
 
-        const systemPrompt = `You are the Stacked Chat assistant — a friendly, direct AI support bot for hospitality operators in the UK. You specialise in hospitality technology troubleshooting.
+        // ── Dish/menu images: surface a photo ONLY when the user actually asks
+        // to SEE one (a photo/picture/image, or "what does it look like"). This
+        // prevents a photo popping up unprompted just because the chat mentioned
+        // something that happens to match an image name.
+        let imageContext = '';
+        let matchedImages = [];
+        const wantsPhoto = /\b(photo|photos|picture|pictures|image|images|pic|pics|snap|visual)\b/i.test(message) || /\blooks?\s+like\b/i.test(message) || /\bwhat\b.*\blooks?\b/i.test(message);
+        if (wantsPhoto) {
+          try {
+            const imgQ = workspaceId
+              ? '/rest/v1/images?or=(tenant.is.null,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=url,title,description&limit=300'
+              : '/rest/v1/images?tenant=is.null&select=url,title,description&limit=300';
+            let imgR; try { imgR = await sbFetch(imgQ); if (!imgR || (imgR.status && imgR.status >= 400) || !Array.isArray(imgR.data)) throw 0; } catch(e2) { imgR = { data: [] }; }
+            const imgs = Array.isArray(imgR.data) ? imgR.data : [];
+            if (imgs.length) {
+              const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','images','send','what','does','the','and','for','our','can','of','me','please']);
+              // Only gated by wantsPhoto, so it's safe to use recent turns to
+              // resolve "what does it look like" right after naming the item.
+              const imgSearch = ((message || '') + ' ' + history.slice(-3).map(m => (typeof m.content === 'string' ? m.content : '')).join(' ')).toLowerCase();
+              const words = [...new Set(imgSearch.split(/[\s,?!.;:()\[\]_]+/).filter(w => w.length >= 3 && !STOPI.has(w)))];
+              const scored = imgs.map(im => { const t = ((im.title || '') + ' ' + (im.description || '')).toLowerCase(); return { im: im, hits: words.filter(w => t.includes(w)).length }; });
+              matchedImages = scored.filter(s => s.hits >= 1).sort((a, b) => b.hits - a.hits).slice(0, 1).map(s => ({ url: s.im.url, title: s.im.title }));
+              if (matchedImages.length) {
+                imageContext = '\n\nIMAGE LIBRARY — you have a photo that matches this question:\n' +
+                  matchedImages.map(m => '- "' + m.title + '"').join('\n') +
+                  '\nIMPORTANT: If the photo is relevant, mention it naturally in one short sentence (e.g. "Here is a photo of the ' + matchedImages[0].title + ' below"). The image is attached automatically beneath your reply — never paste a URL or use technical phrases like "the system will attach".';
+              }
+            }
+          } catch(e) {}
+        }
+
+        // Tell the model whether a downloadable file link is ACTUALLY attached to
+        // this reply, so it never promises a "link below" that isn't there.
+        let docFileNote = '';
+        if (docFile) {
+          docFileNote = '\n\nSHAREABLE FILE: A download link for "' + docFile.filename + '" IS attached automatically beneath your reply. If the user wants to share, forward or download it, tell them to open/forward it using that link below.';
+        } else if (fileIntent) {
+          docFileNote = '\n\nSHAREABLE FILE: There is NO downloadable file link attached to this reply. If the user asks to share/forward/download a document file, do NOT claim a link is below. Explain the document was stored as text only, and an admin can re-add it with the "+" button (Add doc) to make the original file shareable.';
+        }
+
+        const systemPrompt = `You are Stacked Chat — a friendly, direct AI assistant for UK hospitality businesses. You answer ANY question about running this business using its own knowledge base: staff handbooks, SOPs, policies, supplier and delivery info, rotas, opening/closing procedures — as well as hospitality technology troubleshooting. Tech support is one of the things you do, not the only thing.
+
+ANSWER ONLY FROM THE KNOWLEDGE BASE — STRICT MODE. The KNOWLEDGE BASE you can use consists of THREE sources, and ONLY these three: (a) the shared / global knowledge maintained by Stacked admins and tech partners (shown under "FROM KNOWLEDGE BASE" below when relevant); (b) the asker's own venue's private documents uploaded by their venue admin (also shown under "FROM KNOWLEDGE BASE" when relevant); (c) the bundled "VENDOR KNOWLEDGE" / vendor support information embedded in this prompt. If the answer is in any of these three, USE it — do NOT refuse just because the user's exact wording or a qualifier (a season, a year, "summer", etc.) isn't in a document title. When your answer draws on a specific document, cite it briefly at the end, e.g. "Source: Staff Handbook" using the document's filename. DO NOT fall back to general training knowledge, generic best practice, "what usually applies", or your own assumptions for anything else. If the question is NOT covered by the three sources above, reply in this spirit: "I don't have that in your knowledge base yet — your admin can add it via the '+' button and I'll be able to answer this for the whole team next time." Keep it brief and friendly. Never invent or guess at facts, policies, contacts, prices, hours, ingredients or procedures that aren't in the loaded knowledge. This strict rule applies to every topic, not just allergens.
+
+IMAGES & PHOTOS: You CAN show photos added to this venue's library — when one matches, it attaches automatically beneath your reply (see "IMAGE LIBRARY" below if present). You can also READ an image a user attaches. You CANNOT email/download files or re-send an image the user just uploaded, so never say a flat "I am just a chat assistant, I cannot send images". IMPORTANT — when the user asks to SEE or SHARE a photo: FIRST answer their question fully from the knowledge base if the topic is covered there (give the details you have). NEVER say a document or topic is missing if it appears in the KNOWLEDGE BASE / documents below — it is only the PHOTO that might be missing. ONLY if no photo is attached beneath your reply, add ONE short line that a photo of it is not in the image library yet and an admin can add one with the "+" button. Do not refuse the whole request.
+
+DOCUMENTS & FILES: When your answer is based on an uploaded document that has a shareable file, a download link to that file is attached automatically beneath your reply. If the user asks to send, share, forward or download a document (e.g. "send me the PDF"), answer their question and tell them they can open or forward it using the link below — never say you are unable to send files. If the document has no file link (older uploads stored text only), say it can be re-added by an admin via "+" to make it shareable.
+
+ALLERGENS — STRICT (OVERRIDES THE GENERAL FALLBACK): Allergen, allergy, intolerance, "contains", "free from", "safe for [allergy/diet]", "any nuts/dairy/gluten/sesame/shellfish/eggs/soya/fish/celery/mustard/lupin/sulphites/molluscs/peanuts/crustaceans" and similar questions are SAFETY-CRITICAL (Natasha's Law). For ANY allergen or "may contain" question you MUST answer ONLY from THIS venue's own uploaded documents (their allergen matrix, recipe cards with allergen info, supplier specs). DO NOT guess from general knowledge, typical recipes, what an item "usually" contains, or general best practice — those are NOT acceptable sources for allergen advice. If the venue's documents do NOT clearly cover the specific item asked about, reply along these lines: "I don't have verified allergen information for [item] in your knowledge base. Please check with the kitchen or duty manager directly before serving. An admin can upload your allergen sheet via the '+' button so I can answer this accurately next time." Never improvise allergen statements. This rule overrides the general best-practice fallback above.
 
 LANGUAGE: Detect the language the user is writing in and reply in that same language. If they write in French, reply in French. If Spanish, reply in Spanish. Default to British English if unclear.
-
-ESCALATION: If the issue clearly needs human intervention — for example the user has tried all steps and it's still broken, there is data loss, a vendor outage, account access issues only the vendor can fix, or the user is losing significant revenue — add [ESCALATE] on its own line at the very end of your response. Keep your reply helpful and reassuring; the system will handle alerting the team automatically.
 
 Your personality:
 - Calm under pressure (operators often message you during a crisis)
@@ -5629,8 +6384,8 @@ Your personality:
 - Friendly but efficient
 - Use British English when responding in English
 
-PRODUCT DETECTION — this is critical:
-When a user describes a problem but does NOT mention the specific product or brand (e.g. they say "my till is broken" or "payments aren't working" without naming the system), you MUST ask which product they are using before troubleshooting. Ask in a single short friendly question.
+PRODUCT DETECTION (only for TECH / equipment problems — NOT for handbook, HR, policy, supplier, rota or other general questions):
+When a user reports a TECH or equipment fault but does NOT name the specific product or brand (e.g. "my till is broken" or "payments aren't working"), you MUST ask which product they are using before troubleshooting. Ask in a single short friendly question. For non-tech questions, do not ask about products — just answer from the knowledge base.
 
 EXCEPTION: If the venue's tech stack is provided above, skip asking — you already know their system.
 
@@ -5651,11 +6406,12 @@ Once you know the product, respond with:
 - A mid-service workaround if relevant
 - The vendor support URL inline
 
-NPS / VENDOR RATING REQUESTS:
-When a user says they want to rate their tech vendors, rate a product, give feedback, or provide an NPS score:
-1. Ask them which specific vendor/product they would like to rate. Be friendly and concise, e.g. "Sure! Which vendor would you like to rate? For example Lightspeed, Square, Tevalis, Dojo, OpenTable, Deputy, or any other product you use."
-2. Once they name the vendor, reply with a short confirmation like "Great — rating [vendor name] now." and add [NPS:vendorname] on its own line at the very end of your response (e.g. [NPS:lightspeed] or [NPS:resdiary]). Use the lowercase vendor key. The system will display the NPS rating widget automatically.
+NPS / VENDOR RATING REQUESTS (STRICT — only when the user EXPLICITLY asks):
+Only follow this flow when the USER says they want to rate / review / give feedback / give an NPS score for a product or vendor. NEVER volunteer an [NPS:...] tag just because a vendor was mentioned in passing (yours or theirs) — that produces wrong-vendor ratings (e.g. talking about SKY WiFi must never trigger a Stampede rating).
+1. If the user clearly wants to rate but hasn't named the vendor, ask which one. Friendly and concise, e.g. "Sure! Which vendor would you like to rate?"
+2. If the user names the vendor in the same message (e.g. "can I rate Sky?", "I want to give feedback on Tenzo"), reply with a short confirmation like "Great — rating [vendor name] now." and ALWAYS add [NPS:vendorname] on its own line at the very end (use the exact name the user gave, lowercased, e.g. [NPS:sky], [NPS:tenzo]). Allow ANY vendor name, even ones not in your support list.
 3. Do NOT ask them to rate on a scale yourself — the system handles the rating UI.
+4. Never emit [NPS:...] outside this explicit user-driven flow.
 
 Support URLs:
   --- POINT OF SALE ---
@@ -5743,14 +6499,26 @@ Support URLs:
   Cisco Meraki: https://documentation.meraki.com
 
 - ALWAYS include the full vendor support URL (starting with https://) when referencing a support page - never just the domain name
-- End with "If this hasn't resolved it, hit 'Raise a ticket' below" if the issue seems complex
 
 KNOWLEDGE BASE:
-${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
+${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${docFileNote}${venueContext}`;
 
         const messages = history.slice(-8).map(m => ({role:m.role,content:m.content}));
-        if (!messages.length || messages[messages.length-1].content !== message) {
-          messages.push({role:'user',content:message});
+        // Build the current user turn. If an image was attached, send it as a
+        // multimodal block so the model can actually SEE it (Claude vision).
+        const userContent = (image && image.data && image.media_type)
+          ? [
+              { type: 'image', source: { type: 'base64', media_type: image.media_type, data: image.data } },
+              { type: 'text', text: (message && message.trim()) ? message : 'Please look at this image and help me with it.' }
+            ]
+          : message;
+        const lastMsg = messages[messages.length - 1];
+        if (lastMsg && lastMsg.role === 'user') {
+          // The client already included this turn in history — upgrade it
+          // (attaches the image / ensures the text is present).
+          lastMsg.content = userContent;
+        } else {
+          messages.push({ role: 'user', content: userContent });
         }
 
         const https = require('https');
@@ -5784,16 +6552,24 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
         }
         const rawReply = apiRes.content?.[0]?.text || 'Sorry, I could not get a response. Please try again.';
 
-        // Detect supportUrl BEFORE cleaning — user message first (most accurate), then Claude's reply
+        // Detect supportUrl BEFORE cleaning — user message first (most accurate), then Claude's reply.
+        // Only surface a vendor support link when the user is genuinely asking for
+        // TECH HELP. A product name merely appearing (e.g. "Tech on Toast") must NOT
+        // trigger a support pill.
         let supportUrl = null;
         const userMsgLower = message.toLowerCase();
-        for (const [vendor, url] of Object.entries(VENDOR_SUPPORT_URLS)) {
-          if (userMsgLower.includes(vendor)) { supportUrl = url; break; }
-        }
-        if (!supportUrl) {
-          const mlm = rawReply.match(/\]\((https?:\/\/[^)]+)\)/);
-          if (mlm) supportUrl = mlm[1];
-          else { const pm = rawReply.match(/https?:\/\/[^\s)>\]]+/); if (pm) supportUrl = pm[0]; }
+        const techIntent = /\b(not working|isn'?t working|not connecting|won'?t|wont|broken|down|crash(ing|ed)?|error|issue|problem|fault|glitch|fix|setup|set ?up|configure|connect|disconnect|offline|frozen|freeze|stuck|reset|reboot|restart|re-?sync|sync|update|install|uninstall|log ?in|login|logged out|password|printer|terminal|card machine|payment|epos|e-?pos|till|\bpos\b|how do i|how to|troubleshoot|trouble|support|helpline|keeps|not printing|declined)\b/i.test(userMsgLower);
+        if (techIntent) {
+          // Guard against "tech on toast" matching the Toast POS vendor.
+          const vendorScan = userMsgLower.replace(/tech on toast/g, '');
+          for (const [vendor, url] of Object.entries(VENDOR_SUPPORT_URLS)) {
+            if (vendorScan.includes(vendor)) { supportUrl = url; break; }
+          }
+          if (!supportUrl) {
+            const mlm = rawReply.match(/\]\((https?:\/\/[^)]+)\)/);
+            if (mlm) supportUrl = mlm[1];
+            else { const pm = rawReply.match(/https?:\/\/[^\s)>\]]+/); if (pm) supportUrl = pm[0]; }
+          }
         }
 
         // Clean reply: strip markdown link syntax (keep label text), remove bare URLs
@@ -5829,46 +6605,23 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
           }
         } catch(e) {}
 
-        // ─── ESCALATION DETECTION ────────────────────────────────────────
-        const ESCALATION_PHRASES = [
-          'speak to someone','talk to someone','need a human','need a person',
-          'real person','human agent','actual person','still not working',
-          'still broken','nothing works','tried everything','tried all','not fixed',
-          'losing money','losing sales','no solution','cant fix','can\'t fix','given up'
-        ];
-        const botEscalate = rawReply.includes('[ESCALATE]');
-        const userEscalate = ESCALATION_PHRASES.some(p => message.toLowerCase().includes(p));
-        const longUnresolved = history.length >= 10;
-        const shouldEscalate = botEscalate || userEscalate || longUnresolved;
-
-        // Strip [ESCALATE] tag from reply text
+        // ─── ESCALATION REMOVED ──────────────────────────────────────────
+        // The "flagged for our team" handoff has been removed entirely.
+        // Strip any stray [ESCALATE] tag defensively so it can never leak.
         reply = reply.replace(/\[ESCALATE\]/g, '').trim();
         finalReply = finalReply.replace(/\[ESCALATE\]/g, '').trim();
 
         // Handle [NPS:vendorname] tag — AI-triggered NPS rating
-        const npsMatch = reply.match(/\[NPS:([a-z0-9 ]+)\]/i);
+        const npsMatch = reply.match(/\[NPS:([^\]]+)\]/i);
         if (npsMatch) {
           detectedVendor = npsMatch[1].toLowerCase().trim();
-          reply = reply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
-          finalReply = finalReply.replace(/\[NPS:[a-z0-9 ]+\]/gi, '').trim();
-        }
-
-        if (shouldEscalate) {
-          try {
-            const issue = history.length > 0
-              ? history.find(m => m.role === 'user')?.content || message
-              : message;
-            await sbFetch('/rest/v1/tickets', {
-              method: 'POST',
-              headers: { 'Prefer': 'return=minimal' },
-              body: { email: 'escalation@stackedchat.io', name: userName || 'Unknown', venue: venue || 'Unknown', issue: issue.substring(0, 300), status: 'open', escalated: true }
-            });
-            await sendSlackAlert({ venue, userName, email: 'via chat', issue: message.substring(0, 200), turns: history.length + 1 });
-          } catch(e) { console.error('Escalation error:', e); }
+          npsForced = true;
+          reply = reply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
+          finalReply = finalReply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
         }
 
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: shouldEscalate, videos:relevantVideos, videoCount:relevantVideos.length, detectedVendor, forceNPS: !!npsMatch}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: false, videos:relevantVideos, videoCount:relevantVideos.length, images: matchedImages, docFile, detectedVendor, forceNPS: npsForced || !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
@@ -6042,77 +6795,6 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
     }); return;
   }
 
-  // ─── HEALTH CHECK SAVE ─────────────────────────────────────────────────
-  if (method === 'POST' && url === '/health-check') {
-    let body = '';
-    req.on('data', c => body += c);
-    req.on('end', async () => {
-      try {
-        const payload = JSON.parse(body);
-        await sbFetch('/rest/v1/health_checks', {
-          method: 'POST',
-          headers: { 'Prefer': 'return=minimal' },
-          body: payload
-        });
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ok:true}));
-      } catch(e) {
-        console.error('[health-check]', e.message);
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ok:false,error:e.message}));
-      }
-    }); return;
-  }
-
-  // ─── HEALTH CHECKS LIST ────────────────────────────────────────────────
-  if (method === 'GET' && url.startsWith('/health-checks')) {
-    try {
-      const params = new URL(url, 'http://localhost');
-      const venueId = params.searchParams.get('venue_id');
-      const filter = venueId
-        ? '/rest/v1/health_checks?select=*&venue_id=eq.' + encodeURIComponent(venueId) + '&order=checked_at.desc&limit=50'
-        : '/rest/v1/health_checks?select=*&order=checked_at.desc&limit=50';
-      const r = await sbFetch(filter);
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify(Array.isArray(r.data) ? r.data : []));
-    } catch(e) {
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify([]));
-    }
-    return;
-  }
-
-  // ─── CRON: SHIFT CHECK REMINDER ───────────────────────────────────────
-  if (method === 'POST' && url === '/cron/remind') {
-    const params = new URL(url, 'http://localhost');
-    let body = ''; req.on('data', c => body += c);
-    req.on('end', async () => {
-      try {
-        const { secret } = JSON.parse(body || '{}');
-        if (secret !== CRON_SECRET) { res.writeHead(401); res.end('Unauthorised'); return; }
-        // Fetch recent active venues
-        const vr = await sbFetch('/rest/v1/venues?select=name,id&order=created_at.desc&limit=100');
-        const venues = Array.isArray(vr.data) ? vr.data : [];
-        const day = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
-        const time = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-        if (SLACK_WEBHOOK_URL) {
-          const text = [
-            `☀️ *Good morning — time for your shift check!*`,
-            `It's ${day} at ${time}. Before service kicks off, make sure your tech is green across the board.`,
-            ``,
-            `*${venues.length} venue${venues.length !== 1 ? 's' : ''} active on Stacked Chat.*`,
-            `Open the app and hit *Start of shift check* to log your system status.`,
-          ].join('\n');
-          await sendSlackAlert({ venue: 'All venues', userName: 'Cron', email: '', issue: text, turns: 0 });
-        }
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok: true, venueCount: venues.length }));
-      } catch(e) {
-        res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
-      }
-    }); return;
-  }
-
   // ─── VENUE BRANDING SAVE ──────────────────────────────────────────────
   if (method === 'POST' && url.startsWith('/venue/') && url.endsWith('/branding')) {
     let body = ''; req.on('data', c => body += c);
@@ -6144,506 +6826,6 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${venueContext}`;
       res.end(JSON.stringify([]));
     }
     return;
-  }
-
-  // ─── VENUE DASHBOARD TOKEN BY NAME ───────────────────────────────────────
-  if (method === 'POST' && url === '/venues/generate-token-by-name') {
-    let body = ''; req.on('data', c => body += c);
-    req.on('end', async () => {
-      try {
-        const { name } = JSON.parse(body);
-        if (!name) { res.writeHead(400); res.end(JSON.stringify({ error: 'name required' })); return; }
-        const crypto = require('crypto');
-        // Look up by name (case-insensitive)
-        const found = await sbFetch('/rest/v1/venues?select=id,dashboard_token&name=ilike.' + encodeURIComponent(name) + '&limit=1');
-        let venue = found.data && found.data[0];
-        if (!venue) {
-          // Create a minimal venue record
-          const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-          const token = crypto.randomBytes(16).toString('hex');
-          const created = await sbFetch('/rest/v1/venues', { method: 'POST', headers: { 'Prefer': 'return=representation' }, body: { name, slug, dashboard_token: token } });
-          if (!created.data || !created.data[0]) throw new Error('Could not create venue record');
-          res.writeHead(200, {'Content-Type':'application/json'});
-          res.end(JSON.stringify({ ok: true, token }));
-          return;
-        }
-        let token = venue.dashboard_token;
-        if (!token) {
-          token = crypto.randomBytes(16).toString('hex');
-          await sbFetch('/rest/v1/venues?id=eq.' + venue.id, { method: 'PATCH', headers: { 'Prefer': 'return=minimal' }, body: { dashboard_token: token } });
-        }
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok: true, token }));
-      } catch(e) {
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok: false, error: e.message }));
-      }
-    }); return;
-  }
-
-  // ─── VENUE DASHBOARD TOKEN GENERATION ────────────────────────────────────
-  if (method === 'POST' && url.match(/^\/venues\/[^/]+\/generate-token$/)) {
-    try {
-      const id = url.split('/')[2];
-      const existing = await sbFetch('/rest/v1/venues?select=id,dashboard_token&id=eq.' + id + '&limit=1');
-      let token = existing.data && existing.data[0] && existing.data[0].dashboard_token;
-      if (!token) {
-        const crypto = require('crypto');
-        token = crypto.randomBytes(16).toString('hex');
-        await sbFetch('/rest/v1/venues?id=eq.' + id, { method: 'PATCH', headers: { 'Prefer': 'return=minimal' }, body: { dashboard_token: token } });
-      }
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({ ok: true, token }));
-    } catch(e) {
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({ ok: false, error: e.message }));
-    }
-    return;
-  }
-
-  // ─── VENUE DASHBOARD DATA ─────────────────────────────────────────────────
-  if (method === 'GET' && url.startsWith('/venue-data/')) {
-    try {
-      const token = url.split('/venue-data/')[1];
-      const vr = await sbFetch('/rest/v1/venues?select=id,name,slug,primary_color,logo_url,bot_name&dashboard_token=eq.' + encodeURIComponent(token) + '&limit=1');
-      if (!vr.data || !vr.data[0]) { res.writeHead(404); res.end(JSON.stringify({ error: 'Not found' })); return; }
-      const venue = vr.data[0];
-      const [convsR, npsR] = await Promise.all([
-        sbFetch('/rest/v1/conversations?select=id,email,name,venue,messages,created_at&order=created_at.desc&limit=500'),
-        sbFetch('/rest/v1/nps_scores?select=vendor,score,comment,respondent_name,created_at&order=created_at.desc&limit=500'),
-      ]);
-      const allConvs = Array.isArray(convsR.data) ? convsR.data : [];
-      const convs = allConvs.filter(c => (c.venue || '').toLowerCase() === venue.name.toLowerCase());
-      const totalMsgs = convs.reduce((n, c) => n + (c.messages || []).filter(m => m.role === 'user').length, 0);
-      const lastSeen = convs.length ? convs[0].created_at : null;
-      const allNps = Array.isArray(npsR.data) ? npsR.data : [];
-      const venueNps = allNps.filter(n => (n.vendor || '').toLowerCase() === venue.name.toLowerCase());
-      let nps = null;
-      if (venueNps.length) {
-        const scores = venueNps.map(n => n.score);
-        const promoters = scores.filter(s => s >= 9).length;
-        const detractors = scores.filter(s => s <= 6).length;
-        nps = { score: Math.round((promoters / scores.length - detractors / scores.length) * 100), count: scores.length, avg: (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) };
-      }
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({ venue, convs: convs.slice(0, 20), totalConvs: convs.length, totalMsgs, lastSeen, nps }));
-    } catch(e) {
-      res.writeHead(500); res.end(JSON.stringify({ error: e.message }));
-    }
-    return;
-  }
-
-  // ─── VENUE DASHBOARD PAGE ─────────────────────────────────────────────────
-  if (method === 'GET' && url.startsWith('/venue-dashboard/')) {
-    try {
-      const token = url.split('/venue-dashboard/')[1];
-      const vr = await sbFetch('/rest/v1/venues?select=id,name,primary_color&dashboard_token=eq.' + encodeURIComponent(token) + '&limit=1');
-      if (!vr.data || !vr.data[0]) {
-        res.writeHead(404, {'Content-Type':'text/html'});
-        res.end('<html><body style="font-family:sans-serif;padding:40px;background:#F7EDE0"><h2>Link not found</h2><p>This dashboard link is invalid or has been removed.</p></body></html>');
-        return;
-      }
-      const v = vr.data[0];
-      const accent = v.primary_color || '#E8622A';
-      const page = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${v.name} — Stacked Chat</title>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=DM+Sans:wght@300..700&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#F7EDE0;font-family:'DM Sans',system-ui,sans-serif;color:#1A1100;min-height:100vh}
-.header{background:#fff;border-bottom:1px solid #E2D4C0;padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
-.header-title{font-family:'Archivo Black',sans-serif;font-size:20px;color:#1A1100}
-.header-sub{font-size:13px;color:#6A5545}
-.powered{font-size:11px;color:#A08870;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
-.content{max-width:900px;margin:0 auto;padding:32px 24px}
-.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:32px}
-.kpi{background:#fff;border:1px solid #E2D4C0;border-radius:12px;padding:20px 24px}
-.kpi-label{font-size:12px;color:#6A5545;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-.kpi-value{font-family:'Archivo Black',sans-serif;font-size:28px;color:#1A1100}
-.kpi-sub{font-size:12px;color:#A08870;margin-top:2px}
-.nps-pill{display:inline-block;padding:2px 10px;border-radius:20px;font-size:13px;font-weight:700;background:#dcfce7;color:#166534}
-.nps-pill.neg{background:#fee2e2;color:#991b1b}
-.section-title{font-family:'Archivo Black',sans-serif;font-size:15px;color:#1A1100;margin-bottom:16px}
-.conv-list{display:flex;flex-direction:column;gap:8px}
-.conv-card{background:#fff;border:1px solid #E2D4C0;border-radius:10px;padding:14px 18px;display:flex;align-items:flex-start;gap:12px}
-.conv-avatar{width:34px;height:34px;border-radius:50%;background:${accent};color:#fff;display:flex;align-items:center;justify-content:center;font-family:'Archivo Black',sans-serif;font-size:13px;flex-shrink:0}
-.conv-name{font-weight:600;font-size:14px;color:#1A1100}
-.conv-meta{font-size:12px;color:#A08870;margin-top:2px}
-.conv-preview{font-size:13px;color:#6A5545;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:600px}
-.empty{color:#A08870;font-size:14px;padding:32px;text-align:center;background:#fff;border:1px solid #E2D4C0;border-radius:12px}
-.nps-section{background:#fff;border:1px solid #E2D4C0;border-radius:12px;padding:20px 24px;margin-bottom:32px}
-</style>
-</head><body>
-<div class="header">
-  <div>
-    <div class="header-title">${v.name}</div>
-    <div class="header-sub">Support activity overview</div>
-  </div>
-  <div class="powered">Powered by Stacked Chat</div>
-</div>
-<div class="content" id="app"><div class="empty">Loading...</div></div>
-<script>
-const TOKEN='${token}';
-async function load(){
-  const app=document.getElementById('app');
-  try{
-    const r=await fetch('/venue-data/'+TOKEN);
-    const d=await r.json();
-    if(d.error){app.innerHTML='<div class="empty">'+d.error+'</div>';return;}
-    const lastD=d.lastSeen?new Date(d.lastSeen).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):'—';
-    let npsHtml='';
-    if(d.nps){
-      const cls=d.nps.score>=0?'':'neg';
-      npsHtml='<div class="nps-section"><div class="section-title">Customer Satisfaction (NPS)</div>'+
-        '<div style="display:flex;align-items:center;gap:12px">'+
-        '<span class="nps-pill '+cls+'">'+(d.nps.score>0?'+':'')+d.nps.score+' NPS</span>'+
-        '<span style="font-size:13px;color:#6A5545">Avg rating: <strong>'+d.nps.avg+'/10</strong> from '+d.nps.count+' responses</span>'+
-        '</div></div>';
-    }
-    let convHtml='<div class="empty">No conversations yet</div>';
-    if(d.convs&&d.convs.length){
-      convHtml=d.convs.map(c=>{
-        const initials=(c.name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-        const dt=new Date(c.created_at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-        const msgs=(c.messages||[]).filter(m=>m.role==='user');
-        const preview=msgs.length?msgs[msgs.length-1].content.slice(0,100):'';
-        return '<div class="conv-card">'+
-          '<div class="conv-avatar">'+initials+'</div>'+
-          '<div style="flex:1;min-width:0">'+
-            '<div class="conv-name">'+(c.name||'Anonymous')+'</div>'+
-            '<div class="conv-meta">'+(c.email||'')+(c.email&&dt?' · ':'')+dt+' · '+msgs.length+' message'+(msgs.length!==1?'s':'')+'</div>'+
-            (preview?'<div class="conv-preview">'+preview+'</div>':'')+
-          '</div>'+
-        '</div>';
-      }).join('');
-    }
-    app.innerHTML=
-      '<div class="kpi-row">'+
-        '<div class="kpi"><div class="kpi-label">Total chats</div><div class="kpi-value">'+d.totalConvs+'</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Messages sent</div><div class="kpi-value">'+d.totalMsgs+'</div></div>'+
-        '<div class="kpi"><div class="kpi-label">Last active</div><div class="kpi-value" style="font-size:18px">'+lastD+'</div></div>'+
-      '</div>'+
-      npsHtml+
-      '<div class="section-title">Recent conversations</div>'+
-      '<div class="conv-list">'+convHtml+'</div>';
-  }catch(e){app.innerHTML='<div class="empty">Error: '+e.message+'</div>';}
-}
-load();
-</script>
-</body></html>`;
-      res.writeHead(200, {'Content-Type':'text/html'});
-      res.end(page);
-    } catch(e) {
-      res.writeHead(500, {'Content-Type':'text/html'});
-      res.end('<html><body>Error: ' + e.message + '</body></html>');
-    }
-    return;
-  }
-
-  // ─── SURVEYS ───────────────────────────────────────────────────────────────
-
-  // GET /surveys — list all surveys with counts
-  if (method === 'GET' && url === '/surveys') {
-    try {
-      const [sR, qR, recR] = await Promise.all([
-        sbFetch('/rest/v1/surveys?select=id,title,description,status,created_at&order=created_at.desc&limit=100'),
-        sbFetch('/rest/v1/survey_questions?select=id,survey_id&limit=2000'),
-        sbFetch('/rest/v1/survey_recipients?select=id,survey_id,responded_at&limit=5000')
-      ]);
-      const surveys = Array.isArray(sR.data) ? sR.data : [];
-      const questions = Array.isArray(qR.data) ? qR.data : [];
-      const recipients = Array.isArray(recR.data) ? recR.data : [];
-      const result = surveys.map(s => ({
-        ...s,
-        question_count: questions.filter(q => q.survey_id === s.id).length,
-        total_recipients: recipients.filter(r => r.survey_id === s.id).length,
-        responded: recipients.filter(r => r.survey_id === s.id && r.responded_at).length
-      }));
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify(result));
-    } catch(e) {
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify([]));
-    }
-    return;
-  }
-
-  // POST /surveys — create survey with questions
-  if (method === 'POST' && url === '/surveys') {
-    let body = ''; req.on('data', c => body += c);
-    req.on('end', async () => {
-      try {
-        const { title, description, questions } = JSON.parse(body);
-        if (!title) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Title required'})); return; }
-        const sR = await sbFetch('/rest/v1/surveys', { method:'POST', headers:{'Prefer':'return=representation'}, body:{ title, description: description||null, status:'active' } });
-        const survey = Array.isArray(sR.data) ? sR.data[0] : null;
-        if (!survey) throw new Error('Failed to create survey');
-        if (questions && questions.length) {
-          for (const q of questions) {
-            await sbFetch('/rest/v1/survey_questions', { method:'POST', headers:{'Prefer':'return=minimal'}, body:{ survey_id:survey.id, label:q.label, type:q.type, options:q.options||null, required:q.required||false, position:q.position||0 } });
-          }
-        }
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok:true, id:survey.id }));
-      } catch(e) {
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok:false, error:e.message }));
-      }
-    }); return;
-  }
-
-  // DELETE /surveys/:id
-  if (method === 'DELETE' && url.startsWith('/surveys/') && !url.includes('/recipients') && !url.includes('/results')) {
-    const surveyId = url.split('/surveys/')[1];
-    try {
-      await sbFetch('/rest/v1/surveys?id=eq.' + encodeURIComponent(surveyId), { method:'DELETE' });
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({ ok:true }));
-    } catch(e) {
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({ ok:false, error:e.message }));
-    }
-    return;
-  }
-
-  // POST /surveys/:id/recipients — generate unique links
-  if (method === 'POST' && url.match(/^\/surveys\/[^/]+\/recipients$/)) {
-    const surveyId = url.split('/')[2];
-    let body = ''; req.on('data', c => body += c);
-    req.on('end', async () => {
-      try {
-        const { recipients } = JSON.parse(body);
-        const host = req.headers.host || 'localhost';
-        const proto = req.headers['x-forwarded-proto'] || 'http';
-        const baseUrl = proto + '://' + host;
-        const links = [];
-        for (const rec of recipients) {
-          const token = generateSurveyToken();
-          await sbFetch('/rest/v1/survey_recipients', { method:'POST', headers:{'Prefer':'return=minimal'}, body:{ survey_id:surveyId, email:rec.email, name:rec.name||null, token } });
-          links.push({ email:rec.email, token, url: baseUrl + '/survey/' + token });
-        }
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok:true, links }));
-      } catch(e) {
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok:false, error:e.message }));
-      }
-    }); return;
-  }
-
-  // GET /surveys/:id/recipients — list recipients with links
-  if (method === 'GET' && url.match(/^\/surveys\/[^/]+\/recipients$/)) {
-    const surveyId = url.split('/')[2];
-    try {
-      const rR = await sbFetch('/rest/v1/survey_recipients?select=email,token,responded_at&survey_id=eq.' + encodeURIComponent(surveyId) + '&order=created_at.asc&limit=500');
-      const recs = Array.isArray(rR.data) ? rR.data : [];
-      const host = req.headers.host || 'localhost';
-      const proto = req.headers['x-forwarded-proto'] || 'http';
-      const baseUrl = proto + '://' + host;
-      const recipients = recs.map(r => ({ ...r, url: baseUrl + '/survey/' + r.token }));
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({ ok:true, recipients }));
-    } catch(e) {
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({ ok:false, error:e.message }));
-    }
-    return;
-  }
-
-  // GET /surveys/:id/results — aggregated responses
-  if (method === 'GET' && url.match(/^\/surveys\/[^/]+\/results$/)) {
-    const surveyId = url.split('/')[2];
-    try {
-      const [sR, qR, recR, respR] = await Promise.all([
-        sbFetch('/rest/v1/surveys?select=id,title,description,status&id=eq.' + encodeURIComponent(surveyId) + '&limit=1'),
-        sbFetch('/rest/v1/survey_questions?select=id,label,type,options,position&survey_id=eq.' + encodeURIComponent(surveyId) + '&order=position.asc&limit=100'),
-        sbFetch('/rest/v1/survey_recipients?select=id,responded_at&survey_id=eq.' + encodeURIComponent(surveyId) + '&limit=2000'),
-        sbFetch('/rest/v1/survey_responses?select=question_id,answer&survey_id=eq.' + encodeURIComponent(surveyId) + '&limit=10000')
-      ]);
-      const survey = Array.isArray(sR.data) ? sR.data[0] : null;
-      if (!survey) { res.writeHead(404, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Not found'})); return; }
-      const questions = Array.isArray(qR.data) ? qR.data : [];
-      const recipients = Array.isArray(recR.data) ? recR.data : [];
-      const responses = Array.isArray(respR.data) ? respR.data : [];
-      const result = {
-        ok: true,
-        survey,
-        total_recipients: recipients.length,
-        total_responses: recipients.filter(r => r.responded_at).length,
-        questions: questions.map(q => ({
-          ...q,
-          answers: responses.filter(r => r.question_id === q.id).map(r => r.answer).filter(Boolean)
-        }))
-      };
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify(result));
-    } catch(e) {
-      res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify({ ok:false, error:e.message }));
-    }
-    return;
-  }
-
-  // GET /survey/:token — public survey page
-  if (method === 'GET' && url.match(/^\/survey\/[a-f0-9]{32}$/)) {
-    const token = url.split('/survey/')[1];
-    try {
-      const recR = await sbFetch('/rest/v1/survey_recipients?select=id,survey_id,responded_at&token=eq.' + encodeURIComponent(token) + '&limit=1');
-      const rec = Array.isArray(recR.data) ? recR.data[0] : null;
-      if (!rec) { res.writeHead(404, {'Content-Type':'text/html'}); res.end('<h2>Survey not found</h2>'); return; }
-      const [sR, qR] = await Promise.all([
-        sbFetch('/rest/v1/surveys?select=title,description&id=eq.' + encodeURIComponent(rec.survey_id) + '&limit=1'),
-        sbFetch('/rest/v1/survey_questions?select=id,label,type,options,required,position&survey_id=eq.' + encodeURIComponent(rec.survey_id) + '&order=position.asc&limit=100')
-      ]);
-      const survey = Array.isArray(sR.data) ? sR.data[0] : null;
-      const questions = Array.isArray(qR.data) ? qR.data : [];
-      if (!survey) { res.writeHead(404, {'Content-Type':'text/html'}); res.end('<h2>Survey not found</h2>'); return; }
-
-      const alreadyDone = !!rec.responded_at;
-      const esc2 = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-
-      let questionsHtml = questions.map(q => {
-        let input = '';
-        if (q.type === 'short_text') input = '<input type="text" name="'+q.id+'" data-qid="'+q.id+'" placeholder="Your answer" style="width:100%;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:15px;font-family:inherit;color:#111;background:#fff;box-sizing:border-box"'+(q.required?' required':'')+'>';
-        else if (q.type === 'long_text') input = '<textarea name="'+q.id+'" data-qid="'+q.id+'" placeholder="Your answer" rows="4" style="width:100%;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:15px;font-family:inherit;color:#111;background:#fff;resize:vertical;box-sizing:border-box"'+(q.required?' required':'')+'></textarea>';
-        else if (q.type === 'rating') input = '<div style="display:flex;gap:8px;flex-wrap:wrap">'
-          +[1,2,3,4,5].map(v=>'<label style="cursor:pointer"><input type="radio" name="'+q.id+'" data-qid="'+q.id+'" value="'+v+'" style="display:none" onchange="selectRating(this)"'+(q.required?' required':'')+'><span class="ratingBtn" data-val="'+v+'" style="display:flex;align-items:center;justify-content:center;width:52px;height:52px;border:2px solid #e5e5e5;border-radius:10px;font-size:18px;font-weight:700;color:#666;cursor:pointer;transition:all .15s">'+v+'</span></label>').join('')
-          +'</div>';
-        else if (q.type === 'multiple_choice') {
-          const opts = Array.isArray(q.options) ? q.options : [];
-          input = '<div style="display:flex;flex-direction:column;gap:8px">'
-            +opts.map(o=>'<label style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1.5px solid #e5e5e5;border-radius:8px;cursor:pointer;font-size:15px;color:#111;transition:border-color .15s" onclick="selectMC(this)">'
-              +'<input type="radio" name="'+q.id+'" data-qid="'+q.id+'" value="'+esc2(o)+'" style="display:none"'+(q.required?' required':'')+'>'
-              +'<span class="mc-dot" style="width:18px;height:18px;border:2px solid #ccc;border-radius:50%;flex-shrink:0;transition:all .15s"></span>'
-              +esc2(o)+'</label>').join('')
-            +'</div>';
-        }
-        return '<div class="survey-question" style="margin-bottom:28px"><div style="font-size:16px;font-weight:600;color:#111;margin-bottom:10px">'+esc2(q.label)+(q.required?'<span style="color:#E8573C;margin-left:3px">*</span>':'')+'</div>'+input+'</div>';
-      }).join('');
-
-      const page = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc2(survey.title)}</title>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:#F9F8F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;min-height:100vh;padding:24px 16px 48px}
-.shell{max-width:580px;margin:0 auto}
-.brand{display:flex;align-items:center;gap:8px;margin-bottom:28px}
-.brand-dot{width:28px;height:28px;background:#E8573C;border-radius:6px}
-.brand-name{font-size:14px;font-weight:700;color:#333;letter-spacing:.02em}
-.card{background:#fff;border-radius:14px;padding:28px;box-shadow:0 1px 3px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.04);margin-bottom:20px}
-.survey-title{font-size:22px;font-weight:800;margin-bottom:8px;color:#111}
-.survey-desc{font-size:15px;color:#666;line-height:1.5;margin-bottom:4px}
-.submit-btn{width:100%;padding:15px;background:#E8573C;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:opacity .15s;box-shadow:0 4px 0 0 #a83020;margin-top:8px}
-.submit-btn:hover{opacity:.9}
-.submit-btn:disabled{opacity:.6;cursor:default}
-.done-card{text-align:center;padding:48px 28px}
-.done-icon{font-size:48px;margin-bottom:16px}
-.done-title{font-size:20px;font-weight:800;margin-bottom:8px}
-.done-sub{font-size:15px;color:#666}
-</style>
-</head>
-<body>
-<div class="shell">
-  <div class="brand">
-    <div class="brand-dot"></div>
-    <span class="brand-name">Stacked</span>
-  </div>
-  ${alreadyDone ? `
-  <div class="card done-card">
-    <div class="done-icon">✅</div>
-    <div class="done-title">Already submitted</div>
-    <div class="done-sub">You've already completed this survey — thanks for your feedback!</div>
-  </div>
-  ` : `
-  <div class="card">
-    <div class="survey-title">${esc2(survey.title)}</div>
-    ${survey.description ? `<div class="survey-desc">${esc2(survey.description)}</div>` : ''}
-  </div>
-  <div class="card" id="surveyCard">
-    <form id="surveyForm" onsubmit="submitSurvey(event)">
-      ${questionsHtml}
-      <button type="submit" class="submit-btn" id="submitBtn">Submit &rarr;</button>
-    </form>
-  </div>
-  <div class="card done-card" id="thankYou" style="display:none">
-    <div class="done-icon">🙏</div>
-    <div class="done-title">Thanks for your response!</div>
-    <div class="done-sub">Your feedback has been recorded.</div>
-  </div>
-  `}
-</div>
-<script>
-function selectRating(radio) {
-  const name = radio.name;
-  document.querySelectorAll('input[name="'+name+'"]').forEach(r => {
-    const span = r.nextElementSibling;
-    if(span){span.style.borderColor=r.checked?'#E8573C':'#e5e5e5';span.style.color=r.checked?'#E8573C':'#666';span.style.background=r.checked?'#fff5f3':'#fff';}
-  });
-}
-function selectMC(label) {
-  const radio = label.querySelector('input[type=radio]');
-  const name = radio.name;
-  document.querySelectorAll('input[name="'+name+'"]').forEach(r => {
-    const lbl = r.closest('label');
-    const dot = lbl ? lbl.querySelector('.mc-dot') : null;
-    if(lbl){lbl.style.borderColor=r===radio?'#E8573C':'#e5e5e5';lbl.style.background=r===radio?'#fff5f3':'#fff';}
-    if(dot){dot.style.background=r===radio?'#E8573C':'transparent';dot.style.borderColor=r===radio?'#E8573C':'#ccc';}
-  });
-  radio.checked = true;
-}
-async function submitSurvey(e) {
-  e.preventDefault();
-  const btn = document.getElementById('submitBtn');
-  btn.disabled=true; btn.textContent='Submitting...';
-  const answers = {};
-  document.querySelectorAll('[data-qid]').forEach(el => {
-    if(el.type==='radio'&&!el.checked) return;
-    if(el.value.trim()) answers[el.dataset.qid] = el.value.trim();
-  });
-  try {
-    const r = await fetch(location.pathname+'/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers})});
-    const d = await r.json();
-    if(d.ok){document.getElementById('surveyCard').style.display='none';document.getElementById('thankYou').style.display='';}
-    else{btn.disabled=false;btn.textContent='Submit →';alert('Something went wrong — please try again.');}
-  } catch(err){btn.disabled=false;btn.textContent='Submit →';}
-}
-</script>
-</body>
-</html>`;
-      res.writeHead(200, {'Content-Type':'text/html','Cache-Control':'no-store'});
-      res.end(page);
-    } catch(e) {
-      res.writeHead(500, {'Content-Type':'text/html'});
-      res.end('<h2>Error: '+e.message+'</h2>');
-    }
-    return;
-  }
-
-  // POST /survey/:token/submit — record responses
-  if (method === 'POST' && url.match(/^\/survey\/[a-f0-9]{32}\/submit$/)) {
-    const token = url.split('/survey/')[1].split('/submit')[0];
-    let body = ''; req.on('data', c => body += c);
-    req.on('end', async () => {
-      try {
-        const { answers } = JSON.parse(body);
-        const recR = await sbFetch('/rest/v1/survey_recipients?select=id,survey_id,responded_at&token=eq.' + encodeURIComponent(token) + '&limit=1');
-        const rec = Array.isArray(recR.data) ? recR.data[0] : null;
-        if (!rec) { res.writeHead(404, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Not found'})); return; }
-        if (rec.responded_at) { res.writeHead(409, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:'Already submitted'})); return; }
-        for (const [question_id, answer] of Object.entries(answers||{})) {
-          await sbFetch('/rest/v1/survey_responses', { method:'POST', headers:{'Prefer':'return=minimal'}, body:{ recipient_id:rec.id, survey_id:rec.survey_id, question_id, answer } });
-        }
-        await sbFetch('/rest/v1/survey_recipients?id=eq.' + encodeURIComponent(rec.id), { method:'PATCH', headers:{'Prefer':'return=minimal'}, body:{ responded_at: new Date().toISOString() } });
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok:true }));
-      } catch(e) {
-        res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({ ok:false, error:e.message }));
-      }
-    }); return;
   }
 
   // ─── WEB SCRAPER ───────────────────────────────────────────────────────────
@@ -6687,27 +6869,6 @@ async function submitSurvey(e) {
             await sbFetch('/rest/v1/documents', { method: 'POST', headers: { 'Prefer': 'return=minimal' }, body: chunk });
           }
           return { chunks: chunks.length, chars: text.length, filename };
-        }
-
-        // ── Google Docs / Drive detection ──────────────────────────────────
-        const gdocMatch   = scrapeUrl.match(/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
-        const gsheetMatch = scrapeUrl.match(/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
-        const gdriveMatch = scrapeUrl.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([a-zA-Z0-9_-]+)/);
-        if (gdocMatch || gsheetMatch || gdriveMatch) {
-          const docId = (gdocMatch || gsheetMatch || gdriveMatch)[1];
-          const exportUrl = gsheetMatch
-            ? `https://docs.google.com/spreadsheets/d/${docId}/export?format=csv`
-            : gdocMatch
-              ? `https://docs.google.com/document/d/${docId}/export?format=txt`
-              : `https://drive.google.com/uc?export=download&id=${docId}`;
-          const gRes = await fetch(exportUrl, { signal: AbortSignal.timeout(20000), redirect: 'follow' });
-          if (!gRes.ok) throw new Error('Could not fetch Google document (HTTP ' + gRes.status + ') — make sure sharing is set to "Anyone with the link can view"');
-          const gText = await gRes.text();
-          if (gText.length < 50) throw new Error('Document appears empty or access was denied — check the sharing settings');
-          const result = await saveChunks(gText, vendor || 'Google Drive doc', scrapeUrl);
-          res.writeHead(200, {'Content-Type':'application/json'});
-          res.end(JSON.stringify({ ok: true, ...result, method: 'google-drive' }));
-          return;
         }
 
         // ── Zendesk Help Centre detection ──────────────────────────────────
@@ -6901,8 +7062,4 @@ async function fetchYouTubeTranscript(videoId) {
   throw new Error('Could not fetch transcript. Try uploading a .txt transcript manually.');
 }
 
-// Boot banner — deliberately greppable. If you don't see this exact line in
-// Railway logs after a deploy, the new build isn't live and any code changes
-// in this file haven't taken effect yet.
-const BUILD_TAG = 'chat-fix-2026-04-22';
-server.listen(PORT, () => console.log(`[boot] Stacked Chat server running on port ${PORT} — build=${BUILD_TAG}`));
+server.listen(PORT, () => console.log(`Stacked Chat server running on port ${PORT}`));
