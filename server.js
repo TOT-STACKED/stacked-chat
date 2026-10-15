@@ -13,15 +13,15 @@ const STACKCOLLECT_SUPABASE_KEY = process.env.STACKCOLLECT_SUPABASE_KEY || 'eyJh
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
 // Secrets must come from the environment. There are deliberately no fallback
 // defaults: this repo is public, so any default would be a known credential.
-// Set STACKED_ADMIN_PASSWORD and CRON_SECRET on Render + Railway.
+// Set STACKED_ADMIN_PASSWORD and CRON_SECRET on Render + Railway. If either is
+// missing the server still starts (so deploys never fail on config), but the
+// feature that needs it stays switched off (fail closed) until it is set.
 const CRON_SECRET = process.env.CRON_SECRET || '';
 const ADMIN_PW = process.env.STACKED_ADMIN_PASSWORD || '';
-if (!ADMIN_PW || !CRON_SECRET) {
-  console.error('FATAL: STACKED_ADMIN_PASSWORD and CRON_SECRET must be set. Refusing to start without them.');
-  process.exit(1);
-}
+if (!ADMIN_PW) console.error('WARNING: STACKED_ADMIN_PASSWORD is not set. /admin login is DISABLED until it is.');
+if (!CRON_SECRET) console.error('WARNING: CRON_SECRET is not set. /cron/digest is DISABLED until it is.');
 const crypto = require('crypto');
-const ADMIN_TOKEN = crypto.createHash('sha256').update('sa::' + ADMIN_PW).digest('hex').slice(0, 40);
+const ADMIN_TOKEN = ADMIN_PW ? crypto.createHash('sha256').update('sa::' + ADMIN_PW).digest('hex').slice(0, 40) : null;
 // Constant-time string compare so secrets can't be guessed via response timing.
 function safeEqual(a, b) {
   const ba = Buffer.from(String(a)), bb = Buffer.from(String(b));
@@ -30,7 +30,7 @@ function safeEqual(a, b) {
 function isAdminAuthed(req) {
   const c = req.headers.cookie || '';
   const m = c.match(/(?:^|;\s*)sa_admin=([^;]+)/);
-  return !!(m && safeEqual(m[1], ADMIN_TOKEN));
+  return !!(ADMIN_TOKEN && m && safeEqual(m[1], ADMIN_TOKEN));
 }
 // Guard for admin-panel-only endpoints. Returns true if the caller may proceed;
 // otherwise it has already sent the 401 and the handler must return.
@@ -5072,7 +5072,7 @@ const ADMIN_LOGIN_PAGE = `<!DOCTYPE html><html lang="en"><head><meta charset="ut
       const err=document.getElementById('err'); err.textContent='';
       try{
         const r=await fetch('/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
-        if(r.ok){ location.href='/admin'; } else { err.textContent='Incorrect password'; }
+        if(r.ok){ location.href='/admin'; } else { let m='Incorrect password'; try{ const d=await r.json(); if(d&&d.error) m=d.error; }catch(e){} err.textContent=m; }
       }catch(e){ err.textContent='Something went wrong, try again'; }
     }
     document.getElementById('pw').focus();
@@ -6310,6 +6310,9 @@ const server = http.createServer(async (req, res) => {
     let body = ''; req.on('data', c => body += c);
     req.on('end', () => {
       try {
+        if (!ADMIN_PW) {
+          res.writeHead(503, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false, error: 'Admin password is not configured on this server (set STACKED_ADMIN_PASSWORD).' })); return;
+        }
         if (loginThrottled(getClientIP(req))) {
           res.writeHead(429, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false, error: 'Too many attempts. Try again in 10 minutes.' })); return;
         }
@@ -6715,7 +6718,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const params = new URL(url, 'http://localhost');
       const secret = params.searchParams.get('secret') || '';
-      if (!safeEqual(secret, CRON_SECRET)) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'bad secret'})); return; }
+      if (!CRON_SECRET || !safeEqual(secret, CRON_SECRET)) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'bad secret'})); return; }
       const venuesR = await sbFetch('/rest/v1/venues?select=id,name&limit=1000');
       const venues = Array.isArray(venuesR.data) ? venuesR.data : [];
       const results = [];
