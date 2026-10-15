@@ -2464,13 +2464,6 @@ function showApp() {
   loadHistory();
 }
 
-// ─── SUPABASE HELPERS ─────────────────────────────────────────────────────
-async function supabaseSelect(table, filter) {
-  const url = SUPABASE_URL + '/rest/v1/' + table + '?' + filter + '&order=created_at.desc';
-  const r = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
-  return r.json();
-}
-
 // ─── CHAT ─────────────────────────────────────────────────────────────────
 function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }
 function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; }
@@ -2960,14 +2953,10 @@ async function saveConversation() {
 async function loadHistory() {
   if (!user) return;
   try {
-    // If we have a venue_id, load shared venue history; otherwise personal history
-    let filter;
-    if (user.venue_id) {
-      filter = 'venue_id=eq.' + user.venue_id + '&limit=20';
-    } else {
-      filter = 'email=eq.' + encodeURIComponent(user.email) + '&limit=20';
-    }
-    const rows = await supabaseSelect('conversations', filter);
+    // History comes from the server (membership-checked), never straight from the database.
+    const hr = await fetch(SERVER_URL + '/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: user.venue_id || null, email: user.email }) });
+    const hd = await hr.json();
+    const rows = (hd && hd.ok && Array.isArray(hd.rows)) ? hd.rows : [];
     const body = document.getElementById('histBody');
     if (!rows || rows.length === 0) { body.innerHTML = '<div class="empty-history">No previous chats yet.</div>'; return; }
     body.innerHTML = '';
@@ -6880,6 +6869,28 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ─── SAVE CONVERSATION ─────────────────────────────────────────────────
+  // ─── CHAT HISTORY ───────────────────────────────────────────────────────
+  // Replaces the browser reading `conversations` directly with the public key.
+  // Caller must be a member of the venue; returns only what the history panel
+  // needs (no email/phone of other staff). Non-members just get an empty list.
+  if (method === 'POST' && url === '/history') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      const reply = (rows) => { res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: true, rows })); };
+      try {
+        const { venue_id, email } = JSON.parse(body || '{}');
+        const em = String(email || '').trim().toLowerCase();
+        if (!em || !/^[0-9a-f-]{36}$/i.test(String(venue_id || ''))) return reply([]);
+        const m = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email&limit=500');
+        const isMember = Array.isArray(m.data) && m.data.some(x => String(x.email || '').toLowerCase() === em);
+        if (!isMember) return reply([]);
+        const c = await sbFetch('/rest/v1/conversations?venue_id=eq.' + encodeURIComponent(venue_id) + '&order=created_at.desc&limit=20&select=*');
+        const rows = (Array.isArray(c.data) ? c.data : []).map(r => ({ id: r.id, name: r.name, preview: r.preview, messages: r.messages, created_at: r.created_at, updated_at: r.updated_at }));
+        reply(rows);
+      } catch (e) { res.writeHead(200, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false, rows: [] })); }
+    }); return;
+  }
+
   if (method === 'POST' && url === '/save-conversation') {
     let body = '';
     req.on('data', c => body += c);
