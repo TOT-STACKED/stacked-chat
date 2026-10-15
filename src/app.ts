@@ -9,11 +9,22 @@ import {
 } from 'fastify-type-provider-zod';
 import type { Config } from './config.js';
 import { createSupabaseDb, type Db } from './lib/supabase.js';
+import { createSupabaseRepo } from './lib/supabase-repo.js';
+import type { Repo } from './lib/repo.js';
+import { registerAuth, createSupabaseTokenVerifier, type TokenVerifier } from './lib/auth.js';
+import { ApiHttpError } from './lib/errors.js';
+import { IdempotencyStore } from './lib/idempotency.js';
+import { RateLimiter } from './lib/rate-limit.js';
 import { healthRoutes } from './modules/health/routes.js';
+import { meRoutes } from './modules/me/routes.js';
+import { orgRoutes } from './modules/orgs/routes.js';
+import { apiKeyRoutes } from './modules/api-keys/routes.js';
 
 export interface Deps {
   config: Config;
   db?: Db;
+  repo?: Repo;
+  verifyToken?: TokenVerifier;
 }
 
 /** Standard error envelope for the whole API: { error: { code, message, details? } } */
@@ -23,12 +34,15 @@ export interface ApiError {
 
 export async function buildApp(
   config: Config,
-  overrides: Partial<Deps> & { logStream?: { write(msg: string): void } } = {},
+  overrides: Partial<Deps> & { logStream?: { write(msg: string): void }; limits?: { user?: number; key?: number } } = {},
 ): Promise<FastifyInstance> {
   const db = overrides.db ?? (config.SUPABASE_SERVICE_KEY
     ? createSupabaseDb({ url: config.SUPABASE_URL, serviceKey: config.SUPABASE_SERVICE_KEY })
     : undefined);
-  const deps: Deps = { config, db };
+  const repo = overrides.repo ?? (db ? createSupabaseRepo(db) : undefined);
+  const verifyToken = overrides.verifyToken ?? createSupabaseTokenVerifier({ url: config.SUPABASE_URL, anonKey: config.SUPABASE_KEY });
+  const idempotency = new IdempotencyStore();
+  const deps: Deps = { config, db, repo, verifyToken };
 
   const app = Fastify({
     logger: {
@@ -66,7 +80,10 @@ export async function buildApp(
     const e = err as { statusCode?: number; code?: string; message?: string };
     let status = typeof e.statusCode === 'number' ? e.statusCode : 500;
     let body: ApiError;
-    if (hasZodFastifySchemaValidationErrors(err)) {
+    if (err instanceof ApiHttpError) {
+      status = err.statusCode;
+      body = { error: { code: err.code, message: err.message, ...(err.details !== undefined ? { details: err.details } : {}) } };
+    } else if (hasZodFastifySchemaValidationErrors(err)) {
       status = 400;
       body = { error: { code: 'validation_error', message: 'Request failed validation', details: err.validation } };
     } else if (status >= 500) {
@@ -85,7 +102,18 @@ export async function buildApp(
   // The generated OpenAPI document (single source of truth: the zod schemas on each route).
   app.get('/api/v1/openapi.json', { schema: { hide: true } }, async () => app.swagger());
 
+  registerAuth(app, {
+    repo,
+    verifyToken,
+    userLimiter: new RateLimiter(overrides.limits?.user ?? 120),
+    keyLimiter: new RateLimiter(overrides.limits?.key ?? 600),
+    failLimiter: new RateLimiter(60),
+  });
+
   await app.register(async (instance) => healthRoutes(instance, deps));
+  await app.register(async (instance) => meRoutes(instance));
+  await app.register(async (instance) => orgRoutes(instance, { repo, idempotency }));
+  await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency }));
 
   return app;
 }

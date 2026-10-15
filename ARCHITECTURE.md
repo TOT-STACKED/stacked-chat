@@ -37,3 +37,35 @@ Test: `npm test`. Typecheck: `npm run typecheck`.
 - Errors: `{ "error": { "code", "message", "details?" } }`.
 - Never log credentials (redaction is configured and tested).
 - No service-role key in any browser-facing code or template.
+
+## Identity & tenancy (Phase 1)
+
+Organisation -> site (a venue row; ids unchanged) -> team -> member. Roles: `owner`, `hq_admin`
+(organisation-wide), `site_manager`, `staff`, `kiosk` (site-level; staff may be org-wide).
+You can only grant roles *below* your own (owners can grant any); the last owner can't be removed.
+
+- **Who is calling:** a Supabase session token (`Authorization: Bearer <jwt>`, verified against Supabase
+  Auth; only a *confirmed* email counts) or an API key (`X-API-Key: sk_live_...`, stored hashed, scoped,
+  revocable, optionally limited to one site).
+- **Data access:** the server uses the service-role key; **row-level security denies the public key
+  everything**. A signed-in user may read only their own membership rows.
+- **API conventions:** `Idempotency-Key` on POSTs, per-caller rate limits (`X-RateLimit-*`, `Retry-After`),
+  errors as `{ "error": { code, message } }`, OpenAPI at `/api/v1/openapi.json`.
+
+## Environment variables
+
+| Variable | Purpose |
+|---|---|
+| `SUPABASE_SERVICE_KEY` | **Server-only.** Service-role/secret key. Without it identity endpoints answer 503. |
+| `STACKED_ADMIN_PASSWORD`, `CRON_SECRET` | Legacy `/admin` login and digest cron. Unset = that feature is off (no defaults). |
+| `SUPABASE_URL`, `SUPABASE_KEY` | Project URL and the *anon* key (used only to ask Supabase Auth who a session is). |
+| `DISABLE_MODERN_API=1` | Kill switch: run legacy routes only. |
+| `LOG_LEVEL` | pino level (default `info`). |
+
+## Migrations
+
+Numbered files in `supabase/migrations/`, applied in order. `001_baseline` documents what production
+already had; `002` is the RLS lockdown (already applied). Apply new ones by pasting the file into the
+Supabase SQL editor (or via a Supabase branch). The whole chain is tested on an embedded Postgres
+(`tests/db`), including the legacy-data backfill and the "public key can touch nothing" checks.
+`supabase/audits/rls_audit.sql` is a read-only report of RLS state and grants.
