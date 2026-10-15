@@ -20,6 +20,7 @@ import { meRoutes } from './modules/me/routes.js';
 import { orgRoutes } from './modules/orgs/routes.js';
 import { apiKeyRoutes } from './modules/api-keys/routes.js';
 import { teamRoutes } from './modules/teams/routes.js';
+import { manageRoutes } from './modules/manage/routes.js';
 import { createResendMailer, type Mailer } from './lib/email.js';
 
 export interface Deps {
@@ -37,7 +38,7 @@ export interface ApiError {
 
 export async function buildApp(
   config: Config,
-  overrides: Partial<Deps> & { logStream?: { write(msg: string): void }; limits?: { user?: number; key?: number } } = {},
+  overrides: Partial<Deps> & { logStream?: { write(msg: string): void }; limits?: { user?: number; key?: number }; devMode?: boolean } = {},
 ): Promise<FastifyInstance> {
   const db = overrides.db ?? (config.SUPABASE_SERVICE_KEY
     ? createSupabaseDb({ url: config.SUPABASE_URL, serviceKey: config.SUPABASE_SERVICE_KEY })
@@ -120,6 +121,7 @@ export async function buildApp(
   await app.register(async (instance) => meRoutes(instance));
   await app.register(async (instance) => orgRoutes(instance, { repo, idempotency, mailer, publicUrl: config.PUBLIC_URL }));
   await app.register(async (instance) => teamRoutes(instance, { repo }));
+  await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency }));
 
   return app;

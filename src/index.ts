@@ -24,7 +24,7 @@ export function createModernHandler(opts: { config: Partial<Config> & Record<str
     storageRules: { buildPath, checkUpload, StorageRuleError },
     ready: appPromise.then(() => undefined),
     handles(url: string): boolean {
-      return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/');
+      return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/') || url === '/manage' || url.startsWith('/manage/');
     },
     async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
       res.setHeader('Access-Control-Allow-Origin', '*');

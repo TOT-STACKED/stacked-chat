@@ -6017,6 +6017,8 @@ async function initModern() {
     const { createModernHandler } = require('./dist/index.js');
     const h = createModernHandler({ config: {
       SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY: SUPABASE_SERVICE_KEY || undefined,
+      RESEND_API_KEY: process.env.RESEND_API_KEY || undefined, RESEND_FROM: process.env.RESEND_FROM || undefined,
+      PUBLIC_URL: process.env.PUBLIC_URL || undefined,
       NODE_ENV: process.env.NODE_ENV || 'development',
       LOG_LEVEL: process.env.LOG_LEVEL || 'info',
       APP_VERSION: process.env.RENDER_GIT_COMMIT || process.env.RAILWAY_GIT_COMMIT_SHA || 'dev',
