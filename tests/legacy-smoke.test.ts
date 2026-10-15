@@ -79,6 +79,13 @@ describe('legacy behaviour preserved alongside the modern API', () => {
     }
   });
 
+  it('the partner report page has been removed', async () => {
+    expect((await fetch(base + '/report', { redirect: 'manual' })).status).toBe(404);
+    expect((await fetch(base + '/report?vendor=x', { redirect: 'manual' })).status).toBe(404);
+    const admin = await (await fetch(base + '/admin')).text();
+    expect(admin).not.toContain('href="/report"');
+  });
+
   it('the old public debug endpoint is gone', async () => {
     expect((await fetch(base + '/debug/env-check')).status).toBe(404);
   });
