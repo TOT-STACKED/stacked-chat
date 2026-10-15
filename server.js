@@ -3,6 +3,11 @@ const http = require('http');
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || '';
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yuzlfocqovwhqdpitvxj.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1emxmb2Nxb3Z3aHFkcGl0dnhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyODE3OTgsImV4cCI6MjA4Nzg1Nzc5OH0.zN_GOXI8MI9isqnVRCZvxAmU1ZyXIfWvq-P3SkSh4Vk';
+// Privileged key for SERVER-SIDE data access (bypasses row-level security).
+// Server-only: it is never interpolated into a page template or sent to a browser.
+// When unset the server falls back to the anon key (legacy behaviour).
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SUPABASE_DATA_KEY = SUPABASE_SERVICE_KEY || SUPABASE_KEY;
 // Approved-reporting portal (stackcollect) — NPS from every touchpoint is
 // mirrored here so it lands in the central dashboard at approvedreporting.netlify.app.
 // Anon key is public-facing, rate-limited, and restricted by RLS to INSERT only
@@ -863,8 +868,8 @@ async function sbFetch(path, opts = {}) {
   const url = new URL(`${SUPABASE_URL}${path}`);
   const body = opts.body ? JSON.stringify(opts.body) : null;
   const headers = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'apikey': SUPABASE_DATA_KEY,
+    'Authorization': `Bearer ${SUPABASE_DATA_KEY}`,
     'Content-Type': 'application/json',
     'Prefer': 'return=minimal',
     ...opts.headers
@@ -2246,7 +2251,7 @@ const STACKED_CHAT_TEMPLATE = `<!DOCTYPE html>
 
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────
-const SERVER_URL = 'https://toast-support-bot.onrender.com';
+const SERVER_URL = location.hostname.indexOf('.up.railway.app') > 0 ? location.origin : 'https://toast-support-bot.onrender.com';
 const SUPABASE_URL = 'https://yuzlfocqovwhqdpitvxj.supabase.co';
 // Preset venue — injected server-side when page is served via /chat/:slug
 const PRESET_VENUE_ID = '{{VENUE_ID}}';
@@ -6301,6 +6306,14 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({status:'ok'})); return;
   }
 
+  // Admin-only config check: which Supabase key the server is using. Never returns key material.
+  if (method === 'GET' && url === '/admin/status') {
+    if (!requireAdmin(req, res)) return;
+    res.writeHead(200, {'Content-Type':'application/json'});
+    res.end(JSON.stringify({ supabase_data_access: SUPABASE_SERVICE_KEY ? 'service_role' : 'anon_legacy', admin_password_set: !!ADMIN_PW, cron_secret_set: !!CRON_SECRET, node: process.version, uptime_seconds: Math.round(process.uptime()) }));
+    return;
+  }
+
   if (url === '/admin' || url === '/admin/') {
     res.writeHead(200, {'Content-Type':'text/html'});
     res.end(isAdminAuthed(req) ? ADMIN_PAGE : ADMIN_LOGIN_PAGE); return;
@@ -6538,7 +6551,7 @@ const server = http.createServer(async (req, res) => {
       const statusCode = await new Promise((resolve, reject) => {
         const req2 = https.request({
           hostname: sbUrl.hostname, path: sbUrl.pathname + sbUrl.search, method: 'DELETE',
-          headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }
+          headers: { 'apikey': SUPABASE_DATA_KEY, 'Authorization': `Bearer ${SUPABASE_DATA_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }
         }, (r) => {
           let d = ''; r.on('data', c => d += c); r.on('end', () => resolve(r.statusCode));
         });
@@ -7907,4 +7920,7 @@ async function fetchYouTubeTranscript(videoId) {
   throw new Error('Could not fetch transcript. Try uploading a .txt transcript manually.');
 }
 
-server.listen(PORT, () => console.log(`Stacked Chat server running on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`Stacked Chat server running on port ${PORT}`);
+  console.log('Supabase server-side access: ' + (SUPABASE_SERVICE_KEY ? 'service role key' : 'anon key (legacy, set SUPABASE_SERVICE_KEY)'));
+});
