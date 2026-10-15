@@ -6281,6 +6281,29 @@ setInterval(loadAnalytics,60000);
 
 const PORT = process.env.PORT || 8080;
 
+// ─── MODERN API LOADER (strangler pattern) ──────────────────────────────────
+// New routes live in src/ and compile to dist/ (npm postinstall). If dist/ or its
+// dependencies are missing the legacy server simply carries on without them.
+let modern = null;
+async function initModern() {
+  // Kill switch: set DISABLE_MODERN_API=1 in the host's environment to run legacy-only.
+  if (process.env.DISABLE_MODERN_API === '1') { console.log('Modern API disabled by DISABLE_MODERN_API=1'); return; }
+  try {
+    const { createModernHandler } = require('./dist/index.js');
+    const h = createModernHandler({ config: {
+      SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY: SUPABASE_SERVICE_KEY || undefined,
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+      APP_VERSION: process.env.RENDER_GIT_COMMIT || process.env.RAILWAY_GIT_COMMIT_SHA || 'dev',
+    } });
+    await h.ready;
+    modern = h;
+    console.log('Modern API ready: /api/v1/*, /healthz');
+  } catch (e) {
+    console.error('Modern API disabled (legacy routes unaffected):', e && e.message);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = req.url;
   const method = req.method;
@@ -6288,6 +6311,17 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Modern (TypeScript, src/ -> dist/) API: /api/v1/* and /healthz. Everything else is legacy below.
+  if (modern && modern.handles(url)) {
+    try { await modern.handle(req, res); }
+    catch (e) {
+      console.error('[modern] unhandled', e);
+      if (!res.headersSent) { res.writeHead(500, {'Content-Type':'application/json'}); res.end(JSON.stringify({ error: { code: 'internal_error', message: 'Something went wrong' } })); }
+    }
+    return;
+  }
+
   if (method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
   if (url === '/health') {
@@ -7931,7 +7965,7 @@ async function fetchYouTubeTranscript(videoId) {
   throw new Error('Could not fetch transcript. Try uploading a .txt transcript manually.');
 }
 
-server.listen(PORT, () => {
+initModern().finally(() => server.listen(PORT, () => {
   console.log(`Stacked Chat server running on port ${PORT}`);
   console.log('Supabase server-side access: ' + (SUPABASE_SERVICE_KEY ? 'service role key' : 'anon key (legacy, set SUPABASE_SERVICE_KEY)'));
-});
+}));
