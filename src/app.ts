@@ -19,12 +19,15 @@ import { healthRoutes } from './modules/health/routes.js';
 import { meRoutes } from './modules/me/routes.js';
 import { orgRoutes } from './modules/orgs/routes.js';
 import { apiKeyRoutes } from './modules/api-keys/routes.js';
+import { teamRoutes } from './modules/teams/routes.js';
+import { createResendMailer, type Mailer } from './lib/email.js';
 
 export interface Deps {
   config: Config;
   db?: Db;
   repo?: Repo;
   verifyToken?: TokenVerifier;
+  mailer?: Mailer;
 }
 
 /** Standard error envelope for the whole API: { error: { code, message, details? } } */
@@ -42,6 +45,9 @@ export async function buildApp(
   const repo = overrides.repo ?? (db ? createSupabaseRepo(db) : undefined);
   const verifyToken = overrides.verifyToken ?? createSupabaseTokenVerifier({ url: config.SUPABASE_URL, anonKey: config.SUPABASE_KEY });
   const idempotency = new IdempotencyStore();
+  const mailer = overrides.mailer ?? (config.RESEND_API_KEY
+    ? createResendMailer({ apiKey: config.RESEND_API_KEY, from: config.RESEND_FROM ?? 'Stacked Chat <onboarding@resend.dev>' })
+    : undefined);
   const deps: Deps = { config, db, repo, verifyToken };
 
   const app = Fastify({
@@ -112,7 +118,8 @@ export async function buildApp(
 
   await app.register(async (instance) => healthRoutes(instance, deps));
   await app.register(async (instance) => meRoutes(instance));
-  await app.register(async (instance) => orgRoutes(instance, { repo, idempotency }));
+  await app.register(async (instance) => orgRoutes(instance, { repo, idempotency, mailer, publicUrl: config.PUBLIC_URL }));
+  await app.register(async (instance) => teamRoutes(instance, { repo }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency }));
 
   return app;

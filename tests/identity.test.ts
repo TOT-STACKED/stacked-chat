@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
-import { FakeRepo, fakeVerifier } from './fakes.js';
+import { FakeRepo, fakeVerifier } from '../src/testing/fakes.js';
 import { testConfig } from './helpers.js';
 
 // ---- world ---------------------------------------------------------------------------------
@@ -112,7 +112,7 @@ describe('sites and member visibility', () => {
 
   it('never exposes phone numbers or internal ids in member records', async () => {
     const m = (await call('GET', membersUrl(), 'owner')).body.data[0];
-    expect(Object.keys(m).sort()).toEqual(['created_at', 'display_name', 'email', 'id', 'org_id', 'role', 'site_id', 'status']);
+    expect(Object.keys(m).sort()).toEqual(['created_at', 'display_name', 'email', 'id', 'org_id', 'role', 'site_id', 'status', 'team_ids']);
   });
 });
 

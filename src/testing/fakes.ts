@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { conflict } from '../src/lib/errors.js';
-import type { Membership, Role } from '../src/lib/permissions.js';
-import type { ApiKeyRow, MemberRow, NewApiKey, NewMember, OrgRow, Repo, SiteRow } from '../src/lib/repo.js';
-import type { TokenVerifier } from '../src/lib/auth.js';
+import { conflict } from '../lib/errors.js';
+import type { Membership, Role } from '../lib/permissions.js';
+import type { ApiKeyRow, MemberRow, NewApiKey, NewMember, OrgRow, Repo, SiteRow, TeamRow } from '../lib/repo.js';
+import type { TokenVerifier } from '../lib/auth.js';
 
 /** In-memory Repo that behaves like the Supabase one (unique member per org/site/email, etc). */
 export class FakeRepo implements Repo {
@@ -10,6 +10,8 @@ export class FakeRepo implements Repo {
   sites: SiteRow[] = [];
   members: MemberRow[] = [];
   keys: ApiKeyRow[] = [];
+  teams: TeamRow[] = [];
+  memberTeams: Array<{ member_id: string; team_id: string }> = [];
   touched: string[] = [];
 
   addOrg(name: string): OrgRow { const o = { id: randomUUID(), name, slug: name.toLowerCase().replace(/\W+/g, '-') }; this.orgs.push(o); return o; }
@@ -35,7 +37,29 @@ export class FakeRepo implements Repo {
   async getMember(orgId: string, id: string) { return this.members.find((m) => m.id === id && m.org_id === orgId) ?? null; }
   async createMember(n: NewMember) {
     if (this.members.some((m) => m.org_id === n.org_id && m.site_id === n.site_id && m.email === n.email.toLowerCase())) throw conflict('That already exists');
-    return this.addMember({ id: n.org_id, name: '', slug: '' }, n.email, n.role, n.site_id ? { id: n.site_id } as SiteRow : null, null, n.status);
+    const m: MemberRow = { id: randomUUID(), org_id: n.org_id, site_id: n.site_id, user_id: null, email: n.email.toLowerCase(), display_name: n.display_name ?? null, role: n.role, status: n.status, created_at: new Date().toISOString() };
+    this.members.push(m); return m;
+  }
+  async createSite(s: { org_id: string; name: string; slug: string }) {
+    if (this.sites.some((x) => x.slug === s.slug)) throw conflict('That already exists');
+    const row: SiteRow = { id: randomUUID(), org_id: s.org_id, name: s.name, slug: s.slug, created_at: new Date().toISOString() };
+    this.sites.push(row); return row;
+  }
+  addTeam(org: OrgRow, name: string, site: SiteRow | null = null): TeamRow { const t = { id: randomUUID(), org_id: org.id, site_id: site?.id ?? null, name, created_at: new Date().toISOString() }; this.teams.push(t); return t; }
+  async listTeams(orgId: string) { return this.teams.filter((t) => t.org_id === orgId); }
+  async getTeam(orgId: string, id: string) { return this.teams.find((t) => t.id === id && t.org_id === orgId) ?? null; }
+  async createTeam(t: { org_id: string; site_id: string | null; name: string }) { const row = { id: randomUUID(), created_at: new Date().toISOString(), ...t }; this.teams.push(row); return row; }
+  async renameTeam(id: string, name: string) { const t = this.teams.find((x) => x.id === id)!; t.name = name; return t; }
+  async deleteTeam(orgId: string, id: string) {
+    const i = this.teams.findIndex((t) => t.id === id && t.org_id === orgId); if (i < 0) return false;
+    this.teams.splice(i, 1); this.memberTeams = this.memberTeams.filter((mt) => mt.team_id !== id); return true;
+  }
+  async listMemberTeams(orgId: string) {
+    const ids = new Set(this.members.filter((m) => m.org_id === orgId).map((m) => m.id));
+    return this.memberTeams.filter((mt) => ids.has(mt.member_id));
+  }
+  async setMemberTeams(memberId: string, teamIds: string[]) {
+    this.memberTeams = this.memberTeams.filter((mt) => mt.member_id !== memberId).concat(teamIds.map((team_id) => ({ member_id: memberId, team_id })));
   }
   async updateMember(id: string, patch: { role?: Role; status?: MemberRow['status'] }) {
     const m = this.members.find((x) => x.id === id)!;
@@ -60,4 +84,11 @@ export class FakeRepo implements Repo {
 /** token string -> verified user. Anything else is an invalid session. */
 export function fakeVerifier(users: Record<string, { userId: string; email: string }>): TokenVerifier {
   return async (token) => users[token] ?? null;
+}
+
+/** Captures invitation emails instead of sending them. */
+export class FakeMailer {
+  sent: Array<{ to: string; subject: string; text: string; html: string }> = [];
+  result: 'sent' | 'skipped' | 'failed' = 'sent';
+  async send(mail: { to: string; subject: string; text: string; html: string }) { this.sent.push(mail); return this.result; }
 }

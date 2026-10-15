@@ -107,3 +107,39 @@ describe('Supabase repo (query building and error mapping)', () => {
     expect(calls[0]!.path).toContain('status=eq.active');
   });
 });
+
+describe('Supabase repo: teams and sites', () => {
+  it('lists member-team links for ONE organisation via an inner join, dropping the join column', async () => {
+    const { db, calls } = recordingDb({ status: 200, data: [{ member_id: 'm1', team_id: 't1', members: { org_id: 'o1' } }] });
+    expect(await createSupabaseRepo(db).listMemberTeams('o1')).toEqual([{ member_id: 'm1', team_id: 't1' }]);
+    expect(calls[0]!.path).toBe('/member_teams?select=member_id,team_id,members!inner(org_id)&members.org_id=eq.o1');
+  });
+
+  it('setMemberTeams replaces the set: delete then insert; an empty list only deletes', async () => {
+    const a = recordingDb({ status: 204, data: null }, { status: 201, data: null });
+    await createSupabaseRepo(a.db).setMemberTeams('m1', ['t1', 't2']);
+    expect(a.calls.map((c) => c.init?.method)).toEqual(['DELETE', 'POST']);
+    expect(a.calls[0]!.path).toBe('/member_teams?member_id=eq.m1');
+    expect(a.calls[1]!.init!.body).toEqual([{ member_id: 'm1', team_id: 't1' }, { member_id: 'm1', team_id: 't2' }]);
+    const b = recordingDb({ status: 204, data: null });
+    await createSupabaseRepo(b.db).setMemberTeams('m1', []);
+    expect(b.calls).toHaveLength(1);
+  });
+
+  it('createSite writes to venues with its organisation; a slug clash becomes 409', async () => {
+    const ok = recordingDb({ status: 201, data: [{ id: 's1', org_id: 'o1', name: 'N', slug: 'n-ab12', created_at: null }] });
+    const site = await createSupabaseRepo(ok.db).createSite({ org_id: 'o1', name: 'N', slug: 'n-ab12' });
+    expect(site.id).toBe('s1');
+    expect(ok.calls[0]).toMatchObject({ path: expect.stringContaining('/venues?'), init: { method: 'POST', body: { org_id: 'o1', name: 'N', slug: 'n-ab12' } } });
+    const clash = recordingDb({ status: 409, data: { code: '23505' } });
+    await expect(createSupabaseRepo(clash.db).createSite({ org_id: 'o1', name: 'N', slug: 'dup' })).rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('deleteTeam is scoped to the organisation and reports whether anything was deleted', async () => {
+    const { db, calls } = recordingDb({ status: 200, data: [{ id: 't1' }] }, { status: 200, data: [] });
+    const repo = createSupabaseRepo(db);
+    expect(await repo.deleteTeam('o1', 't1')).toBe(true);
+    expect(calls[0]!.path).toContain('org_id=eq.o1');
+    expect(await repo.deleteTeam('o1', 't1')).toBe(false);
+  });
+});

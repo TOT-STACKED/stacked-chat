@@ -6,7 +6,7 @@ import { createHash, randomBytes } from 'node:crypto';
  */
 export const KEY_PREFIX = 'sk_live_';
 export const API_SCOPES = [
-  'chat', 'sites:read', 'members:read', 'kb:read', 'kb:write',
+  'chat', 'sites:read', 'teams:read', 'members:read', 'kb:read', 'kb:write',
   'tickets:read', 'tickets:write', 'conversations:read', 'webhooks',
 ] as const;
 export type ApiScope = (typeof API_SCOPES)[number];

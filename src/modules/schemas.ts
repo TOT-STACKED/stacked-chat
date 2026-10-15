@@ -6,9 +6,13 @@ export const RoleEnum = z.enum(ROLES);
 export const ErrorBody = z.object({ error: z.object({ code: z.string(), message: z.string(), details: z.unknown().optional() }) });
 
 export const SiteOut = z.object({ id: Id, org_id: Id, name: z.string(), slug: z.string(), created_at: z.string().nullable() });
+export const TeamOut = z.object({ id: Id, org_id: Id, site_id: Id.nullable(), name: z.string(), created_at: z.string() });
 export const MemberOut = z.object({
   id: Id, org_id: Id, site_id: Id.nullable(), email: z.string(), display_name: z.string().nullable(),
   role: RoleEnum, status: z.enum(['invited', 'active', 'disabled']), created_at: z.string(),
+  team_ids: z.array(Id),
+  /** Only on invite responses: was the invitation email sent? */
+  invite: z.enum(['sent', 'skipped', 'failed']).optional(),
 });
 export const ApiKeyOut = z.object({
   id: Id, org_id: Id, site_id: Id.nullable(), name: z.string(), scopes: z.array(z.string()),

@@ -1,7 +1,7 @@
 import type { Db, DbResult } from './supabase.js';
 import { ApiHttpError, conflict } from './errors.js';
 import type { Membership, Role } from './permissions.js';
-import type { ApiKeyRow, MemberRow, NewApiKey, NewMember, OrgRow, Repo, SiteRow } from './repo.js';
+import type { ApiKeyRow, MemberRow, NewApiKey, NewMember, OrgRow, Repo, SiteRow, TeamRow } from './repo.js';
 
 const enc = encodeURIComponent;
 const MEMBER_COLS = 'id,org_id,site_id,user_id,email,display_name,role,status,created_at';
@@ -93,6 +93,49 @@ export function createSupabaseRepo(db: Db): Repo {
     async countActiveOwners(orgId) {
       const rows = must(await db.rest<{ id: string }[]>(`/members?org_id=eq.${enc(orgId)}&role=eq.owner&status=eq.active&select=id`), 'count owners');
       return Array.isArray(rows) ? rows.length : 0;
+    },
+
+    async createSite(site) {
+      const r = await db.rest<SiteRow[]>('/venues?select=id,org_id,name,slug,created_at', {
+        method: 'POST', headers: { Prefer: 'return=representation' }, body: site,
+      });
+      return one(must(r, 'create site'))!;
+    },
+
+    async listTeams(orgId) {
+      return must(await db.rest<TeamRow[]>(`/teams?org_id=eq.${enc(orgId)}&select=id,org_id,site_id,name,created_at&order=name.asc`), 'list teams') ?? [];
+    },
+
+    async getTeam(orgId, teamId) {
+      return one(must(await db.rest<TeamRow[]>(`/teams?id=eq.${enc(teamId)}&org_id=eq.${enc(orgId)}&select=id,org_id,site_id,name,created_at&limit=1`), 'get team'));
+    },
+
+    async createTeam(t) {
+      const r = await db.rest<TeamRow[]>('/teams?select=id,org_id,site_id,name,created_at', { method: 'POST', headers: { Prefer: 'return=representation' }, body: t });
+      return one(must(r, 'create team'))!;
+    },
+
+    async renameTeam(teamId, name) {
+      const r = await db.rest<TeamRow[]>(`/teams?id=eq.${enc(teamId)}&select=id,org_id,site_id,name,created_at`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: { name } });
+      return one(must(r, 'rename team'))!;
+    },
+
+    async deleteTeam(orgId, teamId) {
+      const r = await db.rest<{ id: string }[]>(`/teams?id=eq.${enc(teamId)}&org_id=eq.${enc(orgId)}&select=id`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+      return (must(r, 'delete team') ?? []).length > 0;
+    },
+
+    async listMemberTeams(orgId) {
+      const rows = must(await db.rest<{ member_id: string; team_id: string }[]>(
+        `/member_teams?select=member_id,team_id,members!inner(org_id)&members.org_id=eq.${enc(orgId)}`), 'list member teams');
+      return (rows ?? []).map((r) => ({ member_id: r.member_id, team_id: r.team_id }));
+    },
+
+    async setMemberTeams(memberId, teamIds) {
+      must(await db.rest(`/member_teams?member_id=eq.${enc(memberId)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }), 'clear member teams');
+      if (teamIds.length) {
+        must(await db.rest('/member_teams', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: teamIds.map((team_id) => ({ member_id: memberId, team_id })) }), 'set member teams');
+      }
     },
 
     async insertApiKey(k: NewApiKey) {

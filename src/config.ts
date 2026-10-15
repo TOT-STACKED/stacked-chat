@@ -7,6 +7,11 @@ const schema = z.object({
   SUPABASE_KEY: z.string().min(1),
   /** service-role key: server-side data access. Optional so the app still boots (and says so) without it. */
   SUPABASE_SERVICE_KEY: z.string().optional(),
+  /** Resend (invite emails). Optional: without it invites are saved but no email is sent. */
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM: z.string().optional(),
+  /** Public base URL used in links inside emails. */
+  PUBLIC_URL: z.string().url().default('https://stackedchat.io'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   NODE_ENV: z.string().default('development'),
   APP_VERSION: z.string().default('dev'),
