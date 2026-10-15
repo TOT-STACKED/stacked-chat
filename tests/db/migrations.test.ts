@@ -178,3 +178,82 @@ describe('005 storage policies', () => {
     await db.exec(migrationSql('005_storage_private.sql')); // safe to re-run
   });
 });
+
+describe('006 keep new tenancy model in sync with legacy writes', () => {
+  const orgOf = async (db: PGlite, slug: string) => (await q(db, `select org_id from venues where slug = '${slug}'`))[0]?.org_id as string;
+  const memberRole = async (db: PGlite, email: string) => (await q(db, `select role::text r, status from members where email = '${email}'`))[0];
+
+  it('catches up venues and members that were created after the 004 backfill', async () => {
+    const db = await newDb('005_storage_private.sql');
+    await db.exec(migrationSql('004_backfill_organisations.sql'));
+    await db.exec(`
+      insert into venues (id, name, slug, workspace_id) values ('e0000000-0000-0000-0000-00000000000e', 'Late Venue', 'late-venue', 'tgi-fridays');
+      insert into venue_members (venue_id, email, name, role) values ('e0000000-0000-0000-0000-00000000000e', 'Boss@Late.com', 'Boss', 'admin');
+    `);
+    expect((await q(db, "select count(*)::int n from venues where org_id is null"))[0]?.n).toBe(1); // the gap
+    await db.exec(migrationSql('006_sync_legacy_to_tenancy.sql'));
+    expect((await q(db, "select count(*)::int n from venues where org_id is null"))[0]?.n).toBe(0);
+    expect((await q(db, "select slug from organisations where workspace_id = 'tgi-fridays'"))[0]?.slug).toBe('tgi-fridays');
+    expect(await memberRole(db, 'boss@late.com')).toEqual({ r: 'owner', status: 'active' });
+    await db.exec(migrationSql('006_sync_legacy_to_tenancy.sql')); // idempotent
+    expect((await q(db, "select count(*)::int n from members where email = 'boss@late.com'"))[0]?.n).toBe(1);
+  });
+
+  describe('after the migration (live sync)', () => {
+    let db: PGlite;
+    beforeEach(async () => { db = await newDb(); });
+
+    it('gives every new venue an organisation: by workspace, or its own', async () => {
+      await db.exec(`
+        insert into venues (name, slug, workspace_id) values ('A1', 'a1', 'chain'), ('A2', 'a2', 'chain'), ('Solo', 'solo', null);`);
+      expect(await orgOf(db, 'a1')).toBe(await orgOf(db, 'a2'));
+      expect(await orgOf(db, 'solo')).not.toBe(await orgOf(db, 'a1'));
+      expect((await q(db, "select slug from organisations where id = (select org_id from venues where slug='solo')"))[0]?.slug).toBe('venue-solo');
+    });
+
+    it("a workspace set later is adopted by the venue's own organisation (no duplicate org)", async () => {
+      await db.exec(`insert into venues (id, name, slug) values ('f0000000-0000-0000-0000-00000000000f', 'Later', 'later');`);
+      const before = await orgOf(db, 'later');
+      await db.exec(`update venues set workspace_id = 'later-co' where slug = 'later'`);
+      expect(await orgOf(db, 'later')).toBe(before);
+      expect((await q(db, "select count(*)::int n from organisations"))[0]?.n).toBe(1);
+      expect((await q(db, `select workspace_id from organisations where id = '${before}'`))[0]?.workspace_id).toBe('later-co');
+    });
+
+    it('moves a venue (and its members) when its workspace already belongs to another organisation', async () => {
+      await db.exec(`
+        insert into venues (id, name, slug, workspace_id) values ('a1000000-0000-0000-0000-0000000000a1', 'Main', 'main', 'group');
+        insert into venues (id, name, slug) values ('a2000000-0000-0000-0000-0000000000a2', 'Branch', 'branch');
+        insert into venue_members (venue_id, email, name, role) values ('a2000000-0000-0000-0000-0000000000a2', 'x@y.com', 'X', 'staff');
+        update venues set workspace_id = 'group' where slug = 'branch';`);
+      expect(await orgOf(db, 'branch')).toBe(await orgOf(db, 'main'));
+      expect((await q(db, "select count(*)::int n from members m join venues v on v.id = m.site_id where m.org_id <> v.org_id"))[0]?.n).toBe(0);
+    });
+
+    it('mirrors legacy members: first admin -> owner, later admins -> site_manager, staff -> staff', async () => {
+      await db.exec(`
+        insert into venues (id, name, slug, workspace_id) values ('b0000000-0000-0000-0000-00000000000b', 'V', 'v', 'co');
+        insert into venue_members (venue_id, email, name, role) values
+          ('b0000000-0000-0000-0000-00000000000b', 'one@co.com', 'One', 'admin'),
+          ('b0000000-0000-0000-0000-00000000000b', 'two@co.com', 'Two', 'admin'),
+          ('b0000000-0000-0000-0000-00000000000b', 'S@co.com', 'S', 'staff');`);
+      expect((await memberRole(db, 'one@co.com'))?.r).toBe('owner');
+      expect((await memberRole(db, 'two@co.com'))?.r).toBe('site_manager');
+      expect((await memberRole(db, 's@co.com'))?.r).toBe('staff');
+    });
+
+    it('follows legacy role changes but never demotes an owner; deleting disables, never deletes', async () => {
+      await db.exec(`
+        insert into venues (id, name, slug, workspace_id) values ('c0000000-0000-0000-0000-00000000000c', 'V', 'v', 'co');
+        insert into venue_members (venue_id, email, name, role) values
+          ('c0000000-0000-0000-0000-00000000000c', 'own@co.com', 'Own', 'admin'),
+          ('c0000000-0000-0000-0000-00000000000c', 'adm@co.com', 'Adm', 'admin');
+        update venue_members set role = 'staff' where email = 'adm@co.com';
+        update venue_members set role = 'staff' where email = 'own@co.com';`);
+      expect((await memberRole(db, 'adm@co.com'))?.r).toBe('staff');
+      expect((await memberRole(db, 'own@co.com'))?.r).toBe('owner'); // owner is a new-model role: not demoted by legacy edits
+      await db.exec(`delete from venue_members where email = 'adm@co.com'`);
+      expect(await memberRole(db, 'adm@co.com')).toEqual({ r: 'staff', status: 'disabled' });
+    });
+  });
+});
