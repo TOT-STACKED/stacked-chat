@@ -119,6 +119,9 @@ describe('createUpload', () => {
     const u = await mk(impl).createUpload(`docs/${V1}/1-a.pdf`);
     expect(calls[0]!.url).toBe(`${SUPA}/storage/v1/object/upload/sign/stacked-videos/docs/${V1}/1-a.pdf`);
     expect(calls[0]!.init.method).toBe('POST');
+    // regression: a JSON content-type with NO body is rejected by Supabase Storage (400)
+    expect((calls[0]!.init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+    expect(calls[0]!.init.body).toBe('{}');
     expect(u.uploadUrl).toBe(`${SUPA}/storage/v1/object/upload/sign/stacked-videos/docs/${V1}/1-a.pdf?token=TKN`);
     expect(u.url).toBe(pub(`docs/${V1}/1-a.pdf`));
   });

@@ -106,7 +106,7 @@ export function createStorage(opts: StorageOptions) {
 
   /** One-time signed upload URL for a server-chosen path. */
   async function createUpload(path: string): Promise<SignedUpload> {
-    const res = await f(`${base}/storage/v1/object/upload/sign/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`, { method: 'POST', headers });
+    const res = await f(`${base}/storage/v1/object/upload/sign/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`, { method: 'POST', headers, body: '{}' }); // Supabase rejects a JSON content-type with an empty body
     if (!res.ok) throw new Error('Could not create upload URL');
     const j = (await res.json()) as { url?: string };
     if (!j.url) throw new Error('Could not create upload URL');
