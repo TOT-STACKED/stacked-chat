@@ -11,15 +11,86 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6Ik
 const STACKCOLLECT_SUPABASE_URL = process.env.STACKCOLLECT_SUPABASE_URL || 'https://gfbswivkhfsegpvfocox.supabase.co';
 const STACKCOLLECT_SUPABASE_KEY = process.env.STACKCOLLECT_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdmYnN3aXZraGZzZWdwdmZvY294Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkyMzc4ODQsImV4cCI6MjA3NDgxMzg4NH0.YBuuMRXtMu2sUXBG7nJ6ue5LFgkHD8Dj1OP5Zu_J9_U';
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL || '';
-const CRON_SECRET = process.env.CRON_SECRET || 'stacked-cron-secret';
-// Global dashboard (/admin) login. Set STACKED_ADMIN_PASSWORD on Render + Railway
-// to your own secret; 'stacked-admin' is only a bootstrap default.
-const ADMIN_PW = process.env.STACKED_ADMIN_PASSWORD || 'stacked-admin';
-const ADMIN_TOKEN = require('crypto').createHash('sha256').update('sa::' + ADMIN_PW).digest('hex').slice(0, 40);
+// Secrets must come from the environment. There are deliberately no fallback
+// defaults: this repo is public, so any default would be a known credential.
+// Set STACKED_ADMIN_PASSWORD and CRON_SECRET on Render + Railway.
+const CRON_SECRET = process.env.CRON_SECRET || '';
+const ADMIN_PW = process.env.STACKED_ADMIN_PASSWORD || '';
+if (!ADMIN_PW || !CRON_SECRET) {
+  console.error('FATAL: STACKED_ADMIN_PASSWORD and CRON_SECRET must be set. Refusing to start without them.');
+  process.exit(1);
+}
+const crypto = require('crypto');
+const ADMIN_TOKEN = crypto.createHash('sha256').update('sa::' + ADMIN_PW).digest('hex').slice(0, 40);
+// Constant-time string compare so secrets can't be guessed via response timing.
+function safeEqual(a, b) {
+  const ba = Buffer.from(String(a)), bb = Buffer.from(String(b));
+  return ba.length === bb.length && crypto.timingSafeEqual(ba, bb);
+}
 function isAdminAuthed(req) {
   const c = req.headers.cookie || '';
   const m = c.match(/(?:^|;\s*)sa_admin=([^;]+)/);
-  return !!(m && m[1] === ADMIN_TOKEN);
+  return !!(m && safeEqual(m[1], ADMIN_TOKEN));
+}
+// Guard for admin-panel-only endpoints. Returns true if the caller may proceed;
+// otherwise it has already sent the 401 and the handler must return.
+function requireAdmin(req, res) {
+  if (isAdminAuthed(req)) return true;
+  res.writeHead(401, {'Content-Type':'application/json'});
+  res.end(JSON.stringify({ ok: false, error: 'Not authorised' }));
+  return false;
+}
+// Brute-force throttle for the admin login: 8 attempts / 10 min / IP.
+const _loginAttempts = new Map();
+function loginThrottled(ip) {
+  const now = Date.now();
+  let r = _loginAttempts.get(ip);
+  if (!r || now > r.resetAt) r = { count: 0, resetAt: now + 600_000 };
+  r.count++;
+  _loginAttempts.set(ip, r);
+  return r.count > 8;
+}
+
+// ─── SSRF-SAFE FETCH (used by /scrape) ──────────────────────────────────────
+// Only http(s), and only to public IPs: blocks loopback, private ranges,
+// link-local/cloud-metadata (169.254.x.x) and CGNAT. Redirects are followed by
+// hand so every hop is re-validated.
+const dns = require('dns').promises;
+const net = require('net');
+function isPrivateIp(ip) {
+  if (net.isIPv6(ip)) {
+    const v = ip.toLowerCase();
+    if (v === '::1' || v === '::') return true;
+    if (v.startsWith('::ffff:')) return isPrivateIp(v.slice(7));
+    return v.startsWith('fc') || v.startsWith('fd') || v.startsWith('fe8') || v.startsWith('fe9') || v.startsWith('fea') || v.startsWith('feb');
+  }
+  const p = ip.split('.').map(Number);
+  if (p.length !== 4 || p.some(n => !(n >= 0 && n <= 255))) return true;
+  const [a, b] = p;
+  return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) ||
+         (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+}
+async function assertPublicUrl(u) {
+  let parsed;
+  try { parsed = new URL(u); } catch (e) { throw new Error('Invalid URL'); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Only http(s) URLs are allowed');
+  const host = parsed.hostname.replace(/^\[|\]$/g, '');
+  const addrs = net.isIP(host) ? [{ address: host }] : await dns.lookup(host, { all: true });
+  if (!addrs.length || addrs.some(a => isPrivateIp(a.address))) throw new Error('That address is not allowed');
+  return parsed;
+}
+async function safeFetch(u, opts = {}, maxRedirects = 5) {
+  let current = u;
+  for (let i = 0; i <= maxRedirects; i++) {
+    await assertPublicUrl(current);
+    const r = await fetch(current, { ...opts, redirect: 'manual' });
+    if (r.status >= 300 && r.status < 400 && r.headers.get('location')) {
+      current = new URL(r.headers.get('location'), current).toString();
+      continue;
+    }
+    return r;
+  }
+  throw new Error('Too many redirects');
 }
 
 // ─── RATE LIMIT + MODERATION ─────────────────────────────────────────────
@@ -6239,9 +6310,13 @@ const server = http.createServer(async (req, res) => {
     let body = ''; req.on('data', c => body += c);
     req.on('end', () => {
       try {
+        if (loginThrottled(getClientIP(req))) {
+          res.writeHead(429, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false, error: 'Too many attempts. Try again in 10 minutes.' })); return;
+        }
         const { password } = JSON.parse(body || '{}');
-        if (password === ADMIN_PW) {
-          res.writeHead(200, {'Content-Type':'application/json', 'Set-Cookie':'sa_admin=' + ADMIN_TOKEN + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000'});
+        if (typeof password === 'string' && safeEqual(password, ADMIN_PW)) {
+          const secure = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+          res.writeHead(200, {'Content-Type':'application/json', 'Set-Cookie':'sa_admin=' + ADMIN_TOKEN + '; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000' + secure});
           res.end(JSON.stringify({ ok: true }));
         } else {
           res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ ok: false }));
@@ -6441,6 +6516,7 @@ const server = http.createServer(async (req, res) => {
 
   // ─── TICKET CLOSE ──────────────────────────────────────────────────────
   if (method === 'POST' && url.startsWith('/ticket/') && url.endsWith('/close')) {
+    if (!requireAdmin(req, res)) return;
     const id = url.split('/')[2];
     await sbFetch(`/rest/v1/tickets?id=eq.${id}`, {method:'PATCH', body:{status:'closed'}});
     res.writeHead(200, {'Content-Type':'application/json'});
@@ -6449,6 +6525,7 @@ const server = http.createServer(async (req, res) => {
 
   // ─── DELETE DOCUMENT ───────────────────────────────────────────────────
   if (method === 'DELETE' && url.startsWith('/documents')) {
+    if (!requireAdmin(req, res)) return;
     try {
       const params = new URL(url, 'http://localhost');
       const filename = params.searchParams.get('filename');
@@ -6475,6 +6552,7 @@ const server = http.createServer(async (req, res) => {
 
   // ─── UPLOAD DOCUMENT ───────────────────────────────────────────────────
   if (method === 'POST' && url === '/upload') {
+    if (!requireAdmin(req, res)) return;
     let body = '';
     req.on('data', c => body += c);
     req.on('end', async () => {
@@ -6633,33 +6711,11 @@ const server = http.createServer(async (req, res) => {
   // Guarded by CRON_SECRET env var. Wire an external scheduler (Render Cron,
   // cron-job.org, GitHub Actions) to hit this Monday morning.
   // (redeploy trigger 2026-07-12)
-  // Temporary: prove which env vars the running Node process actually sees.
-  // Returns booleans + string lengths only — never leaks the actual values.
-  // Remove after digest sending is confirmed working.
-  if (method === 'GET' && url === '/debug/env-check') {
-    res.writeHead(200, {'Content-Type':'application/json'});
-    res.end(JSON.stringify({
-      RESEND_API_KEY_set: !!process.env.RESEND_API_KEY,
-      RESEND_API_KEY_length: (process.env.RESEND_API_KEY || '').length,
-      RESEND_FROM_set: !!process.env.RESEND_FROM,
-      RESEND_FROM_value: process.env.RESEND_FROM ? process.env.RESEND_FROM.slice(0, 30) + '...' : null,
-      CRON_SECRET_set: !!process.env.CRON_SECRET,
-      NODE_ENV: process.env.NODE_ENV || null,
-      RAILWAY_PROJECT_NAME: process.env.RAILWAY_PROJECT_NAME || null,
-      RAILWAY_SERVICE_NAME: process.env.RAILWAY_SERVICE_NAME || null,
-      RAILWAY_ENVIRONMENT_NAME: process.env.RAILWAY_ENVIRONMENT_NAME || null,
-      pid: process.pid,
-      uptime_seconds: Math.round(process.uptime())
-    }));
-    return;
-  }
-
   if (method === 'GET' && url.startsWith('/cron/digest')) {
     try {
       const params = new URL(url, 'http://localhost');
       const secret = params.searchParams.get('secret') || '';
-      const expected = process.env.CRON_SECRET || '';
-      if (!expected || secret !== expected) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'bad secret'})); return; }
+      if (!safeEqual(secret, CRON_SECRET)) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'bad secret'})); return; }
       const venuesR = await sbFetch('/rest/v1/venues?select=id,name&limit=1000');
       const venues = Array.isArray(venuesR.data) ? venuesR.data : [];
       const results = [];
@@ -7410,6 +7466,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
 
   // ─── YOUTUBE INGEST ────────────────────────────────────────────────────
   if (method === 'POST' && url === '/youtube-ingest') {
+    if (!requireAdmin(req, res)) return;
     let body = ''; req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       res.writeHead(200, {'Content-Type':'application/x-ndjson','Transfer-Encoding':'chunked','Cache-Control':'no-cache'});
@@ -7453,6 +7510,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
 
   // ─── VIDEOS ────────────────────────────────────────────────────────────
   if (method === 'GET' && url === '/videos') {
+    if (!requireAdmin(req, res)) return;
     try {
       const r = await sbFetch('/rest/v1/videos?select=*&order=created_at.desc&limit=100');
       res.writeHead(200, {'Content-Type':'application/json'});
@@ -7462,6 +7520,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
   }
 
   if (method === 'POST' && url === '/videos/add') {
+    if (!requireAdmin(req, res)) return;
     let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
       try {
@@ -7485,6 +7544,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
   }
 
   if (method === 'DELETE' && url.startsWith('/videos/')) {
+    if (!requireAdmin(req, res)) return;
     try {
       const id = url.split('/videos/')[1];
       await sbFetch('/rest/v1/videos?id=eq.' + id, { method: 'DELETE' });
@@ -7495,6 +7555,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
 
   // ─── YOUTUBE SEARCH ────────────────────────────────────────────────────────
   if (method === 'GET' && url.startsWith('/youtube/search')) {
+    if (!requireAdmin(req, res)) return;
     const ytKey = process.env.YOUTUBE_API_KEY;
     if (!ytKey) {
       res.writeHead(200, {'Content-Type':'application/json'});
@@ -7529,6 +7590,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
 
   // ─── YOUTUBE BULK IMPORT ───────────────────────────────────────────────────
   if (method === 'POST' && url === '/youtube/import') {
+    if (!requireAdmin(req, res)) return;
     let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
       try {
@@ -7575,6 +7637,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
 
   // ─── VENUE BRANDING SAVE ──────────────────────────────────────────────
   if (method === 'POST' && url.startsWith('/venue/') && url.endsWith('/branding')) {
+    if (!requireAdmin(req, res)) return;
     let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
       try {
@@ -7595,6 +7658,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
 
   // ─── VENUE LIST FOR ADMIN ──────────────────────────────────────────────
   if (method === 'GET' && url === '/venues/all') {
+    if (!requireAdmin(req, res)) return;
     try {
       const r = await sbFetch('/rest/v1/venues?select=*&order=name.asc&limit=200');
       res.writeHead(200, {'Content-Type':'application/json'});
@@ -7608,6 +7672,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
 
   // ─── WEB SCRAPER ───────────────────────────────────────────────────────────
   if (method === 'POST' && url === '/scrape') {
+    if (!requireAdmin(req, res)) return;
     let body = ''; req.on('data', c => body += c);
     req.on('end', async () => {
       try {
@@ -7665,7 +7730,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
 
           let apiBlocked = false;
           while (pageUrl && pagesFetched < maxPages) {
-            const apiRes = await fetch(pageUrl, {
+            const apiRes = await safeFetch(pageUrl, {
               headers: { ...browserHeaders, 'Accept': 'application/json' },
               signal: AbortSignal.timeout(20000)
             });
@@ -7694,10 +7759,9 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
         }
 
         // ── Standard HTML scrape ───────────────────────────────────────────
-        const fetchRes = await fetch(scrapeUrl, {
+        const fetchRes = await safeFetch(scrapeUrl, {
           headers: browserHeaders,
-          signal: AbortSignal.timeout(20000),
-          redirect: 'follow'
+          signal: AbortSignal.timeout(20000)
         });
         if (!fetchRes.ok) throw new Error('HTTP ' + fetchRes.status + ' — site may block scraping or require login');
         const html = await fetchRes.text();
