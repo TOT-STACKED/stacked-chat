@@ -99,9 +99,8 @@ describe('row-level security', () => {
   const U2 = '22222222-2222-2222-2222-222222222222';
   let db: PGlite;
   beforeEach(async () => {
-    db = await newDb();
+    db = await newDb(); // the 006/008 triggers already mirror the seeded legacy rows into members
     await seedLegacy(db);
-    await db.exec(migrationSql('004_backfill_organisations.sql'));
     await db.exec(`update members set user_id = '${U1}' where email = 'zed@x.com'; update members set user_id = '${U2}' where email = 'amy@x.com';`);
   });
 
@@ -290,5 +289,54 @@ describe('007 billing', () => {
       }
       await expect(asRole(db, role, null, () => db.query(`select usage_bump(gen_random_uuid(), '2026-10-01')`)), `${role} usage_bump`).rejects.toThrow();
     }
+  });
+});
+
+describe('008 owners are company-wide', () => {
+  const NORTH = 'a0000000-0000-0000-0000-00000000000a';
+  const rows = (db: PGlite, email: string) =>
+    q(db, `select role::text r, site_id is null as org_wide, status from members where email = '${email}' order by role`);
+  const seed = (db: PGlite) => db.exec(`
+    insert into venues (id, name, slug, workspace_id) values ('${NORTH}', 'North', 'north', 'acme');
+    insert into venue_members (venue_id, email, name, role) values
+      ('${NORTH}', 'boss@acme.com', 'Boss', 'admin'), ('${NORTH}', 'amy@acme.com', 'Amy', 'staff');`);
+
+  it('widens owners that 006 left attached to one venue, and changes nobody else', async () => {
+    const db = await newDb('007_billing.sql');
+    await seed(db);
+    expect(await rows(db, 'boss@acme.com')).toEqual([{ r: 'owner', org_wide: false, status: 'active' }]); // the bug
+    await db.exec(migrationSql('008_owners_company_wide.sql'));
+    expect(await rows(db, 'boss@acme.com')).toEqual([{ r: 'owner', org_wide: true, status: 'active' }]);
+    expect(await rows(db, 'amy@acme.com')).toEqual([{ r: 'staff', org_wide: false, status: 'active' }]); // staff stay at their venue
+    expect((await q(db, 'select count(*)::int n from members'))[0]?.n).toBe(2); // nobody added or removed
+  });
+
+  it('merges with an existing company-wide row for the same person, keeping the higher role', async () => {
+    const db = await newDb('007_billing.sql');
+    await seed(db);
+    const org = (await q(db, "select org_id from venues where slug = 'north'"))[0]?.org_id;
+    await db.exec(`insert into members (org_id, site_id, email, role, status) values ('${org}', null, 'boss@acme.com', 'staff', 'active')`);
+    await db.exec(migrationSql('008_owners_company_wide.sql'));
+    expect(await rows(db, 'boss@acme.com')).toEqual([{ r: 'owner', org_wide: true, status: 'active' }]);
+  });
+
+  it('widens an HQ admin too, and is safe to re-run', async () => {
+    const db = await newDb('007_billing.sql');
+    await seed(db);
+    await db.exec(`update members set role = 'hq_admin' where email = 'amy@acme.com'`);
+    await db.exec(migrationSql('008_owners_company_wide.sql'));
+    await db.exec(migrationSql('008_owners_company_wide.sql'));
+    expect(await rows(db, 'amy@acme.com')).toEqual([{ r: 'hq_admin', org_wide: true, status: 'active' }]);
+  });
+
+  it('from now on the first legacy admin becomes a company-wide owner, and later edits do not duplicate them', async () => {
+    const db = await newDb();
+    await seed(db);
+    expect(await rows(db, 'boss@acme.com')).toEqual([{ r: 'owner', org_wide: true, status: 'active' }]);
+    await db.exec(`update venue_members set name = 'The Boss', role = 'staff' where email = 'boss@acme.com'`); // legacy edit: owner is not demoted
+    expect(await rows(db, 'boss@acme.com')).toEqual([{ r: 'owner', org_wide: true, status: 'active' }]);
+    expect((await q(db, "select display_name from members where email = 'boss@acme.com'"))[0]?.display_name).toBe('The Boss');
+    await db.exec(`insert into venue_members (venue_id, email, name, role) values ('${NORTH}', 'second@acme.com', 'Second', 'admin')`);
+    expect(await rows(db, 'second@acme.com')).toEqual([{ r: 'site_manager', org_wide: false, status: 'active' }]); // only the first admin is promoted
   });
 });
