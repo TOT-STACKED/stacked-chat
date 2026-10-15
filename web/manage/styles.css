@@ -77,6 +77,30 @@ td.act .lnk+ .lnk{margin-left:14px}
 .banner{border:1px solid var(--warn);color:var(--warn);background:#FBEDE9;border-radius:12px;padding:12px 16px}
 .rule{display:flex;flex-direction:column;gap:6px}
 
+/* billing */
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.sechead{display:flex;flex-direction:column;gap:6px}
+.sechead h2{margin:0;font-size:22px}
+.sub{flex:0 0 200px;display:flex;flex-direction:column;gap:4px}
+.sub a{display:block;padding:9px 12px;border-radius:10px;font-size:15px;text-decoration:none}
+.sub a.on{background:#fff;border:1px solid var(--line);font-weight:700}
+.soonlink{padding:9px 12px;font-size:13px;color:var(--muted)}
+.cols>.stack{flex:999 1 520px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.stat{display:flex;flex-direction:column;gap:6px}
+.big{font-size:24px;line-height:1.15}
+.price{display:flex;flex-direction:column;gap:4px;padding:4px 0}
+h3{margin:8px 0 -4px;font-size:18px}
+table.narrow{min-width:480px}
+td select{border:1px solid var(--line);border-radius:12px;padding:8px 10px;background:#fff;min-height:40px}
+.usage{display:flex;flex-direction:column;gap:6px;padding-bottom:14px;border-bottom:1px solid var(--line2)}
+.usage:last-child{border-bottom:0;padding-bottom:0}
+.usagehead{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.metermeta{display:flex;justify-content:space-between;font-size:14px}
+.bar{height:10px;background:var(--line2);border-radius:999px;overflow:hidden}
+.bar>div{height:10px;background:var(--ink);border-radius:999px}
+.bar.over>div{background:var(--warn)}
+
 /* modal */
 .overlay{position:fixed;inset:0;background:rgba(27,26,23,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
 .dlg{background:var(--cream);border-radius:20px;max-width:520px;width:100%;max-height:92vh;overflow:auto;padding:26px;display:flex;flex-direction:column;gap:16px}

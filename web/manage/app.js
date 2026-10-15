@@ -2,7 +2,8 @@ import { clear, h, toast } from './dom.js';
 import { createAuth } from './auth.js';
 import { createApi } from './api.js';
 import { renderPeople } from './people.js';
-import { ROLE_LABEL, bestRole, isManagerAnywhere } from './lib.js';
+import { renderBilling } from './billing.js';
+import { ROLE_LABEL, atLeast, bestRole, isManagerAnywhere } from './lib.js';
 
 const root = document.getElementById('app');
 let cfg; let auth; let api;
@@ -134,12 +135,11 @@ const SOON = {
   home: ['Home', 'A single place for what needs your attention: questions the AI could not answer, drafts to review, pending invites.'],
   knowledge: ['Knowledge', 'Handbooks, documents and media in one list, aimed at the company, a site, a team or a role.'],
   insights: ['Insights', 'What people ask most, what the AI could not answer, and usage by site and team.'],
-  settings: ['Settings', 'Company details, chat branding, API keys and webhooks.'],
 };
 
 function route() {
   if (!main) return;
-  const key = (location.hash.replace('#/', '') || 'people').split('?')[0];
+  const key = (location.hash.replace('#/', '') || 'people').split('?')[0].split('/')[0];
   const view = NAV.some(([k]) => k === key) ? key : 'people';
   document.querySelectorAll('.nav a').forEach((a) => { a.classList.toggle('on', a.id === 'nav-' + view); if (a.id === 'nav-' + view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   clear(main);
@@ -151,6 +151,15 @@ function route() {
       return;
     }
     renderPeople(main, { api, memberships: state.memberships, orgId: state.orgId, orgName: org.name });
+    return;
+  }
+  if (view === 'settings') {
+    if (!atLeast(bestRole(state.memberships, state.orgId, null), 'hq_admin')) {
+      main.append(h('div', { class: 'head' }, h('div', { class: 't' }, h('span', { class: 'mono', text: org.name }), h('h1', { class: 'disp', text: 'Settings' }))),
+        h('div', { class: 'card pad rule' }, h('b', { text: 'This area is for company admins' }), h('span', { class: 'muted', text: 'Billing and company settings are managed by owners and HQ admins.' })));
+      return;
+    }
+    renderBilling(main, { api, orgId: state.orgId, orgName: org.name });
     return;
   }
   const [title, blurb] = SOON[view];

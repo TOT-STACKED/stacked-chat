@@ -6019,6 +6019,14 @@ async function initModern() {
       SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY: SUPABASE_SERVICE_KEY || undefined,
       RESEND_API_KEY: process.env.RESEND_API_KEY || undefined, RESEND_FROM: process.env.RESEND_FROM || undefined,
       PUBLIC_URL: process.env.PUBLIC_URL || undefined,
+      // Billing (Stripe, test mode). Billing stays off unless ALL the Stripe settings are present.
+      STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || undefined, STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || undefined,
+      STRIPE_PRICE_STANDARD_MONTHLY: process.env.STRIPE_PRICE_STANDARD_MONTHLY || undefined, STRIPE_PRICE_STANDARD_ANNUAL: process.env.STRIPE_PRICE_STANDARD_ANNUAL || undefined,
+      STRIPE_PRICE_GROUP_MONTHLY: process.env.STRIPE_PRICE_GROUP_MONTHLY || undefined, STRIPE_PRICE_GROUP_ANNUAL: process.env.STRIPE_PRICE_GROUP_ANNUAL || undefined,
+      STRIPE_PRICE_LARGE_MONTHLY: process.env.STRIPE_PRICE_LARGE_MONTHLY || undefined, STRIPE_PRICE_LARGE_ANNUAL: process.env.STRIPE_PRICE_LARGE_ANNUAL || undefined,
+      STRIPE_ALLOW_LIVE: process.env.STRIPE_ALLOW_LIVE || undefined,
+      FAIR_USE_AI_QUESTIONS: process.env.FAIR_USE_AI_QUESTIONS || undefined, FAIR_USE_STAFF_PER_VENUE: process.env.FAIR_USE_STAFF_PER_VENUE || undefined,
+      CRON_SECRET: process.env.CRON_SECRET || undefined, SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL || undefined,
       NODE_ENV: process.env.NODE_ENV || 'development',
       LOG_LEVEL: process.env.LOG_LEVEL || 'info',
       APP_VERSION: process.env.RENDER_GIT_COMMIT || process.env.RAILWAY_GIT_COMMIT_SHA || 'dev',
@@ -6030,6 +6038,17 @@ async function initModern() {
     console.error('Modern API disabled (legacy routes unaffected):', e && e.message);
   }
 }
+
+// Billing: after a lapsed payment an organisation is read-only for admins (staff can still read everything).
+// This fails OPEN: if billing cannot be checked for any reason, nobody is blocked.
+async function billingBlocks(venueId) {
+  try {
+    if (!modern || !modern.billingStateForSite || !venueId) return false;
+    const st = await modern.billingStateForSite(venueId);
+    return !!(st && st.writable === false);
+  } catch (e) { return false; }
+}
+const BILLING_READONLY = { ok: false, code: 'billing_required', error: 'Your account is read-only until billing is sorted. An admin can fix this in Manage, under Settings, Billing.' };
 
 const server = http.createServer(async (req, res) => {
   const url = req.url;
@@ -6345,6 +6364,7 @@ const server = http.createServer(async (req, res) => {
         if (!filename || !content || !venue_id) {
           res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return;
         }
+        if (await billingBlocks(venue_id)) { res.writeHead(402, {'Content-Type':'application/json'}); res.end(JSON.stringify(BILLING_READONLY)); return; }
         if (file_url && !storageUrlOwnedBy(file_url, venue_id)) { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'That file does not belong to this venue'})); return; }
         // Verified-admin guard: caller must hold a valid session (email-code verified).
         const vEmail = await verifyAuthEmail(token);
@@ -6544,6 +6564,7 @@ const server = http.createServer(async (req, res) => {
       try {
         if (!modern || !modern.storage || !modern.storageRules) return out(503, { ok: false, error: 'File uploads are temporarily unavailable' });
         const { venue_id, token, kind, filename, content_type, size } = JSON.parse(body || '{}');
+        if (await billingBlocks(venue_id)) return out(402, BILLING_READONLY);
         const vEmail = await verifyAuthEmail(token);
         if (!vEmail) return out(401, { ok: false, error: 'Please verify your email first' });
         const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id || '') + '&select=email,role&limit=200');
@@ -6567,6 +6588,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const { url: videoUrl, title, venue_id, token } = JSON.parse(body);
         if (!videoUrl || !venue_id) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        if (await billingBlocks(venue_id)) { res.writeHead(402, {'Content-Type':'application/json'}); res.end(JSON.stringify(BILLING_READONLY)); return; }
         if (!storageUrlOwnedBy(videoUrl, venue_id)) { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'That file does not belong to this venue'})); return; }
         const vEmail = await verifyAuthEmail(token);
         if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
@@ -6602,6 +6624,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const { url: imgUrl, title, description, venue_id, token } = JSON.parse(body);
         if (!imgUrl || !venue_id || !title) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        if (await billingBlocks(venue_id)) { res.writeHead(402, {'Content-Type':'application/json'}); res.end(JSON.stringify(BILLING_READONLY)); return; }
         if (!storageUrlOwnedBy(imgUrl, venue_id)) { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'That file does not belong to this venue'})); return; }
         const vEmail = await verifyAuthEmail(token);
         if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
@@ -6751,6 +6774,9 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({response: mod.message, supportUrl: null, escalate: false, videos: [], videoCount: 0, images: [], docFile: null, detectedVendor: null, forceNPS: false}));
           return;
         }
+
+        // Fair-use metering: count the question for this venue (never blocks, never throws).
+        if (venue_id && modern && modern.recordQuestion) modern.recordQuestion(venue_id).catch(() => {});
 
         // Fetch venue tech stack if we have a venue_id
         let techStackContext = '';

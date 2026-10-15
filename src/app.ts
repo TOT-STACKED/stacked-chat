@@ -22,6 +22,15 @@ import { apiKeyRoutes } from './modules/api-keys/routes.js';
 import { teamRoutes } from './modules/teams/routes.js';
 import { manageRoutes } from './modules/manage/routes.js';
 import { createResendMailer, type Mailer } from './lib/email.js';
+import { billingRoutes, billingWebhookRoute } from './modules/billing/routes.js';
+import { loadBillingConfig } from './modules/billing/config.js';
+import { createBilling, type Billing } from './modules/billing/service.js';
+import { createStripeApi, type StripeApi } from './modules/billing/stripe.js';
+import { createSupabaseBillingStore, type BillingStore } from './modules/billing/store.js';
+
+declare module 'fastify' {
+  interface FastifyInstance { billing: Billing | null }
+}
 
 export interface Deps {
   config: Config;
@@ -29,6 +38,9 @@ export interface Deps {
   repo?: Repo;
   verifyToken?: TokenVerifier;
   mailer?: Mailer;
+  stripe?: StripeApi;
+  billingStore?: BillingStore;
+  now?: () => Date;
 }
 
 /** Standard error envelope for the whole API: { error: { code, message, details? } } */
@@ -61,6 +73,25 @@ export async function buildApp(
     genReqId: (req) => (typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : randomUUID()),
     trustProxy: true,
   });
+
+  // Billing (Stripe, test mode). Off, and failing closed, unless every Stripe setting is present.
+  const billingCfg = loadBillingConfig(config);
+  const billingStore = overrides.billingStore ?? (db ? createSupabaseBillingStore(db) : undefined);
+  const billing: Billing | null = billingCfg.ok && billingStore
+    ? createBilling({
+        store: billingStore,
+        stripe: overrides.stripe ?? createStripeApi({ secretKey: billingCfg.config.secretKey }),
+        config: billingCfg.config,
+        mailer,
+        orgName: async (id) => (await repo?.getOrg(id))?.name ?? null,
+        log: app.log,
+        now: overrides.now,
+      })
+    : null;
+  app.decorate('billing', billing);
+  const billingReason = billingCfg.ok ? 'Billing needs the database to be configured' : billingCfg.reason;
+  if (!billing) app.log.info({ reason: billingReason }, 'billing disabled');
+  const gate = async (orgId: string) => { await billing?.assertWritable(orgId); };
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -119,10 +150,13 @@ export async function buildApp(
 
   await app.register(async (instance) => healthRoutes(instance, deps));
   await app.register(async (instance) => meRoutes(instance));
-  await app.register(async (instance) => orgRoutes(instance, { repo, idempotency, mailer, publicUrl: config.PUBLIC_URL }));
-  await app.register(async (instance) => teamRoutes(instance, { repo }));
+  await app.register(async (instance) => orgRoutes(instance, { repo, idempotency, mailer, publicUrl: config.PUBLIC_URL, gate, onSiteAdded: (orgId) => { void billing?.syncQuietly(orgId); } }));
+  await app.register(async (instance) => teamRoutes(instance, { repo, gate }));
   await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode }));
-  await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency }));
+  await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
+  const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };
+  await app.register(async (instance) => billingRoutes(instance, billingCtx));
+  await app.register(async (instance) => billingWebhookRoute(instance, billingCtx));
 
   return app;
 }

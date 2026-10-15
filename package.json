@@ -9,7 +9,8 @@
     "postinstall": "tsc -p tsconfig.build.json || echo 'TypeScript build failed: legacy server still runs'",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "stripe:setup": "npx --yes tsx scripts/stripe-setup.ts"
   },
   "engines": {
     "node": ">=20"

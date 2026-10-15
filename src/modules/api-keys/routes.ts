@@ -11,7 +11,7 @@ import { assertOrgAccess, userOnly } from '../access.js';
 import { assertSiteInOrg } from '../orgs/routes.js';
 import { ApiKeyOut, ErrorBody, Id, SECURITY } from '../schemas.js';
 
-interface Ctx { repo?: Repo; idempotency: IdempotencyStore }
+interface Ctx { repo?: Repo; idempotency: IdempotencyStore; gate: (orgId: string) => Promise<void> }
 
 const toOut = (k: ApiKeyRow) => ({
   id: k.id, org_id: k.org_id, site_id: k.site_id, name: k.name, scopes: k.scopes, key_prefix: k.key_prefix,
@@ -54,6 +54,7 @@ export async function apiKeyRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId } = req.params;
     const p = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     if (!canManageApiKeys(p, orgId)) throw forbidden('Only organisation admins can manage API keys');
     const siteId = req.body.site_id ?? null;
     if (siteId) await assertSiteInOrg(repo(), orgId, siteId);

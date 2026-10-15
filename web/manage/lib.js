@@ -96,3 +96,34 @@ export function inviteResultText(results) {
   if (failed.length) parts.push(`${failed.length} could not be added (${failed.map((f) => f.email + ': ' + f.error).join('; ')})`);
   return parts.join('. ') + '.';
 }
+
+// ---- billing (display helpers; the server decides the real numbers) --------------------------------
+export function formatGbp(pence) {
+  const pounds = pence / 100;
+  return '£' + pounds.toLocaleString('en-GB', { minimumFractionDigits: pence % 100 ? 2 : 0, maximumFractionDigits: 2 });
+}
+export const INTERVAL_WORD = { month: 'month', year: 'year' };
+
+/** "Venue", "Group", or "Venue + Large venue": whatever the lines on the bill are. */
+export function planName(pricing) {
+  if (!pricing || !pricing.lines.length) return 'No venues yet';
+  return pricing.lines.map((l) => l.label).join(' + ');
+}
+
+/** What to tell an admin about their billing state, or null. */
+export function bannerFor(state) {
+  if (!state || !state.banner) return null;
+  const d = state.trial_days_left;
+  switch (state.banner) {
+    case 'trial': return { tone: 'info', text: `Your free trial has ${d} day${d === 1 ? '' : 's'} left. Add a card before it ends so nothing is interrupted. You won't be charged until then.`, cta: 'card' };
+    case 'trial_ended': return { tone: 'warn', text: 'Your free trial has ended, so your account is read-only. Add a card to carry on. Staff can still read everything.', cta: 'card' };
+    case 'past_due': return { tone: 'warn', text: `Your last payment didn't go through. Update your card by ${state.grace_ends_at ? new Date(state.grace_ends_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' }) : 'the end of the week'} to avoid your account becoming read-only.`, cta: 'portal' };
+    case 'restricted': return { tone: 'warn', text: 'Payment is overdue, so your account is read-only. Staff can still read everything. Update your card to restore full access.', cta: 'portal' };
+    case 'canceled': return { tone: 'warn', text: 'This subscription has ended. Your data is kept for 90 days. Contact Stacked to restart it.', cta: null };
+    default: return null;
+  }
+}
+
+/** 0..1 for a usage bar (capped, so an over-limit venue shows a full bar). */
+export const usageRatio = (used, cap) => (cap > 0 ? Math.min(1, used / cap) : 0);
+export const venueCountText = (n) => `${n} venue${n === 1 ? '' : 's'}`;

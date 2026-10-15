@@ -8,7 +8,7 @@ import { assertOrgAccess, userOnly } from '../access.js';
 import { assertSiteInOrg } from '../orgs/routes.js';
 import { ErrorBody, Id, SECURITY, TeamOut } from '../schemas.js';
 
-interface Ctx { repo?: Repo }
+interface Ctx { repo?: Repo; gate: (orgId: string) => Promise<void> }
 
 const Name = z.string().trim().min(1).max(60);
 
@@ -49,6 +49,7 @@ export async function teamRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId } = req.params;
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     const siteId = req.body.site_id ?? null;
     if (siteId) await assertSiteInOrg(repo(), orgId, siteId);
     if (!canManageMembers(actor, orgId, siteId)) throw forbidden('You cannot create teams here');
@@ -68,6 +69,7 @@ export async function teamRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId, teamId } = req.params;
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     const team = await repo().getTeam(orgId, teamId);
     if (!team) throw notFound('Team not found');
     if (!canManageMembers(actor, orgId, team.site_id)) throw forbidden('You cannot manage this team');
@@ -86,6 +88,7 @@ export async function teamRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId, teamId } = req.params;
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     const team = await repo().getTeam(orgId, teamId);
     if (!team) throw notFound('Team not found');
     if (!canManageMembers(actor, orgId, team.site_id)) throw forbidden('You cannot manage this team');

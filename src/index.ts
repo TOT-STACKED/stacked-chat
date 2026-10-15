@@ -23,8 +23,11 @@ export function createModernHandler(opts: { config: Partial<Config> & Record<str
     storage,
     storageRules: { buildPath, checkUpload, StorageRuleError },
     ready: appPromise.then(() => undefined),
+    /** Legacy server.js calls these. Both never throw and never block the chat. */
+    async recordQuestion(siteId: string): Promise<void> { (await appPromise).billing?.recordQuestion(siteId); },
+    async billingStateForSite(siteId: string) { return (await appPromise).billing?.stateForSite(siteId) ?? null; },
     handles(url: string): boolean {
-      return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/') || url === '/manage' || url.startsWith('/manage/');
+      return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/') || url === '/manage' || url.startsWith('/manage/') || url === '/billing/webhook';
     },
     async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
       res.setHeader('Access-Control-Allow-Origin', '*');

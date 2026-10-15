@@ -257,3 +257,38 @@ describe('006 keep new tenancy model in sync with legacy writes', () => {
     });
   });
 });
+
+describe('007 billing', () => {
+  let db: PGlite;
+  beforeEach(async () => { db = await newDb(); });
+
+  it('defaults venues to standard + active, so current customers are untouched', async () => {
+    await db.exec(`insert into venues (name, slug) values ('V', 'v');`);
+    expect((await q(db, "select billing_tier t, active a from venues where slug='v'"))[0]).toEqual({ t: 'standard', a: true });
+    expect((await q(db, 'select count(*)::int n from billing_accounts'))[0]?.n).toBe(0); // nobody is billed until we say so
+  });
+
+  it('rejects unknown tiers and statuses', async () => {
+    await db.exec(`insert into venues (name, slug) values ('V', 'v');`);
+    await expect(db.exec(`update venues set billing_tier = 'huge'`)).rejects.toThrow();
+    const org = (await q(db, "select org_id from venues where slug='v'"))[0]?.org_id;
+    await expect(db.exec(`insert into billing_accounts (org_id, status) values ('${org}', 'free')`)).rejects.toThrow();
+  });
+
+  it('counts questions atomically per venue per month', async () => {
+    await db.exec(`insert into venues (id, name, slug) values ('a0000000-0000-0000-0000-0000000000a1', 'V', 'v');`);
+    const bump = async (m: string) => (await q(db, `select usage_bump('a0000000-0000-0000-0000-0000000000a1', '${m}') n`))[0]?.n;
+    expect(await bump('2026-10-01')).toBe(1);
+    expect(await bump('2026-10-01')).toBe(2);
+    expect(await bump('2026-11-01')).toBe(1);
+  });
+
+  it('is invisible to the public keys (RLS + revoked grants)', async () => {
+    for (const role of ['anon', 'authenticated'] as const) {
+      for (const t of ['billing_accounts', 'stripe_events', 'usage_monthly']) {
+        await expect(asRole(db, role, null, () => db.query(`select * from ${t}`)), `${role} ${t}`).rejects.toThrow();
+      }
+      await expect(asRole(db, role, null, () => db.query(`select usage_bump(gen_random_uuid(), '2026-10-01')`)), `${role} usage_bump`).rejects.toThrow();
+    }
+  });
+});

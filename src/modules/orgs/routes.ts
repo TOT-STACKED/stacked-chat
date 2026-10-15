@@ -14,7 +14,13 @@ import type { MemberRow, Repo } from '../../lib/repo.js';
 import { assertOrgAccess, userOnly } from '../access.js';
 import { ErrorBody, Id, MemberOut, RoleEnum, SECURITY, SiteOut } from '../schemas.js';
 
-interface Ctx { repo?: Repo; idempotency: IdempotencyStore; mailer?: Mailer; publicUrl: string }
+interface Ctx {
+  repo?: Repo; idempotency: IdempotencyStore; mailer?: Mailer; publicUrl: string;
+  /** throws 402 when the organisation's billing makes it read-only */
+  gate: (orgId: string) => Promise<void>;
+  /** called after a site is added so billing can update the subscription */
+  onSiteAdded?: (orgId: string) => void;
+}
 
 const slugify = (name: string) =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'site';
@@ -72,12 +78,14 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId } = req.params;
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     if (!atLeast(bestRole(actor, orgId, null), 'hq_admin')) throw forbidden('Only organisation admins can add sites');
     return ctx.idempotency.run(req, reply, principalId(actor), async () => {
       const base = slugify(req.body.name);
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
           const site = await repo().createSite({ org_id: orgId, name: req.body.name, slug: `${base}-${randomBytes(2).toString('hex')}` });
+          ctx.onSiteAdded?.(orgId);
           return { status: 201, body: site };
         } catch (e) {
           if (!(e instanceof ApiHttpError && e.statusCode === 409)) throw e; // slug clash: try another suffix
@@ -125,6 +133,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId } = req.params;
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     const siteId = req.body.site_id ?? null;
     if (siteId) await assertSiteInOrg(repo(), orgId, siteId);
     const actorRole = bestRole(actor, orgId, siteId);
@@ -153,6 +162,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId, memberId } = req.params;
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     const target = await repo().getMember(orgId, memberId);
     if (!target) throw notFound('Member not found');
     if (!canManageMembers(actor, orgId, target.site_id)) throw forbidden('You cannot manage this member');
@@ -175,6 +185,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId, memberId } = req.params;
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     const target = await repo().getMember(orgId, memberId);
     if (!target) throw notFound('Member not found');
     const actorRole = bestRole(actor, orgId, target.site_id);
@@ -204,6 +215,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     const { orgId, memberId } = req.params;
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
     const target = await repo().getMember(orgId, memberId);
     if (!target) throw notFound('Member not found');
     const actorRole = bestRole(actor, orgId, target.site_id);

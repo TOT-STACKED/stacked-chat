@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createModernHandler } from '../src/index.js';
 import {
+  bannerFor, formatGbp, planName, usageRatio,
   bestRole, canEditMember, canManage, filterMembers, grantableRoles, inviteResultText, parseEmails, rolesFor,
 } from '../web/manage/lib.js';
 import { testConfig } from './helpers.js';
@@ -53,6 +54,31 @@ describe('manage lib: lists and forms', () => {
   it('words the invite outcome plainly', () => {
     expect(inviteResultText([{ ok: true, invite: 'sent' }, { ok: true, invite: 'sent' }])).toBe('2 invitations emailed.');
     expect(inviteResultText([{ ok: false, email: 'a@x.com', error: 'exists' }])).toContain('could not be added');
+  });
+});
+
+describe('manage lib: billing wording', () => {
+  it('formats pounds plainly', () => {
+    expect(formatGbp(4500)).toBe('£45');
+    expect(formatGbp(19550)).toBe('£195.50');
+  });
+  it('names the plan from the lines on the bill', () => {
+    expect(planName({ lines: [{ label: 'Venue' }] })).toBe('Venue');
+    expect(planName({ lines: [{ label: 'Group' }, { label: 'Large venue' }] })).toBe('Group + Large venue');
+    expect(planName({ lines: [] })).toBe('No venues yet');
+  });
+  it('tells admins what to do for each state, and nothing when all is well', () => {
+    expect(bannerFor({ banner: null })).toBeNull();
+    expect(bannerFor({ banner: 'trial', trial_days_left: 1 })).toMatchObject({ tone: 'info', cta: 'card' });
+    expect(bannerFor({ banner: 'trial', trial_days_left: 1 })!.text).toContain('1 day left');
+    expect(bannerFor({ banner: 'past_due', grace_ends_at: '2026-10-20T00:00:00Z' })!.text).toContain('20 October');
+    expect(bannerFor({ banner: 'restricted' })).toMatchObject({ tone: 'warn', cta: 'portal' });
+    expect(bannerFor({ banner: 'canceled' })!.text).toContain('90 days');
+  });
+  it('keeps usage bars within 0 to 1', () => {
+    expect(usageRatio(500, 2000)).toBe(0.25);
+    expect(usageRatio(5000, 2000)).toBe(1);
+    expect(usageRatio(5, 0)).toBe(0);
   });
 });
 

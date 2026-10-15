@@ -69,3 +69,8 @@ already had; `002` is the RLS lockdown (already applied). Apply new ones by past
 Supabase SQL editor (or via a Supabase branch). The whole chain is tested on an embedded Postgres
 (`tests/db`), including the legacy-data backfill and the "public key can touch nothing" checks.
 `supabase/audits/rls_audit.sql` is a read-only report of RLS state and grants.
+
+
+## Billing
+
+Per-venue subscription billing lives in `src/modules/billing/` (Stripe over fetch, no SDK). It is self-contained: pure pricing and gating rules, an idempotent subscription sync, a signed webhook, and fair-use metering, behind `BillingStore` / `StripeApi` interfaces so tests use in-memory fakes. Billing stays off, and fails closed, unless every Stripe setting is present. See `docs/BILLING.md` for pricing, endpoints, setup and the test-mode walkthrough.
