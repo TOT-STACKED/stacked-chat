@@ -13,7 +13,11 @@ const SUPABASE_STUBS = `
   create table auth.users (id uuid primary key default gen_random_uuid(), email text);
   create function auth.uid() returns uuid language sql stable as $$
     select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-  grant usage on schema public, auth to anon, authenticated, service_role;
+  -- minimal imitation of Supabase Storage's table, for the storage-policy migration
+  create schema storage;
+  create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
+  alter table storage.objects enable row level security;
+  grant usage on schema public, auth, storage to anon, authenticated, service_role;
   -- Supabase grants new public tables to these roles by default; migrations must lock down explicitly.
   alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
   alter default privileges in schema public grant all on functions to anon, authenticated, service_role;

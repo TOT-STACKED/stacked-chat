@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { buildApp } from './app.js';
 import { loadConfig, type Config } from './config.js';
+import { StorageRuleError, buildPath, checkUpload, createStorage } from './lib/storage.js';
 
 /**
  * Front door for the modern API. The legacy server.js asks `handles(url)` first and
@@ -9,12 +10,18 @@ import { loadConfig, type Config } from './config.js';
  */
 export function createModernHandler(opts: { config: Partial<Config> & Record<string, unknown> }) {
   const config = loadConfig(opts.config as Record<string, string | undefined>);
+  // Private file storage (signed reads / signed uploads). Only available with the service-role key.
+  const storage = config.SUPABASE_SERVICE_KEY
+    ? createStorage({ supabaseUrl: config.SUPABASE_URL, serviceKey: config.SUPABASE_SERVICE_KEY })
+    : null;
   const appPromise = buildApp(config).then(async (app) => {
     await app.ready();
     return app;
   });
 
   return {
+    storage,
+    storageRules: { buildPath, checkUpload, StorageRuleError },
     ready: appPromise.then(() => undefined),
     handles(url: string): boolean {
       return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/');

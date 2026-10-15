@@ -3049,6 +3049,19 @@ function signOut() {
 
 // ─── ADMIN EMAIL VERIFICATION (real login for admin powers) ───────────────
 let _pendingAdminAction = null;
+// File uploads go through the server: it checks you are a verified venue admin, chooses the
+// storage path and enforces the allowed type/size, then hands back a one-time upload URL.
+// The browser never holds a storage key. Returns { ok, url } or { ok:false, error }.
+async function storageUpload(file, kind) {
+  try {
+    const ctype = file.type || (kind === 'doc' ? 'application/octet-stream' : '');
+    const r = await fetch(SERVER_URL + '/storage/sign-upload', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ venue_id: user.venue_id, token: getAuthToken(), kind: kind, filename: file.name, content_type: ctype, size: file.size }) });
+    const d = await r.json();
+    if (!r.ok || !d || !d.ok) return { ok: false, error: (d && d.error) || 'Upload not allowed' };
+    const up = await fetch(d.upload_url, { method:'PUT', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': ctype || 'application/octet-stream', 'x-upsert':'true' }, body: file });
+    return up.ok ? { ok: true, url: d.url } : { ok: false, error: 'Upload failed' };
+  } catch(e) { return { ok: false, error: 'Upload failed' }; }
+}
 function getAuthToken() {
   try {
     const a = JSON.parse(localStorage.getItem('stacked_auth') || 'null');
@@ -3149,11 +3162,9 @@ async function handleKbUpload(files) {
       if (isImage) {
         try {
           showToast('Saving image\\u2026');
-          const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-          const path = 'images/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
-          const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'image/png', 'x-upsert':'true' }, body: file });
+          const up = await storageUpload(file, 'image');
           if (up.ok) {
-            const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+            const publicUrl = up.url;
             const ir = await fetch(SERVER_URL + '/kb-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: file.name, description: text.slice(0, 300), venue_id: user.venue_id, token: getAuthToken() }) });
             const id = await ir.json();
             imageStored = !!(id && id.ok);
@@ -3165,10 +3176,8 @@ async function handleKbUpload(files) {
       // download link (e.g. forward a PDF to your boss) — not just the text.
       let fileUrl = null;
       try {
-        const safeD = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const dpath = 'docs/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safeD;
-        const dup = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + dpath, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'application/octet-stream', 'x-upsert':'true' }, body: file });
-        if (dup.ok) fileUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + dpath;
+        const dup = await storageUpload(file, 'doc');
+        if (dup.ok) fileUrl = dup.url;
       } catch(e) {}
 
       // Store the extracted text as a knowledge doc when there is enough to be useful.
@@ -3203,15 +3212,9 @@ async function handleVideoUpload(files) {
     if (file.size > 50 * 1024 * 1024) { showToast(file.name + ' is over 50MB \\u2014 too large'); continue; }
     try {
       showToast('Uploading ' + file.name + '\\u2026');
-      const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
-      const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'video/mp4', 'x-upsert': 'true' },
-        body: file
-      });
-      if (!up.ok) { showToast('Video storage not set up yet'); continue; }
-      const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+      const up = await storageUpload(file, 'video');
+      if (!up.ok) { showToast(up.error || 'Video upload failed'); continue; }
+      const publicUrl = up.url;
       const r = await fetch(SERVER_URL + '/kb-video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: file.name.replace(/\\.[^.]+$/, ''), venue_id: user.venue_id, token: getAuthToken() }) });
       const data = await r.json();
       if (data && data.ok) {
@@ -3285,11 +3288,9 @@ async function submitImage() {
   if (file.size > 10 * 1024 * 1024) { showToast('Image is over 10MB \\u2014 too large'); return; }
   try {
     showToast('Uploading ' + file.name + '\\u2026');
-    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = 'images/' + encodeURIComponent(user.venue_id) + '/' + Date.now() + '-' + safe;
-    const up = await fetch(SUPABASE_URL + '/storage/v1/object/stacked-videos/' + path, { method:'POST', headers:{ 'apikey': SUPABASE_KEY, 'Authorization':'Bearer ' + SUPABASE_KEY, 'Content-Type': file.type || 'image/jpeg', 'x-upsert':'true' }, body: file });
-    if (!up.ok) { showToast('Image storage not set up yet'); return; }
-    const publicUrl = SUPABASE_URL + '/storage/v1/object/public/stacked-videos/' + path;
+    const up = await storageUpload(file, 'image');
+    if (!up.ok) { showToast(up.error || 'Image upload failed'); return; }
+    const publicUrl = up.url;
     const r = await fetch(SERVER_URL + '/kb-image', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: publicUrl, title: title, description: desc, venue_id: user.venue_id, token: getAuthToken() }) });
     const d = await r.json();
     if (!d || !d.ok) { showToast((d && d.error) || 'Could not add image'); return; }
@@ -6281,6 +6282,20 @@ setInterval(loadAnalytics,60000);
 
 const PORT = process.env.PORT || 8080;
 
+// ─── MEDIA URLS (private storage) ───────────────────────────────────────────
+// Files live in a PRIVATE bucket and keep their historical "public" URL in the database.
+// Every URL handed to a browser is swapped here for a short-lived signed one. If signing
+// isn't available the original URL is returned unchanged.
+async function signMedia(items, ttlSeconds) {
+  if (!modern || !modern.storage || !Array.isArray(items) || !items.length) return items;
+  const urls = await modern.storage.signUrls(items.map(i => i && i.url), ttlSeconds);
+  return items.map((it, i) => (it && urls[i]) ? Object.assign({}, it, { url: urls[i] }) : it);
+}
+// A venue may only register files that live in its OWN storage folders (never another venue's).
+function storageUrlOwnedBy(u, venueId) {
+  return (!modern || !modern.storage) ? true : modern.storage.ownsUrl(u, venueId);
+}
+
 // ─── MODERN API LOADER (strangler pattern) ──────────────────────────────────
 // New routes live in src/ and compile to dist/ (npm postinstall). If dist/ or its
 // dependencies are missing the legacy server simply carries on without them.
@@ -6618,6 +6633,7 @@ const server = http.createServer(async (req, res) => {
         if (!filename || !content || !venue_id) {
           res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return;
         }
+        if (file_url && !storageUrlOwnedBy(file_url, venue_id)) { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'That file does not belong to this venue'})); return; }
         // Verified-admin guard: caller must hold a valid session (email-code verified).
         const vEmail = await verifyAuthEmail(token);
         if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
@@ -6839,6 +6855,30 @@ const server = http.createServer(async (req, res) => {
   // ─── KB VIDEO (admin registers a video, scoped to their workspace) ────────
   // File bytes are uploaded client-side to Supabase Storage; this just records
   // the resulting URL in the videos table tagged with the workspace (tenant).
+  // ─── FILE UPLOAD: signed upload URL (verified venue admin; server picks path, type and size rules) ───
+  if (method === 'POST' && url === '/storage/sign-upload') {
+    let body = ''; req.on('data', c => body += c);
+    req.on('end', async () => {
+      const out = (code, obj) => { res.writeHead(code, {'Content-Type':'application/json'}); res.end(JSON.stringify(obj)); };
+      try {
+        if (!modern || !modern.storage || !modern.storageRules) return out(503, { ok: false, error: 'File uploads are temporarily unavailable' });
+        const { venue_id, token, kind, filename, content_type, size } = JSON.parse(body || '{}');
+        const vEmail = await verifyAuthEmail(token);
+        if (!vEmail) return out(401, { ok: false, error: 'Please verify your email first' });
+        const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id || '') + '&select=email,role&limit=200');
+        const me = (Array.isArray(mem.data) ? mem.data : []).find(m => (m.email || '').toLowerCase() === vEmail);
+        if (!me || me.role !== 'admin') return out(403, { ok: false, error: 'Only admins can upload files' });
+        const R = modern.storageRules;
+        R.checkUpload(kind, content_type, Number(size));
+        const up = await modern.storage.createUpload(R.buildPath(kind, venue_id, filename));
+        out(200, { ok: true, upload_url: up.uploadUrl, url: up.url, path: up.path });
+      } catch (e) {
+        if (modern && modern.storageRules && e instanceof modern.storageRules.StorageRuleError) return out(400, { ok: false, error: e.message });
+        out(500, { ok: false, error: 'Could not start the upload' });
+      }
+    }); return;
+  }
+
   if (method === 'POST' && url === '/kb-video') {
     let body = '';
     req.on('data', c => body += c);
@@ -6846,6 +6886,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const { url: videoUrl, title, venue_id, token } = JSON.parse(body);
         if (!videoUrl || !venue_id) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        if (!storageUrlOwnedBy(videoUrl, venue_id)) { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'That file does not belong to this venue'})); return; }
         const vEmail = await verifyAuthEmail(token);
         if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
         const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
@@ -6880,6 +6921,7 @@ const server = http.createServer(async (req, res) => {
       try {
         const { url: imgUrl, title, description, venue_id, token } = JSON.parse(body);
         if (!imgUrl || !venue_id || !title) { res.writeHead(400, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'missing fields'})); return; }
+        if (!storageUrlOwnedBy(imgUrl, venue_id)) { res.writeHead(403, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'That file does not belong to this venue'})); return; }
         const vEmail = await verifyAuthEmail(token);
         if (!vEmail) { res.writeHead(401, {'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Please verify your email first'})); return; }
         const mem = await sbFetch('/rest/v1/venue_members?venue_id=eq.' + encodeURIComponent(venue_id) + '&select=email,role&limit=200');
@@ -7515,8 +7557,11 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
           finalReply = finalReply.replace(/\[NPS:[^\]]+\]/gi, '').trim();
         }
 
+        const outVideos = await signMedia(relevantVideos, 6 * 3600);
+        const outImages = await signMedia(matchedImages, 6 * 3600);
+        const outDoc = docFile ? (await signMedia([docFile], 7 * 24 * 3600))[0] : null; // shareable: valid for a week
         res.writeHead(200, {'Content-Type':'application/json'});
-        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: false, videos:relevantVideos, videoCount:relevantVideos.length, images: matchedImages, docFile, detectedVendor, forceNPS: npsForced || !!npsMatch}));
+        res.end(JSON.stringify({response:finalReply, supportUrl, escalate: false, videos:outVideos, videoCount:outVideos.length, images: outImages, docFile: outDoc, detectedVendor, forceNPS: npsForced || !!npsMatch}));
       } catch(e) {
         console.error(e);
         res.writeHead(500, {'Content-Type':'application/json'});
@@ -7575,7 +7620,7 @@ ${KNOWLEDGE_BASE}${vendorContext}${docContext}${videoContext}${imageContext}${do
     try {
       const r = await sbFetch('/rest/v1/videos?select=*&order=created_at.desc&limit=100');
       res.writeHead(200, {'Content-Type':'application/json'});
-      res.end(JSON.stringify(Array.isArray(r.data) ? r.data : []));
+      res.end(JSON.stringify(await signMedia(Array.isArray(r.data) ? r.data : [], 6 * 3600)));
     } catch(e) { res.writeHead(500, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:e.message})); }
     return;
   }

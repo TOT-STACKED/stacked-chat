@@ -163,3 +163,18 @@ describe('row-level security', () => {
     });
   });
 });
+
+describe('005 storage policies', () => {
+  it('drops the public rules on the stacked-videos bucket and leaves other buckets alone', async () => {
+    const db = await newDb('004_backfill_organisations.sql');
+    await db.exec(`
+      create policy "anon read videos"   on storage.objects for select to anon using (bucket_id = 'stacked-videos');
+      create policy "anon upload videos" on storage.objects for insert to anon with check (bucket_id = 'stacked-videos');
+      create policy "other app avatars"  on storage.objects for select to anon using (bucket_id = 'avatars');
+    `);
+    await db.exec(migrationSql('005_storage_private.sql'));
+    const left = (await db.query<{ policyname: string }>(`select policyname from pg_policies where schemaname='storage' order by 1`)).rows;
+    expect(left).toEqual([{ policyname: 'other app avatars' }]);
+    await db.exec(migrationSql('005_storage_private.sql')); // safe to re-run
+  });
+});

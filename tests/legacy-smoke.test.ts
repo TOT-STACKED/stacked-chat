@@ -47,6 +47,19 @@ describe('legacy pages still render and their client JS parses', () => {
     const html = await (await fetch(base + '/')).text();
     expect(html).not.toContain('/rest/v1/');
   });
+
+  it('the chat page no longer uploads to storage with the public key (uploads go via the server)', async () => {
+    const html = await (await fetch(base + '/')).text();
+    expect(html).not.toContain('/storage/v1/object/stacked-videos/');
+    expect(html).not.toContain('/storage/v1/object/public/');
+    expect(html).toContain('/storage/sign-upload');
+  });
+
+  it('the signed-upload endpoint refuses anonymous callers', async () => {
+    const res = await fetch(base + '/storage/sign-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: 'x', kind: 'doc', filename: 'a.pdf', content_type: 'application/pdf', size: 10 }) });
+    expect([401, 503]).toContain(res.status); // 503 here: no service key in the test environment
+    expect((await res.json()).ok).toBe(false);
+  });
 });
 
 describe('legacy behaviour preserved alongside the modern API', () => {
