@@ -123,7 +123,7 @@ describe('drafts, publishing and the chat', () => {
     expect(await kb.list(ORG)).toHaveLength(0);
   });
   it('refuses oversized text and unknown sites', async () => {
-    await expect(doc({ body: 'x'.repeat(200_001) })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(doc({ body: 'x'.repeat(600_001) })).rejects.toMatchObject({ statusCode: 400 });
     await expect(doc({ site_id: randomUUID() })).rejects.toMatchObject({ statusCode: 400 });
     expect(store.items).toHaveLength(0);
   });
