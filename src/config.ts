@@ -32,6 +32,9 @@ const schema = z.object({
   INSIGHTS_MODEL: z.string().default('claude-sonnet-4-6'),
   /** The model that answers staff questions in the chat. */
   CHAT_MODEL: z.string().default('claude-sonnet-4-6'),
+  /** Vendor ratings are also copied here (the partner portal). Optional. */
+  STACKCOLLECT_SUPABASE_URL: z.string().optional(),
+  STACKCOLLECT_SUPABASE_KEY: z.string().optional(),
   SLACK_WEBHOOK_URL: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   NODE_ENV: z.string().default('development'),

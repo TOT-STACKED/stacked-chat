@@ -75,7 +75,7 @@ describe('finding the right passages', () => {
   });
   it('builds a prompt that holds the strict rules and only the matched knowledge', () => {
     const p = buildSystemPrompt({ botName: 'Nora', orgName: 'Acme', siteName: 'North', personName: 'Amy', passages: [{ item_id: '1', title: 'Fire safety', text: 'Meet at the car park.', score: 3 }], hasVideo: false, hasImage: false });
-    expect(p).toContain('You are Nora'); expect(p).toContain('ANSWER ONLY FROM THE KNOWLEDGE BASE'); expect(p).toContain('ALLERGENS ARE SAFETY-CRITICAL');
+    expect(p).toContain('You are Nora'); expect(p).toContain('ANSWER ONLY FROM TWO SOURCES'); expect(p).toContain('ALLERGENS ARE SAFETY-CRITICAL');
     expect(p).toContain('[Fire safety]\nMeet at the car park.'); expect(p).toContain("I don't have that in your knowledge base yet");
   });
 });
@@ -98,10 +98,11 @@ describe('the chat service', () => {
     await publish('Fire safety', 'Meet at the car park when the fire alarm sounds.');
     await publish('South fire plan', 'South fire alarm: meet at the south yard.', { site_id: south });
     await kb().createDocument(ORG, { title: 'Draft fire memo', body: 'Fire alarm secret draft text', site_id: null, status: 'draft', by: 'a@b.co' });
+    model.reply = 'Meet at the car park.\nSource: Fire safety';
     const r = await chat.ask(me(), { message: 'Where do we meet when the fire alarm sounds?' });
     const sys = model.calls[0]!.system;
     expect(sys).toContain('car park'); expect(sys).not.toContain('south yard'); expect(sys).not.toContain('secret draft');
-    expect(r).toMatchObject({ reply: expect.stringContaining('Here is the answer'), unanswered: false });
+    expect(r).toMatchObject({ reply: expect.stringContaining('car park'), unanswered: false });
     expect(r.sources).toEqual([expect.objectContaining({ title: 'Fire safety' })]);
   });
   it('team knowledge reaches that team only', async () => {
@@ -156,6 +157,14 @@ describe('the chat service', () => {
     expect(r.videos).toEqual([expect.objectContaining({ title: 'How to void a payment on the till', url: 'https://cdn.x/clip.mp4?signed=1' })]);
     model.reply = "I don't have that in your knowledge base yet.";
     expect((await chat.ask(me(), { message: 'video: how do I void a payment on the till?' })).videos).toEqual([]);
+  });
+  it('shows only the sources the answer cites, not everything that was searched', async () => {
+    await publish('Fire safety', 'Meet at the car park when the fire alarm sounds.');
+    await publish('Handbook', 'Breaks are twenty minutes. Fire alarm tests are on Fridays.');
+    model.reply = 'Meet at the car park.\nSource: Fire safety';
+    expect((await chat.ask(me(), { message: 'where do we meet when the fire alarm sounds' })).sources.map((s) => s.title)).toEqual(['Fire safety']);
+    model.reply = 'Restart the till. (answered from vendor notes, no document used)';
+    expect((await chat.ask(me(), { message: 'where do we meet when the fire alarm sounds' })).sources).toEqual([]);
   });
   it('cleans replies of links and stray tags, and recognises "could not answer"', () => {
     expect(cleanReply('See [the guide](https://x.co/g) or https://y.co now [ESCALATE]\n\n\n\nDone')).toBe('See the guide or now\n\nDone');

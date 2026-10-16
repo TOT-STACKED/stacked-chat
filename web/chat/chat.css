@@ -91,3 +91,17 @@ button,input,select,textarea{font:inherit;color:inherit}
 .devbox{border:1px dashed var(--line-strong);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--muted)}
 .devbox div{display:flex;flex-wrap:wrap;gap:6px}.devbox button{border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:6px 12px;cursor:pointer}
 .nochat{max-width:420px;margin:15vh auto;text-align:center;padding:0 24px;display:flex;flex-direction:column;gap:12px;align-items:center}
+
+/* vendor support + rating */
+.support{display:inline-flex;align-items:center;gap:8px;margin-top:10px;border:1px solid var(--line-strong);border-radius:999px;padding:5px 14px;font-size:13px;color:var(--ink);text-decoration:none;background:var(--bg)}
+.support span{color:var(--muted)}.support b{font-weight:600}.support:hover{border-color:var(--ink)}
+.nps{display:flex;flex-direction:column;gap:10px;min-width:min(300px,70vw)}
+.nps b{font-weight:600;font-size:14.5px}
+.scale{display:grid;grid-template-columns:repeat(11,1fr);gap:4px}
+.sc{height:36px;border:1px solid var(--line-strong);background:#fff;border-radius:8px;cursor:pointer;font-size:13px;padding:0}
+.sc:hover{border-color:var(--ink)}.sc.on{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);font-weight:700}
+.scalehint{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.nps textarea{border:1px solid var(--line-strong);border-radius:10px;padding:8px 10px;resize:vertical;background:#fff;font-size:14px}
+.nps .row{display:flex;justify-content:flex-end;align-items:center;gap:14px}
+.nps .btn.small{height:36px;padding:0 16px;font-size:14px}
+.npsthanks{margin:0;color:var(--muted)}

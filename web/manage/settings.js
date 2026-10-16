@@ -3,7 +3,7 @@ import { KEY_SCOPES, isHexColour, keyStatus, lastUsedText, scopeLabel, shortDate
 import { pageHeader, tile } from './ui.js';
 import { renderBilling } from './billing.js';
 
-const SECTIONS = [['company', 'Company'], ['branding', 'Chat and branding'], ['api-keys', 'API keys'], ['billing', 'Billing']];
+const SECTIONS = [['company', 'Company'], ['branding', 'Chat and branding'], ['tech-stack', 'Tech stack'], ['api-keys', 'API keys'], ['billing', 'Billing']];
 
 /** Settings: company details, how the chat looks, API keys and billing. Owners and HQ admins only. */
 export function renderSettings(main, ctx) {
@@ -16,6 +16,7 @@ export function renderSettings(main, ctx) {
       h('span', { class: 'soonlink', text: 'Webhooks are coming soon' })), host));
   if (section === 'company') company(host, ctx);
   else if (section === 'branding') branding(host, ctx);
+  else if (section === 'tech-stack') techStack(host, ctx);
   else if (section === 'api-keys') apiKeys(host, ctx);
   else renderBilling(host, { ...ctx, embedded: true });
 }
@@ -103,6 +104,30 @@ async function branding(host, ctx) {
       field('Welcome message', `b-msg-${k}`, msg, 'Plain text only.'),
       h('div', { class: 'grid2' }, h('div', { class: 'field' }, h('label', { for: `b-hex-${k}`, text: 'Main colour' }), h('div', { class: 'actions' }, swatch, hex)), field('Logo link', `b-logo-${k}`, logo, 'A link to an image, starting with https://')),
       h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'Preview' }), prev), err, h('div', { class: 'row', style: 'justify-content:flex-start' }, save)));
+  }
+}
+
+// ---- tech stack ---------------------------------------------------------------------------------------------
+async function techStack(host, ctx) {
+  const { api, orgId } = ctx;
+  const intro = 'Tell us which systems each venue uses. The chat then gives answers for the right product, and never asks "which till do you use?".';
+  host.append(head('Tech stack', intro), h('p', { class: 'muted', text: 'Loading…' }));
+  let data;
+  try { data = await api.get(`/api/v1/orgs/${orgId}/tech-stack`); }
+  catch (e) { clear(host); host.append(head('Tech stack'), h('div', { class: 'banner', role: 'alert', text: e.message })); return; }
+  clear(host); host.append(head('Tech stack', intro));
+  if (!data.sites.length) { host.append(h('div', { class: 'card empty-state' }, tile('empty', 56), h('b', { text: 'No venues yet' }), h('p', { text: 'Add a venue in People first.' }))); return; }
+  for (const site of data.sites) {
+    const k = site.id.slice(0, 8);
+    const inputs = data.categories.map((c) => ({ c, el: input(`ts-${c.key}-${k}`, site.stack[c.key] || '', { maxlength: 60, placeholder: 'e.g. ' + ({ epos: 'Lightspeed', payments: 'Dojo', reservations: 'SevenRooms', rota: 'Deputy', ordering: 'Deliverect', loyalty: 'Stampede', inventory: 'Apicbase', pms: 'Mews', wifi: 'Purple Wi-Fi' }[c.key] || 'Product name') }) }));
+    const err = h('div');
+    const save = h('button', { class: 'btn cta', onclick: async () => {
+      clear(err); save.disabled = true;
+      try { await api.patch(`/api/v1/orgs/${orgId}/sites/${site.id}/tech-stack`, { stack: Object.fromEntries(inputs.map(({ c, el }) => [c.key, el.value.trim()])) }); toast(`Saved for ${site.name}`); }
+      catch (e) { err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
+      save.disabled = false;
+    } }, 'Save');
+    host.append(h('div', { class: 'card pad stack' }, h('h3', { text: site.name }), h('div', { class: 'grid2' }, inputs.map(({ c, el }) => field(c.label, `ts-${c.key}-${k}`, el))), err, h('div', { class: 'row', style: 'justify-content:flex-start' }, save)));
   }
 }
 

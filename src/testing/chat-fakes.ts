@@ -16,6 +16,14 @@ export class FakeConversationStore implements ConversationStore {
 export const previewChatModel: ChatModel = {
   async complete({ system, messages }: { system: string; messages: ChatTurn[] }) {
     await new Promise((r) => setTimeout(r, 700));
+    const last0 = messages.at(-1)?.content ?? '';
+    const rate = /\brate\s+([a-z0-9 .&-]{2,30})\??$/i.exec(last0.trim());
+    if (rate) return `Great, rating ${rate[1]!.trim()} now.\n[NPS:${rate[1]!.trim().toLowerCase()}]`;
+    const vendorNotes = system.split('STACKED VENDOR SUPPORT NOTES (maintained by Stacked; use for hospitality technology faults):\n')[1]?.split('\n\n---\n\n')[0];
+    if (vendorNotes && /till|offline|printer|terminal|reader|not working|frozen/i.test(last0)) {
+      const fix = /1\.\s*([^\n]{20,200})/.exec(vendorNotes)?.[1] ?? 'Restart the device and check the connection.';
+      return `**Restart it and check the connection first.**\n1. ${fix.slice(0, 160)}\n2. If it still fails, use the vendor support link below.\n\nMid-service workaround: take cash or a backup reader while you sort it.`;
+    }
     const kb = system.split('KNOWLEDGE BASE:\n')[1] ?? '';
     if (kb.startsWith('(Nothing')) return "I don't have that in your knowledge base yet. Ask your manager to add it and I'll be able to help the whole team next time.";
     const first = kb.split('\n\n---\n\n')[0] ?? '';

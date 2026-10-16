@@ -5,7 +5,7 @@ import { parseBlocks, readableOn, youtubeThumb } from './render.js';
 
 const root = document.getElementById('app');
 let cfg; let auth; let api;
-const st = { ctx: null, site: null, conversationId: null, messages: [], sending: false, error: null };
+const st = { ctx: null, site: null, conversationId: null, messages: [], sending: false, error: null, npsShown: false };
 const SITE_KEY = 'stacked_chat_site';
 
 const svg = (d, size = 20, extra = {}) => {
@@ -76,7 +76,7 @@ function showNoAccess() {
     h('button', { class: 'btn', onclick: signOut }, 'Sign out')));
 }
 function signOut() { auth.signOut(); st.ctx = null; showSignIn(); }
-function resetChat() { st.conversationId = null; st.messages = []; st.error = null; }
+function resetChat() { st.conversationId = null; st.messages = []; st.error = null; st.npsShown = false; }
 
 function brandName() { return (st.site.branding.bot_name || 'Stacked Chat'); }
 function applyBrand() {
@@ -117,6 +117,28 @@ function hello() {
     h('div', { class: 'chipsrow' }, st.site.suggestions.map((q) => h('button', { class: 'suggest', onclick: () => send(q) }, q))));
 }
 
+const titleCase = (s) => String(s).replace(/\b\w/g, (c) => c.toUpperCase());
+
+function npsCard(m) {
+  const card = h('div', { class: 'nps', role: 'group', 'aria-label': `Rate ${m.vendor}` });
+  let score = null;
+  const draw = (done) => {
+    clear(card);
+    if (done) { card.append(h('p', { class: 'npsthanks', text: done })); return; }
+    const err = h('div'); const comment = h('textarea', { rows: 2, maxlength: 500, placeholder: 'Anything you want to add? (optional)', 'aria-label': 'Comment' });
+    const send = h('button', { class: 'btn small', disabled: true, onclick: async () => {
+      send.disabled = true; clear(err);
+      try { await api.post('/api/v1/chat/nps', { site_id: st.site.site_id, vendor: m.vendor, score, comment: comment.value.trim() || null }); draw('Thanks, that helps other venues choose.'); }
+      catch (e) { send.disabled = false; err.append(h('div', { class: 'err', role: 'alert', text: e.message })); }
+    } }, 'Send');
+    const scale = h('div', { class: 'scale', role: 'radiogroup', 'aria-label': 'Score from 0 to 10' }, Array.from({ length: 11 }, (_, i) => h('button', { class: 'sc', role: 'radio', 'aria-checked': 'false', onclick: (e) => { score = i; send.disabled = false; scale.querySelectorAll('.sc').forEach((b, k) => { b.classList.toggle('on', k === i); b.setAttribute('aria-checked', String(k === i)); }); } }, String(i))));
+    card.append(h('b', { text: `How likely are you to recommend ${titleCase(m.vendor)} to another hospitality business?` }), scale, h('div', { class: 'scalehint' }, h('span', { text: 'Not likely' }), h('span', { text: 'Very likely' })), comment, err,
+      h('div', { class: 'row' }, h('button', { class: 'lnk', onclick: () => draw('No problem.') }, 'Skip'), send));
+  };
+  draw();
+  return h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble' }, card));
+}
+
 function botBubble(m) {
   const parts = [];
   if (m.unanswered) parts.push(h('span', { class: 'notin', text: 'Not in your knowledge base yet' }));
@@ -130,6 +152,7 @@ function botBubble(m) {
   for (const v of m.videos || []) if (isHttps(v.url)) { const t = youtubeThumb(v.url); media.push(h('a', { class: 'vcard', href: v.url, target: '_blank', rel: 'noopener noreferrer' }, t ? h('img', { src: t, alt: '' }) : h('span', { class: 'ph', 'aria-hidden': 'true', text: '▶' }), h('div', null, h('b', { text: v.title }), h('span', { text: 'Watch video' })))); }
   for (const i of m.images || []) if (isHttps(i.url)) media.push(h('img', { class: 'pic', src: i.url, alt: i.title }));
   if (media.length) parts.push(h('div', { class: 'media' }, media));
+  if (m.support && isHttps(m.support.url)) parts.push(h('a', { class: 'support', href: m.support.url, target: '_blank', rel: 'noopener noreferrer' }, h('span', { text: 'Vendor support' }), h('b', { text: titleCase(m.support.vendor) })));
   return h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble' }, parts));
 }
 
@@ -137,7 +160,7 @@ function drawThread() {
   clear(thread);
   const col = h('div', { class: 'col' });
   if (!st.messages.length && !st.sending) col.append(hello());
-  for (const m of st.messages) col.append(m.role === 'user' ? h('div', { class: 'msg user' }, h('div', { class: 'bubble', text: m.content })) : botBubble(m));
+  for (const m of st.messages) col.append(m.role === 'user' ? h('div', { class: 'msg user' }, h('div', { class: 'bubble', text: m.content })) : m.role === 'nps' ? npsCard(m) : botBubble(m));
   if (st.sending) col.append(h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble', role: 'status', 'aria-label': 'Thinking' }, h('span', { class: 'typing' }, h('i'), h('i'), h('i')))));
   if (st.error) col.append(h('div', { class: 'err', role: 'alert', text: st.error }));
   thread.append(col); thread.scrollTop = thread.scrollHeight;
@@ -151,7 +174,10 @@ async function send(text) {
   try {
     const r = await api.post('/api/v1/chat', { site_id: st.site.site_id, message: text, ...(st.conversationId ? { conversation_id: st.conversationId } : {}) });
     st.conversationId = r.conversation_id;
-    st.messages.push({ role: 'assistant', content: r.reply, unanswered: r.unanswered, sources: r.sources, videos: r.videos, images: r.images });
+    st.messages.push({ role: 'assistant', content: r.reply, unanswered: r.unanswered, sources: r.sources, videos: r.videos, images: r.images, support: r.support });
+    // a rating card: always when they asked to rate; otherwise once, after a couple of questions about a vendor
+    const userTurns = st.messages.filter((m) => m.role === 'user').length;
+    if (r.nps && (r.nps.forced || (!st.npsShown && userTurns >= 2))) { if (!r.nps.forced) st.npsShown = true; setTimeout(() => { st.messages.push({ role: 'nps', vendor: r.nps.vendor }); drawThread(); }, 900); }
   } catch (e) {
     if (e.status === 401) return;
     st.error = e.message || 'Something went wrong. Please try again.';

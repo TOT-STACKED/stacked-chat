@@ -37,6 +37,9 @@ import { chatAppRoutes } from './modules/chat/app-routes.js';
 import { createChat, type Chat } from './modules/chat/service.js';
 import { createAnthropicChatModel, type ChatModel } from './modules/chat/model.js';
 import { createSupabaseConversationStore, type ConversationStore } from './modules/chat/store.js';
+import { createPortalMirror, createSupabaseNpsStore, type NpsMirror, type NpsStore } from './modules/chat/nps.js';
+import { techStackRoutes } from './modules/vendors/routes.js';
+import { createSupabaseTechStackStore, type TechStackStore } from './modules/vendors/store.js';
 import { createSupabaseBrandingStore, type BrandingStore } from './modules/branding/store.js';
 import { createInsights, type Insights } from './modules/insights/service.js';
 import { createSupabaseInsightsStore, type InsightsStore } from './modules/insights/store.js';
@@ -58,6 +61,9 @@ export interface Deps {
   insightsStore?: InsightsStore;
   brandingStore?: BrandingStore;
   conversationStore?: ConversationStore;
+  techStackStore?: TechStackStore;
+  npsStore?: NpsStore;
+  mirrorNps?: NpsMirror | null;
   chatModel?: ChatModel | null;
   storage?: { signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>> } | null;
   drafter?: AnswerDrafter | null;
@@ -127,7 +133,10 @@ export async function buildApp(
     conversations: conversationStore, model: chatModel,
     signUrls: overrides.storage ? async (urls) => overrides.storage!.signUrls(urls) as Promise<Array<string | null>> : undefined,
     onAnswered: (siteId) => { void billing?.recordQuestion(siteId); },
+    nps: overrides.npsStore ?? (db ? createSupabaseNpsStore(db) : null),
+    mirrorNps: overrides.mirrorNps !== undefined ? overrides.mirrorNps : (config.STACKCOLLECT_SUPABASE_URL && config.STACKCOLLECT_SUPABASE_KEY ? createPortalMirror({ url: config.STACKCOLLECT_SUPABASE_URL, key: config.STACKCOLLECT_SUPABASE_KEY }) : null),
   }) : null;
+  const techStackStore = overrides.techStackStore ?? (db ? createSupabaseTechStackStore(db) : null);
   const insights: Insights | null = insightsStore && knowledge ? createInsights({ store: insightsStore, knowledge, drafter }) : null;
   const billingReason = billingCfg.ok ? 'Billing needs the database to be configured' : billingCfg.reason;
   if (!billing) app.log.info({ reason: billingReason }, 'billing disabled');
@@ -196,7 +205,8 @@ export async function buildApp(
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
   await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate }));
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
-  await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null }));
+  await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore }));
+  await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => insightsRoutes(instance, { insights, store: insightsStore ?? null, gate }));
   const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };

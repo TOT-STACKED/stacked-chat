@@ -97,7 +97,7 @@ Manage → Settings (owners and HQ admins): Company (rename the company and venu
 
 `src/modules/chat/` answers. For each question it finds what this person may see: published knowledge for the whole company, their venue, or their team (`retrieve.ts`, drafts never), picks the best passages by word overlap, and asks the model with a strict prompt (`prompt.ts`): answer only from that knowledge, cite the source, allergens only from the company's own documents, and a fixed "I don't have that in your knowledge base yet" when it has nothing. The reply, sources, a matching video, and a photo (only if asked for) come back; the conversation is saved to `conversations` (Insights reads it) and the question is metered for fair use. Nothing is pasted into the page as HTML: the page builds DOM nodes from text.
 
-Venue branding from Settings (name, colours, welcome text, logo) styles each venue's chat. Conversations are private to the person and venue. Not yet ported from the old chat: the tech-support vendor playbook, NPS ratings, and the Slack hand-off. Env: `ANTHROPIC_API_KEY`, optional `CHAT_MODEL`.
+Venue branding from Settings (name, colours, welcome text, logo) styles each venue's chat. Conversations are private to the person and venue. Ported from the old chat: the vendor playbook and NPS (below). Not ported: the Slack hand-off. Env: `ANTHROPIC_API_KEY`, optional `CHAT_MODEL`.
 
 
 ## What was retired (2026-10-16)
@@ -105,3 +105,10 @@ Venue branding from Settings (name, colours, welcome text, logo) styles each ven
 The old chat widget is gone: its page template, the operator app shell, and every endpoint only it used (`/chat`, `/history`, `/save-*`, venue sign-up and team endpoints, `/kb-*`, `/storage/sign-upload`, `/admin-summary`, the weekly digest, vendor playbook and Slack/NPS helpers). `/` and `/app` now redirect to `/chat/`, and `/chat/<venue>` opens the new chat on that venue. `server.js` shrank from about 7,700 to about 2,000 lines: it now only loads the modern API and serves the **Stacked team admin dashboard** at `/admin` (password-protected: vendor intelligence, sign-ups, adoption, content), which stays until the Console replaces it.
 
 Everything removed is recoverable from the git tag `legacy-chat-widget` (for example the tech-support vendor playbook, NPS ratings, and the weekly digest, if we port them).
+
+
+## Vendor playbook and ratings (in the chat)
+
+`src/modules/vendors/` holds Stacked's hospitality-technology support playbook, maintained by Stacked and not by customers: detailed troubleshooting profiles for the main vendors (`data/profiles.json`), support pages for about 117 vendors (`data/support-urls.json`) and about 225 recognised product names. When someone reports a technology fault, the chat gives the model the matching vendor notes (current message first, then the person's recent messages, then the venue's recorded tech stack), and returns a vendor support link as a button (the model is told never to write web addresses). A venue's tech stack (EPOS, payments, rota...) is set in Manage, Settings, Tech stack (`venues.tech_stack`), so the chat never asks "which till do you use?". Sources are shown only when the answer cites a document.
+
+Ratings: when the person explicitly asks to rate a vendor the model adds `[NPS:vendor]`; the page shows a 0 to 10 card (also offered once after a couple of questions about a vendor). `POST /api/v1/chat/nps` saves to `nps_scores` and copies to the partner portal (`STACKCOLLECT_SUPABASE_URL` and `_KEY`, best effort, never blocks). Ratings are only ever triggered by what the person said, never a vendor the assistant mentioned in passing.

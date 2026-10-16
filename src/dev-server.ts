@@ -80,7 +80,9 @@ async function main() {
   for (let i = 0; i < 4; i++) ask(c, 'alex@example.com', 'How do I log a broken fridge?', false, i);
   for (let i = 0; i < 3; i++) ask(a, 'someone@example.com', 'What time does the bar close on Sundays?', true, i);
   const drafter = { draft: async (q: string) => `Staff are paid for training days at [CONFIRM: rate]. Training is rostered like a normal shift. (Draft for: ${q})` };
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), conversationStore: new FakeConversationStore(), chatModel: previewChatModel, drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
+  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), conversationStore: new FakeConversationStore(), chatModel: previewChatModel, mirrorNps: null,
+    npsStore: { save: async (r) => { console.log('[preview] rating saved', JSON.stringify(r)); } },
+    techStackStore: (() => { const stacks = new Map<string, Record<string, string>>([[a.id, { epos: 'Lightspeed', payments: 'Dojo' }]]); return { get: async (id: string) => stacks.get(id) ?? {}, list: async () => repo.sites.map((x) => ({ id: x.id, name: x.name, stack: stacks.get(x.id) ?? {} })), set: async (id: string, st: Record<string, string>) => { stacks.set(id, st); return st; } }; })(), drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);
   await app.listen({ port, host: '127.0.0.1' });
   console.log(`Manage preview: http://127.0.0.1:${port}/manage/  (sample data, dev sign-in)`);
