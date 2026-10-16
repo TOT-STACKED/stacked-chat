@@ -8,8 +8,10 @@ import { renderKnowledge } from './knowledge.js';
 import { renderInsights } from './insights.js';
 import { ICONS, avatar, logo, pageHeader, tile } from './ui.js';
 import { ROLE_LABEL, atLeast, bestRole, isManagerAnywhere } from './lib.js';
+import { labelTables } from './responsive.js';
 
 const root = document.getElementById('app');
+labelTables(root);
 let cfg; let auth; let api;
 const state = { memberships: [], orgs: [], orgId: null };
 
@@ -133,7 +135,8 @@ function drawShell() {
         NAV.map(([k, label]) => h('a', { href: '#/' + k, id: 'nav-' + k }, tile(k, 28), label))),
       h('nav', { class: 'nav soonwrap', 'aria-label': 'Coming next', style: 'margin-top:8px' }, h('span', { class: 'navlabel', text: 'Coming next' }),
         SOON_NAV.map(([k, label]) => h('span', { class: 'soonitem' }, tile(k, 28), label, h('span', { class: 'tag', text: 'Soon' })))),
-      h('div', { class: 'grow' })),
+      h('div', { class: 'grow' }),
+      h('button', { class: 'btn line small mobsignout', onclick: signOut }, 'Sign out')),
     h('div', { class: 'content' },
       h('header', { class: 'top' }, crumb,
         h('div', { class: 'userbox' }, h('div', { class: 'who' }, h('b', { text: auth.email() }), h('span', { text: org.name })),

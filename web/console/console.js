@@ -3,8 +3,10 @@ import { createAuth } from '/manage/auth.js';
 import { createApi } from '/manage/api.js';
 import { avatar, logo, pageHeader, tile } from '/manage/ui.js';
 import { asksText, barPercent, formatGbp, shortDate } from '/manage/lib.js';
+import { labelTables } from '/manage/responsive.js';
 
 const root = document.getElementById('app');
+labelTables(root);
 let cfg; let auth; let api; let main; let crumb;
 const st = { days: 30, email: '' };
 
@@ -65,7 +67,7 @@ function drawShell() {
   clear(root); main = h('main', { class: 'main', id: 'main' }); crumb = h('span', { class: 'crumbs' });
   root.append(h('div', { class: 'shell' },
     h('aside', { class: 'side staff' }, h('div', { style: 'display:flex;align-items:center' }, logo(), h('span', { class: 'stafftag', text: 'Console' })),
-      h('nav', { class: 'nav', 'aria-label': 'Console' }, h('span', { class: 'navlabel', text: 'Stacked staff' }), NAV.map(([k, label, icon]) => h('a', { href: '#/' + k, id: 'nav-' + k }, tile(icon, 28), label))), h('div', { class: 'grow' })),
+      h('nav', { class: 'nav', 'aria-label': 'Console' }, h('span', { class: 'navlabel', text: 'Stacked staff' }), NAV.map(([k, label, icon]) => h('a', { href: '#/' + k, id: 'nav-' + k }, tile(icon, 28), label))), h('div', { class: 'grow' }), h('button', { class: 'btn line small mobsignout', onclick: signOut }, 'Sign out')),
     h('div', { class: 'content' }, h('header', { class: 'top' }, crumb, h('div', { class: 'userbox' }, h('div', { class: 'who' }, h('b', { text: st.email }), h('span', { text: 'Stacked staff' })), avatar(st.email), h('button', { class: 'btn line small', onclick: signOut }, 'Sign out'))), main)));
 }
 
