@@ -26,14 +26,14 @@ export async function renderKnowledge(main, ctx) {
     const canAdd = scopes().length > 0;
     main.append(pageHeader({
       icon: 'knowledge', title: 'Knowledge', sub: 'Everything your AI can answer from, and who it is for.',
-      actions: canAdd ? [h('button', { class: 'btn line', onclick: () => openForm('video') }, 'Add a video'), h('button', { class: 'btn cta', onclick: () => openForm('document') }, 'Write a document')] : null,
+      actions: canAdd ? [h('button', { class: 'btn line', onclick: () => openForm('video') }, 'Add a video'), h('button', { class: 'btn line', onclick: () => openForm('document') }, 'Write a document'), uploadButton('btn cta', 'Upload a file')] : null,
     }));
     if (st.error) { main.append(h('div', { class: 'banner', role: 'alert' }, st.error + ' ', h('button', { class: 'lnk', onclick: load }, 'Try again'))); return; }
     if (st.loading) { main.append(h('p', { class: 'muted', text: 'Loading…' })); return; }
     if (!st.items.length) {
       main.append(h('div', { class: 'card empty-state' }, tile('empty', 64), h('h2', { text: 'Add your first piece of knowledge' }),
-        h('p', { text: 'Write down a policy, a how-to or a handbook section, or add a video. Your AI answers from what you publish here. Drafts stay private until you publish them.' }),
-        canAdd ? h('button', { class: 'btn cta', onclick: () => openForm('document') }, 'Write a document') : null));
+        h('p', { text: 'Upload a PDF or Word handbook, write down a policy or a how-to, or add a video. Your AI answers from what you publish here. Drafts stay private until you publish them.' }),
+        canAdd ? h('div', { class: 'actions', style: 'justify-content:center' }, uploadButton('btn cta', 'Upload a file'), h('button', { class: 'btn line', onclick: () => openForm('document') }, 'Write a document')) : null));
       return;
     }
     main.append(toolbar(), table());
@@ -73,6 +73,29 @@ export async function renderKnowledge(main, ctx) {
       }))));
   }
 
+  /** A button that opens the file picker. A single file opens for review; several are saved as drafts. */
+  function uploadButton(cls, label) {
+    const input = h('input', { type: 'file', accept: '.pdf,.docx,.txt,.md,application/pdf', multiple: true, style: 'display:none', 'aria-label': 'Choose files to upload' });
+    input.addEventListener('change', () => { const files = [...input.files]; input.value = ''; if (files.length) uploadFiles(files); });
+    return h('span', { style: 'display:inline-block' }, input, h('button', { class: cls, onclick: () => input.click() }, label));
+  }
+
+  async function uploadFiles(files) {
+    const site = (scopes()[0] || { id: '' }).id;
+    const made = []; const failed = [];
+    for (const [n, f] of files.entries()) {
+      toast(files.length > 1 ? `Reading ${f.name} (${n + 1} of ${files.length})…` : `Reading ${f.name}…`);
+      try { made.push(await api.upload(`${base}/upload?filename=${encodeURIComponent(f.name)}${site ? `&site_id=${site}` : ''}`, f)); }
+      catch (e) { failed.push(`${f.name}: ${e.message}`); }
+    }
+    await load();
+    if (failed.length) { modal(made.length ? 'Some files could not be added' : 'We could not add that file', (close) => h('div', { class: 'stack' },
+      made.length ? h('p', { class: 'muted', style: 'margin:0', text: `${made.length} added as drafts. These did not work:` }) : null,
+      h('ul', { style: 'margin:0;padding-left:18px' }, failed.map((m) => h('li', { text: m }))), h('div', { class: 'row' }, h('button', { class: 'btn cta', onclick: close }, 'OK')))); return; }
+    if (made.length === 1) openForm('document', made[0], `We read ${made[0].chars ? made[0].chars.toLocaleString('en-GB') : 'the'} characters from your file. Check the text, choose who it is for, then publish. Until you do, the AI will not use it.`);
+    else toast(`${made.length} files added as drafts. Open each one to check it and publish.`);
+  }
+
   async function togglePublish(i) {
     try { await api.patch(`${base}/${i.id}`, { status: i.status === 'published' ? 'draft' : 'published' }); toast(i.status === 'published' ? 'Unpublished. The AI no longer uses it.' : 'Published. The AI can use it now.'); await load(); }
     catch (e) { toast(e.message); }
@@ -83,7 +106,7 @@ export async function renderKnowledge(main, ctx) {
   }
 
   /** Create (existing == null) or edit. */
-  function openForm(kind, existing) {
+  function openForm(kind, existing, note) {
     const isDoc = kind === 'document'; const editing = !!existing;
     modal(editing ? `Edit ${KIND_LABEL[kind].toLowerCase()}` : isDoc ? 'Write a document' : 'Add a video', (close) => {
       const err = h('div');
@@ -109,6 +132,7 @@ export async function renderKnowledge(main, ctx) {
         } catch (e) { save.disabled = false; save.textContent = editing ? 'Save' : isDoc ? 'Save document' : 'Add video'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
       }
       return h('div', { class: 'stack' },
+        note ? h('div', { class: 'banner info', role: 'status', text: note }) : null,
         h('div', { class: 'field' }, h('label', { for: 'k-title', text: 'Title' }), title),
         isDoc ? h('div', { class: 'field' }, h('label', { for: 'k-body', text: 'Text' }), body) : h('div', { class: 'field' }, h('label', { for: 'k-url', text: 'Video link' }), url, h('span', { class: 'hint', text: 'A YouTube, Vimeo or direct video link.' })),
         h('div', { class: 'field' }, h('label', { for: 'k-aud', text: 'Who is it for?' }), audience),

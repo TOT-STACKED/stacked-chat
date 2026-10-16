@@ -1,10 +1,11 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { forbidden, notFound } from '../../lib/errors.js';
+import { badRequest, forbidden, notFound } from '../../lib/errors.js';
 import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
 import { assertOrgAccess, userOnly } from '../access.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
+import { MAX_UPLOAD_BYTES, extractText, titleFromFilename } from './extract.js';
 import type { Knowledge } from './service.js';
 import { knowledgeView } from './service.js';
 import type { ItemRow } from './store.js';
@@ -61,7 +62,7 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
   });
 
   const Create = z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('document'), title: Title, body: z.string().max(200_000), site_id: Id.nullable().optional(), status: Status.default('draft') }),
+    z.object({ kind: z.literal('document'), title: Title, body: z.string().max(600_000), site_id: Id.nullable().optional(), status: Status.default('draft') }),
     z.object({ kind: z.literal('video'), title: Title, url: z.string().trim().url().max(2000), site_id: Id.nullable().optional(), status: Status.default('draft') }),
   ]);
   r.post('/api/v1/orgs/:orgId/knowledge', {
@@ -85,12 +86,46 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
     return { ...knowledgeView(item), body: item.body };
   });
 
+  // Upload a PDF, Word (.docx) or text file. The raw file is the request body. We read the text out of it and
+  // save it as a DRAFT, so a person always reviews what was extracted before anything is published.
+  for (const type of ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'text/plain', 'text/markdown', 'application/octet-stream']) {
+    app.addContentTypeParser(type, { parseAs: 'buffer', bodyLimit: MAX_UPLOAD_BYTES + 1024 }, (_req, body, done) => done(null, body));
+  }
+  r.post('/api/v1/orgs/:orgId/knowledge/upload', {
+    bodyLimit: MAX_UPLOAD_BYTES + 1024,
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['knowledge'], security: SECURITY,
+      summary: 'Upload a PDF, Word (.docx) or text file. The text is extracted and saved as a draft to review.',
+      params: z.object({ orgId: Id }),
+      querystring: z.object({ filename: z.string().trim().min(1).max(200), site_id: Id.optional() }),
+      response: { 201: ItemDetail, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody, 409: ErrorBody },
+    },
+  }, async (req, reply) => {
+    const { orgId } = req.params;
+    const actor = userOnly(req);
+    assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
+    const siteId = req.query.site_id ?? null;
+    if (!canWrite(actor, orgId, siteId)) throw forbidden(siteId ? 'You cannot add knowledge for this site' : 'Only company admins can add knowledge for the whole company');
+    if (!Buffer.isBuffer(req.body)) throw badRequest('Send the file itself as the request body');
+    const { text, kind } = await extractText(req.body, req.query.filename);
+    const base = titleFromFilename(req.query.filename);
+    // never clash with an existing title: "Handbook", "Handbook (2)", ...
+    const taken = new Set((await kb().list(orgId)).filter((i) => i.kind === 'document').map((i) => (i.doc_filename ?? i.title).toLowerCase()));
+    let title = base; for (let n = 2; taken.has(title.toLowerCase()); n++) title = `${base} (${n})`;
+    const item = await kb().createDocument(orgId, { title, body: text, site_id: siteId, status: 'draft', by: actor.email });
+    reply.status(201);
+    req.log.info({ orgId, kind, chars: text.length }, 'knowledge upload');
+    return { ...knowledgeView(item), body: item.body };
+  });
+
   r.patch('/api/v1/orgs/:orgId/knowledge/:id', {
     preHandler: app.authenticate,
     schema: {
       tags: ['knowledge'], summary: 'Edit, retarget (company or one site), publish or unpublish', security: SECURITY,
       params: z.object({ orgId: Id, id: Id }),
-      body: z.object({ title: Title.optional(), body: z.string().max(200_000).optional(), url: z.string().trim().url().max(2000).optional(), description: z.string().max(500).nullable().optional(), site_id: Id.nullable().optional(), status: Status.optional() })
+      body: z.object({ title: Title.optional(), body: z.string().max(600_000).optional(), url: z.string().trim().url().max(2000).optional(), description: z.string().max(500).nullable().optional(), site_id: Id.nullable().optional(), status: Status.optional() })
         .refine((b) => Object.keys(b).length > 0, 'Nothing to change'),
       response: { 200: ItemDetail, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody, 409: ErrorBody },
     },

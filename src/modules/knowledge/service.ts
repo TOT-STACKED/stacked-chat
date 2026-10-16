@@ -3,7 +3,7 @@ import { chunkText } from './chunk.js';
 import type { ItemRow, KnowledgeStore, NewItem, Status } from './store.js';
 import { describeVideoUrl, isHttpUrl } from './video.js';
 
-const MAX_BODY = 200_000; // characters in one document
+const MAX_BODY = 600_000; // characters in one document (a long handbook is about 300,000)
 
 export interface KnowledgeDeps {
   store: KnowledgeStore;
