@@ -36,6 +36,7 @@ import { chatRoutes } from './modules/chat/routes.js';
 import { consoleRoutes, parseStaff } from './modules/console/routes.js';
 import { consoleAppRoutes } from './modules/console/app-routes.js';
 import { createConsole, type ConsoleService } from './modules/console/service.js';
+import { createCustomers } from './modules/console/customers.js';
 import { createSupabaseConsoleStore, type ConsoleStore } from './modules/console/store.js';
 import { chatAppRoutes } from './modules/chat/app-routes.js';
 import { createChat, type Chat } from './modules/chat/service.js';
@@ -225,7 +226,8 @@ export async function buildApp(
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
-  await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS) }));
+  await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS), idempotency,
+    customers: repo ? createCustomers({ repo, mailer, publicUrl: config.PUBLIC_URL, billing, notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) }) : null }));
   await app.register(async (instance) => consoleAppRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => insightsRoutes(instance, { insights, store: insightsStore ?? null, gate }));
   const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };

@@ -304,3 +304,32 @@ describe('OpenAPI', () => {
     expect(doc.paths['/api/v1/me'].get.security).toEqual([{ bearerAuth: [] }, { apiKey: [] }]);
   });
 });
+
+describe('invitations become access on first sign-in', () => {
+  it('an invited person signs in and is active; a disabled person is not revived', async () => {
+    const repo = new FakeRepo(); const org = repo.addOrg('Acme'); const site = repo.addSite(org, 'North');
+    repo.addMember(org, 'new@a.com', 'staff', site, null, 'invited'); repo.addMember(org, 'gone@a.com', 'staff', site, null, 'disabled');
+    const ids = { n: randomUUID(), g: randomUUID() };
+    const a = await buildApp(testConfig, { repo, verifyToken: fakeVerifier({ n: { userId: ids.n, email: 'new@a.com' }, g: { userId: ids.g, email: 'gone@a.com' } }) });
+    const me = async (t: string) => (await a.inject({ method: 'GET', url: '/api/v1/me', headers: { authorization: 'Bearer ' + t } })).json();
+    expect((await me('n')).memberships).toHaveLength(1);
+    expect(repo.members.find((m) => m.email === 'new@a.com')).toMatchObject({ status: 'active', user_id: ids.n });
+    expect((await me('g')).memberships).toHaveLength(0);
+    expect(repo.members.find((m) => m.email === 'gone@a.com')!.status).toBe('disabled');
+  });
+  it('a NEW invitation reaches someone who is already signed in (no restart needed)', async () => {
+    let now = Date.now(); const realNow = Date.now; Date.now = () => now;
+    try {
+      const repo = new FakeRepo(); const org = repo.addOrg('Acme'); const org2 = repo.addOrg('Other');
+      repo.addMember(org, 'p@a.com', 'staff', null, null, 'invited');
+      const id = randomUUID();
+      const a = await buildApp(testConfig, { repo, verifyToken: fakeVerifier({ t: { userId: id, email: 'p@a.com' } }) });
+      const me = async () => (await a.inject({ method: 'GET', url: '/api/v1/me', headers: { authorization: 'Bearer t' } })).json();
+      expect((await me()).memberships).toHaveLength(1);
+      repo.addMember(org2, 'p@a.com', 'staff', null, null, 'invited'); // invited to a second company later
+      expect((await me()).memberships).toHaveLength(1); // not yet: checked at most once a minute
+      now += 61_000;
+      expect((await me()).memberships).toHaveLength(2);
+    } finally { Date.now = realNow; }
+  });
+});

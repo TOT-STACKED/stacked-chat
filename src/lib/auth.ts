@@ -54,7 +54,8 @@ export interface AuthContext {
 /** Adds `app.authenticate` (preHandler) which sets `req.principal` from a Bearer session token or an API key. */
 export function registerAuth(app: FastifyInstance, ctx: AuthContext) {
   app.decorateRequest('principal', undefined);
-  const linked = new Set<string>();
+  /** when we last linked each person's invitations (refreshed every minute, so a NEW invitation to a person who is already signed in is picked up) */
+  const linked = new Map<string, number>();
 
   async function authenticate(req: FastifyRequest, reply: FastifyReply) {
     if (!ctx.repo) throw new ApiHttpError(503, 'not_configured', 'Identity is not configured on this server');
@@ -83,9 +84,9 @@ export function registerAuth(app: FastifyInstance, ctx: AuthContext) {
     } else if (bearer && !bearer.startsWith(KEY_PREFIX)) {
       const user = await ctx.verifyToken(bearer);
       if (!user) throw fail(unauthorized('Invalid or expired session'));
-      if (!linked.has(user.userId)) {
+      if ((linked.get(user.userId) ?? 0) < Date.now() - 60_000) {
         await repo.linkUser(user.email, user.userId).catch(() => {});
-        linked.add(user.userId);
+        linked.set(user.userId, Date.now());
       }
       const up: UserPrincipal = { kind: 'user', userId: user.userId, email: user.email, memberships: await repo.membershipsForUser(user.userId, user.email) };
       principal = up;

@@ -63,11 +63,11 @@ describe('Supabase repo (query building and error mapping)', () => {
     expect(out.find((m) => m.memberId === 'm2')).toMatchObject({ siteName: 'North', role: 'staff' });
   });
 
-  it('linkUser only touches unlinked rows with that email', async () => {
-    const { db, calls } = recordingDb({ status: 204, data: null });
+  it('linkUser only touches unlinked rows with that email: invited people become active, others are only linked', async () => {
+    const { db, calls } = recordingDb({ status: 204, data: null }, { status: 204, data: null });
     await createSupabaseRepo(db).linkUser('A@B.co', UID);
-    expect(calls[0]).toMatchObject({ init: { method: 'PATCH', body: { user_id: UID } } });
-    expect(calls[0]!.path).toBe('/members?email=eq.a%40b.co&user_id=is.null');
+    expect(calls[0]).toMatchObject({ path: '/members?email=eq.a%40b.co&user_id=is.null&status=eq.invited', init: { method: 'PATCH', body: { user_id: UID, status: 'active' } } });
+    expect(calls[1]).toMatchObject({ path: '/members?email=eq.a%40b.co&user_id=is.null&status=neq.invited', init: { method: 'PATCH', body: { user_id: UID } } });
   });
 
   it('listSites restricts to the given ids, and short-circuits an empty list without a query', async () => {

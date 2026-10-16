@@ -92,6 +92,11 @@ async function main() {
   cstore.memberRows = repo.members.map((m) => ({ org_id: org.id, site_id: m.site_id, email: m.email, display_name: m.display_name, role: m.role, status: m.status }));
   for (const [o, e, r] of [[OB, 'bea@bistro.co.uk', 'owner'], [OH, 'gm@harbour.co.uk', 'owner'], [OC, 'sam@cafesolo.co', 'owner']] as Array<[string, string, string]>) cstore.memberRows.push({ org_id: o, site_id: null, email: e, display_name: null, role: r, status: 'active' });
   cstore.usageRows = [{ site_id: bis[0]!, ai_questions: 2350, flagged_at: ago(2) }];
+  // customers added in the preview show up in the Console list too
+  const baseOrgs = cstore.orgs.bind(cstore); const baseSites = cstore.sites.bind(cstore); const baseMembers = cstore.members.bind(cstore);
+  cstore.orgs = async () => { const have = await baseOrgs(); return [...have, ...repo.orgs.filter((o) => !have.some((h) => h.id === o.id)).map((o) => ({ id: o.id, name: o.name, slug: o.slug, created_at: new Date().toISOString() }))]; };
+  cstore.sites = async () => { const have = await baseSites(); return [...have, ...repo.sites.filter((x) => !have.some((h) => h.id === x.id)).map((x) => ({ id: x.id, org_id: x.org_id, name: x.name, created_at: x.created_at, billing_tier: 'standard' as const, active: true }))]; };
+  cstore.members = async () => { const have = await baseMembers(); return [...have, ...repo.members.filter((m) => !have.some((h) => h.email === m.email && h.org_id === m.org_id)).map((m) => ({ org_id: m.org_id, site_id: m.site_id, email: m.email, display_name: m.display_name, role: m.role, status: m.status }))]; };
   cstore.convRows = [...istore.convs];
   const cq = (site: string, email: string, q: string, answered = true) => cstore.convRows.push({ id: 1000 + cstore.convRows.length, venue_id: site, email, created_at: ago(Math.random() * 20), messages: [{ role: 'user', content: q }, { role: 'assistant', content: answered ? 'Try restarting it.' : IDK }] });
   for (let i = 0; i < 6; i++) cq(bis[i % 3]!, 'ops@bistro.co.uk', 'our dojo card machine keeps declining payments');

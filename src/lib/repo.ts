@@ -30,6 +30,7 @@ export interface Repo {
   createMember(m: NewMember): Promise<MemberRow>;
   updateMember(memberId: string, patch: { role?: Role; status?: 'invited' | 'active' | 'disabled' }): Promise<MemberRow>;
   countActiveOwners(orgId: string): Promise<number>;
+  createOrg(o: { name: string; slug: string }): Promise<OrgRow>;
   createSite(s: { org_id: string; name: string; slug: string }): Promise<SiteRow>;
   listTeams(orgId: string): Promise<TeamRow[]>;
   getTeam(orgId: string, teamId: string): Promise<TeamRow | null>;

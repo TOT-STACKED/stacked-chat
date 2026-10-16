@@ -1,4 +1,4 @@
-import { clear, h } from '/manage/dom.js';
+import { clear, h, modal, toast } from '/manage/dom.js';
 import { createAuth } from '/manage/auth.js';
 import { createApi } from '/manage/api.js';
 import { avatar, logo, pageHeader, tile } from '/manage/ui.js';
@@ -103,7 +103,7 @@ async function customers() {
   const search = h('input', { class: 'filter search', type: 'search', placeholder: 'Search customers', 'aria-label': 'Search', value: custFilter.q });
   const only = h('button', { class: `pill ${custFilter.flagged ? 'on' : ''}`, onclick: () => { custFilter.flagged = !custFilter.flagged; only.classList.toggle('on', custFilter.flagged); drawRows(); } }, 'Needs attention');
   search.addEventListener('input', () => { custFilter.q = search.value; drawRows(); });
-  put(pageHeader({ icon: 'people', title: 'Customers', sub: `${d.data.length} ${d.data.length === 1 ? 'company' : 'companies'}`, actions: periodPills(customers) }), h('div', { class: 'toolbar' }, h('div', { class: 'chips' }, only), search), body);
+  put(pageHeader({ icon: 'people', title: 'Customers', sub: `${d.data.length} ${d.data.length === 1 ? 'company' : 'companies'}`, actions: [periodPills(customers), h('button', { class: 'btn cta', onclick: addCustomer }, 'Add customer')] }), h('div', { class: 'toolbar' }, h('div', { class: 'chips' }, only), search), body);
   function drawRows() {
     clear(body);
     const rows = d.data.filter((c) => (!custFilter.flagged || c.flags.length) && c.name.toLowerCase().includes(custFilter.q.trim().toLowerCase()));
@@ -117,6 +117,37 @@ async function customers() {
         h('td', { class: 'muted', text: c.last_question_at ? shortDate(c.last_question_at) : '–' }))))));
   }
   drawRows();
+}
+
+/** Add a customer: company, first venue and owner (who is invited by email). */
+function addCustomer() {
+  modal('Add a customer', (close) => {
+    const field = (label, id, input, hint) => h('div', { class: 'field' }, h('label', { for: id, text: label }), input, hint ? h('span', { class: 'hint', text: hint }) : null);
+    const company = h('input', { type: 'text', id: 'ac-co', maxlength: 80, placeholder: 'e.g. Bistro Group' });
+    const venue = h('input', { type: 'text', id: 'ac-venue', maxlength: 80, placeholder: 'Same as the company name' });
+    const email = h('input', { type: 'email', id: 'ac-email', placeholder: 'owner@theircompany.com', autocomplete: 'off' });
+    const name = h('input', { type: 'text', id: 'ac-name', maxlength: 60, placeholder: 'Optional' });
+    const trial = h('input', { type: 'checkbox', id: 'ac-trial', checked: true });
+    const err = h('div'); const key = crypto.randomUUID();
+    const go = h('button', { class: 'btn cta', onclick: submit }, 'Create customer');
+    async function submit() {
+      clear(err);
+      if (company.value.trim().length < 2) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Enter the company name.' })); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())) { err.append(h('div', { class: 'banner', role: 'alert', text: "Enter the owner's email address." })); return; }
+      go.disabled = true; go.textContent = 'Creating…';
+      try {
+        const r = await api.post('/api/v1/console/customers', { company_name: company.value.trim(), venue_name: venue.value.trim() || null, owner_email: email.value.trim(), owner_name: name.value.trim() || null, start_trial: trial.checked }, { 'Idempotency-Key': key });
+        close();
+        const bits = [r.invite === 'sent' ? `Invitation emailed to ${email.value.trim().toLowerCase()}` : 'Created, but the invitation email was not sent. They can still sign in with that email address', r.trial === 'started' ? '30-day trial started' : r.trial === 'not_available' ? 'billing is not switched on, so no trial was started' : r.trial === 'failed' ? 'the trial could not be started, do it from their Billing page' : null].filter(Boolean);
+        toast(bits.join('. ') + '.'); location.hash = `#/customers/${r.org_id}`;
+      } catch (e) { go.disabled = false; go.textContent = 'Create customer'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
+    }
+    return h('div', { class: 'stack' },
+      field('Company name', 'ac-co', company), field('First venue', 'ac-venue', venue, 'More venues can be added later in People.'),
+      field("Owner's email", 'ac-email', email, 'They get an invitation and sign in with a one-time code. They become the company owner.'), field("Owner's name", 'ac-name', name),
+      h('label', { class: 'radio', style: 'display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer' }, trial, h('span', null, h('b', { text: 'Start their 30-day free trial' }), h('span', { class: 'hint', text: ' No card needed. Untick to leave them unbilled for now.' }))),
+      err, h('div', { class: 'row' }, h('button', { class: 'btn line', onclick: close }, 'Cancel'), go));
+  });
 }
 
 async function customerDetail(id) {

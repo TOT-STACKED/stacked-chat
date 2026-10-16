@@ -127,3 +127,9 @@ The old admin dashboard (`/admin`, its password login and its routes) is retired
 ## Asking a person (hand-off)
 
 Under the latest answer the chat offers **Ask my manager** (and, when the question was a technology fault, **Ask Stacked support**). `POST /api/v1/chat/help` takes the latest question and the assistant's answer from the person's own conversation, records a row in `tickets`, and then either emails the venue's managers and company admins (`chat/help.ts`: site managers first, never the asker, each once; the email replies straight to the person and links to Knowledge so the answer can be added for everyone) or posts a short alert to Stacked's Slack (`SLACK_WEBHOOK_URL`). A question to a manager stays inside the company: nothing about it goes to Stacked's Slack. Limited to 5 requests an hour per person. Text typed by the person is cleaned and HTML-escaped in the email.
+
+## Adding customers, and how invitations become access
+
+Stacked staff add a customer in the Console (Customers, Add customer): `POST /api/v1/console/customers` creates the organisation, its first venue and an **owner who is invited by email**, can start the 30-day trial, and pings Stacked's Slack (`console/customers.ts`). There is no self-serve sign-up: customers are added by Stacked, and everyone else joins by invitation.
+
+An invited person is stored as `invited` and becomes `active` the first time they sign in with that email (the one-time code proves the address is theirs): `linkUser` activates invited rows and only links the rest (a disabled person stays disabled). That check runs at most once a minute per person, so an invitation sent while someone is already signed in is picked up without a restart. (This was missing before 2026-10-16: invited people could not get in.)

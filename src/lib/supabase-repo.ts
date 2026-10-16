@@ -43,7 +43,13 @@ export function createSupabaseRepo(db: Db): Repo {
     },
 
     async linkUser(email, userId) {
-      must(await db.rest(`/members?email=eq.${enc(email.toLowerCase())}&user_id=is.null`, {
+      // Signing in with the invited address proves it is theirs (the one-time code went there):
+      // an invited person becomes active; anyone else (for example someone disabled) is only linked.
+      const e = enc(email.toLowerCase());
+      must(await db.rest(`/members?email=eq.${e}&user_id=is.null&status=eq.invited`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: { user_id: userId, status: 'active' },
+      }), 'activate invited');
+      must(await db.rest(`/members?email=eq.${e}&user_id=is.null&status=neq.invited`, {
         method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: { user_id: userId },
       }), 'link user');
     },
@@ -100,6 +106,11 @@ export function createSupabaseRepo(db: Db): Repo {
     async countActiveOwners(orgId) {
       const rows = must(await db.rest<{ id: string }[]>(`/members?org_id=eq.${enc(orgId)}&role=eq.owner&status=eq.active&select=id`), 'count owners');
       return Array.isArray(rows) ? rows.length : 0;
+    },
+
+    async createOrg(o) {
+      const r = await db.rest<OrgRow[]>('/organisations?select=id,name,slug', { method: 'POST', headers: { Prefer: 'return=representation' }, body: { name: o.name, slug: o.slug } });
+      return one(must(r, 'create organisation'))!;
     },
 
     async createSite(site) {
