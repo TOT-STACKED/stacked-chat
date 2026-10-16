@@ -1,0 +1,285 @@
+[
+ {
+  "vendor": "Square",
+  "category": "POS",
+  "keywords": [
+   "square"
+  ]
+ },
+ {
+  "vendor": "Toast",
+  "category": "POS",
+  "keywords": [
+   "toasttab",
+   "toast pos",
+   "toast support"
+  ]
+ },
+ {
+  "vendor": "Lightspeed",
+  "category": "POS",
+  "keywords": [
+   "lightspeed"
+  ]
+ },
+ {
+  "vendor": "Zonal",
+  "category": "POS",
+  "keywords": [
+   "zonal"
+  ]
+ },
+ {
+  "vendor": "EPOS Now",
+  "category": "POS",
+  "keywords": [
+   "epos now",
+   "eposnow"
+  ]
+ },
+ {
+  "vendor": "Tevalis",
+  "category": "POS",
+  "keywords": [
+   "tevalis"
+  ]
+ },
+ {
+  "vendor": "ICRTouch",
+  "category": "POS",
+  "keywords": [
+   "icrtouch",
+   "touchpoint"
+  ]
+ },
+ {
+  "vendor": "Vita Mojo",
+  "category": "POS",
+  "keywords": [
+   "vita mojo",
+   "vitamojo"
+  ]
+ },
+ {
+  "vendor": "SumUp",
+  "category": "Payments",
+  "keywords": [
+   "sumup"
+  ]
+ },
+ {
+  "vendor": "Zettle",
+  "category": "Payments",
+  "keywords": [
+   "zettle"
+  ]
+ },
+ {
+  "vendor": "Stripe",
+  "category": "Payments",
+  "keywords": [
+   "stripe"
+  ]
+ },
+ {
+  "vendor": "Dojo",
+  "category": "Payments",
+  "keywords": [
+   "dojo"
+  ]
+ },
+ {
+  "vendor": "Worldpay",
+  "category": "Payments",
+  "keywords": [
+   "worldpay"
+  ]
+ },
+ {
+  "vendor": "Adyen",
+  "category": "Payments",
+  "keywords": [
+   "adyen"
+  ]
+ },
+ {
+  "vendor": "Deliveroo",
+  "category": "Delivery",
+  "keywords": [
+   "deliveroo"
+  ]
+ },
+ {
+  "vendor": "Uber Eats",
+  "category": "Delivery",
+  "keywords": [
+   "uber eats",
+   "ubereats"
+  ]
+ },
+ {
+  "vendor": "Just Eat",
+  "category": "Delivery",
+  "keywords": [
+   "just eat",
+   "justeat"
+  ]
+ },
+ {
+  "vendor": "Deliverect",
+  "category": "Delivery",
+  "keywords": [
+   "deliverect"
+  ]
+ },
+ {
+  "vendor": "Flipdish",
+  "category": "Delivery",
+  "keywords": [
+   "flipdish"
+  ]
+ },
+ {
+  "vendor": "Deputy",
+  "category": "Rotas",
+  "keywords": [
+   "deputy"
+  ]
+ },
+ {
+  "vendor": "Rotaready",
+  "category": "Rotas",
+  "keywords": [
+   "rotaready"
+  ]
+ },
+ {
+  "vendor": "Workforce.com",
+  "category": "Rotas",
+  "keywords": [
+   "workforce"
+  ]
+ },
+ {
+  "vendor": "Fourth",
+  "category": "Rotas",
+  "keywords": [
+   "fourth hospitality",
+   "fourth app"
+  ]
+ },
+ {
+  "vendor": "Planday",
+  "category": "Rotas",
+  "keywords": [
+   "planday"
+  ]
+ },
+ {
+  "vendor": "S4Labour",
+  "category": "Rotas",
+  "keywords": [
+   "s4labour"
+  ]
+ },
+ {
+  "vendor": "OpenTable",
+  "category": "Bookings",
+  "keywords": [
+   "opentable"
+  ]
+ },
+ {
+  "vendor": "ResDiary",
+  "category": "Bookings",
+  "keywords": [
+   "resdiary"
+  ]
+ },
+ {
+  "vendor": "SevenRooms",
+  "category": "Bookings",
+  "keywords": [
+   "sevenrooms"
+  ]
+ },
+ {
+  "vendor": "Resy",
+  "category": "Bookings",
+  "keywords": [
+   "resy"
+  ]
+ },
+ {
+  "vendor": "Collins",
+  "category": "Bookings",
+  "keywords": [
+   "designmynight",
+   "collins"
+  ]
+ },
+ {
+  "vendor": "Crunchtime",
+  "category": "Inventory",
+  "keywords": [
+   "crunchtime"
+  ]
+ },
+ {
+  "vendor": "Apicbase",
+  "category": "Inventory",
+  "keywords": [
+   "apicbase"
+  ]
+ },
+ {
+  "vendor": "Marketman",
+  "category": "Inventory",
+  "keywords": [
+   "marketman"
+  ]
+ },
+ {
+  "vendor": "Nutritics",
+  "category": "Inventory",
+  "keywords": [
+   "nutritics"
+  ]
+ },
+ {
+  "vendor": "Tenzo",
+  "category": "Analytics",
+  "keywords": [
+   "tenzo"
+  ]
+ },
+ {
+  "vendor": "Yumpingo",
+  "category": "Analytics",
+  "keywords": [
+   "yumpingo"
+  ]
+ },
+ {
+  "vendor": "Stampede",
+  "category": "WiFi / Marketing",
+  "keywords": [
+   "stampede"
+  ]
+ },
+ {
+  "vendor": "Purple WiFi",
+  "category": "WiFi",
+  "keywords": [
+   "purple wifi",
+   "purple wi-fi"
+  ]
+ },
+ {
+  "vendor": "Airship",
+  "category": "Loyalty",
+  "keywords": [
+   "airship"
+  ]
+ }
+]

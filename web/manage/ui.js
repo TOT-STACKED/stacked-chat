@@ -9,10 +9,10 @@ export const ICONS = {
 
 export function tile(name, size = 40) {
   return h('span', { class: 'tile', style: `width:${size}px;height:${size}px` },
-    h('img', { src: `assets/icon-${ICONS[name] || name}.png`, alt: '', width: size, height: size }));
+    h('img', { src: `/manage/assets/icon-${ICONS[name] || name}.png`, alt: '', width: size, height: size }));
 }
 
-export const logo = () => h('span', { class: 'logo' }, h('img', { src: 'assets/logo-stacked.png', alt: 'Stacked', height: 24 }));
+export const logo = () => h('span', { class: 'logo' }, h('img', { src: '/manage/assets/logo-stacked.png', alt: 'Stacked', height: 24 }));
 
 const PALETTE = [['#FFF3CC', '#7A5900'], ['#DCCBF8', '#241660'], ['#D5F5B4', '#244106'], ['#FBC4DD', '#85003A'], ['#CFE7FA', '#0F4C8A'], ['#FFE0C9', '#9A3E0A']];
 /** Round initials in a colour that is the same for the same text every time. */

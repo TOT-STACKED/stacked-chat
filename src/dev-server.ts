@@ -11,6 +11,7 @@ import { FakeBillingStore, FakeStripe, testBillingConfig } from './testing/billi
 import { FakeKnowledgeStore } from './testing/knowledge-fakes.js';
 import { FakeInsightsStore } from './testing/insights-fakes.js';
 import { FakeBrandingStore } from './testing/branding-fakes.js';
+import { FakeConsoleStore } from './testing/console-fakes.js';
 import { FakeConversationStore, previewChatModel } from './testing/chat-fakes.js';
 
 async function main() {
@@ -40,7 +41,7 @@ async function main() {
   // Sample billing: the group starts with no plan (try "Start free trial"). BILLING_DEMO=trial|lapsed pre-sets a state.
   const bc = testBillingConfig();
   const env: Record<string, string> = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_KEY: 'dev-anon-key', LOG_LEVEL: 'warn',
-    STRIPE_SECRET_KEY: 'sk_test_dev', STRIPE_WEBHOOK_SECRET: 'whsec_dev' };
+    STRIPE_SECRET_KEY: 'sk_test_dev', STRIPE_WEBHOOK_SECRET: 'whsec_dev', STACKED_STAFF_EMAILS: 'owner@example.com' };
   for (const [k, v] of Object.entries(bc.prices)) { env[`STRIPE_PRICE_${k.toUpperCase()}_MONTHLY`] = v.month; env[`STRIPE_PRICE_${k.toUpperCase()}_ANNUAL`] = v.year; }
   const config = loadConfig(env);
   const store = new FakeBillingStore(); const stripe = new FakeStripe(bc);
@@ -79,8 +80,30 @@ async function main() {
   for (let i = 0; i < 5; i++) ask(a, 'alex@example.com', 'Is there a staff meal policy?', false, i);
   for (let i = 0; i < 4; i++) ask(c, 'alex@example.com', 'How do I log a broken fridge?', false, i);
   for (let i = 0; i < 3; i++) ask(a, 'someone@example.com', 'What time does the bar close on Sundays?', true, i);
+  // Console sample data: this sample company plus a few others, so the staff views have something to show
+  const cstore = new FakeConsoleStore();
+  const day = 86_400_000; const ago = (d: number) => new Date(Date.now() - d * day).toISOString();
+  const OB = crypto.randomUUID(), OH = crypto.randomUUID(), OC = crypto.randomUUID();
+  cstore.orgRows = [{ id: org.id, name: org.name, slug: 'sample', created_at: ago(70) },
+    { id: OB, name: 'Bistro Group', slug: 'bistro', created_at: ago(25) }, { id: OH, name: 'Harbour Hotels', slug: 'harbour', created_at: ago(12) }, { id: OC, name: 'Cafe Solo', slug: 'cafe', created_at: ago(4) }];
+  cstore.siteRows = repo.sites.map((x) => ({ id: x.id, org_id: org.id, name: x.name, created_at: ago(60), billing_tier: x.id === c.id ? 'large' as const : 'standard' as const, active: true }));
+  const extraSite = (orgId: string, name: string, tier: 'standard' | 'large' = 'standard') => { const id = crypto.randomUUID(); cstore.siteRows.push({ id, org_id: orgId, name, created_at: ago(10), billing_tier: tier, active: true }); return id; };
+  const bis = ['One', 'Two', 'Three'].map((n) => extraSite(OB, 'Bistro ' + n)); const har = extraSite(OH, 'Harbour Hotel', 'large'); const caf = extraSite(OC, 'Cafe Solo');
+  cstore.memberRows = repo.members.map((m) => ({ org_id: org.id, site_id: m.site_id, email: m.email, display_name: m.display_name, role: m.role, status: m.status }));
+  for (const [o, e, r] of [[OB, 'bea@bistro.co.uk', 'owner'], [OH, 'gm@harbour.co.uk', 'owner'], [OC, 'sam@cafesolo.co', 'owner']] as Array<[string, string, string]>) cstore.memberRows.push({ org_id: o, site_id: null, email: e, display_name: null, role: r, status: 'active' });
+  cstore.usageRows = [{ site_id: bis[0]!, ai_questions: 2350, flagged_at: ago(2) }];
+  cstore.convRows = [...istore.convs];
+  const cq = (site: string, email: string, q: string, answered = true) => cstore.convRows.push({ id: 1000 + cstore.convRows.length, venue_id: site, email, created_at: ago(Math.random() * 20), messages: [{ role: 'user', content: q }, { role: 'assistant', content: answered ? 'Try restarting it.' : IDK }] });
+  for (let i = 0; i < 6; i++) cq(bis[i % 3]!, 'ops@bistro.co.uk', 'our dojo card machine keeps declining payments');
+  for (let i = 0; i < 4; i++) cq(bis[0]!, 'ops@bistro.co.uk', 'deputy rota not syncing for new starters');
+  for (let i = 0; i < 3; i++) cq(har, 'fd@harbour.co.uk', 'mews check in screen frozen', false);
+  for (let i = 0; i < 2; i++) cq(har, 'fd@harbour.co.uk', 'Do we get paid for training days?', false);
+  for (let i = 0; i < 3; i++) cq(caf, 'sam@cafesolo.co', 'square reader will not connect offline');
+  cstore.npsRows = [...[9, 10, 8, 9, 6].map((score) => ({ vendor: 'dojo', score, comment: null, created_at: ago(3) })), ...[4, 6, 9].map((score) => ({ vendor: 'deputy', score, comment: null, created_at: ago(5) })), { vendor: 'square', score: 10, comment: null, created_at: ago(1) }];
+  await store.saveAccount(OB, { stripe_customer_id: 'cus_b', stripe_subscription_id: 'sub_b', status: 'active', interval: 'month', has_payment_method: true });
+  await store.saveAccount(OH, { stripe_customer_id: 'cus_h', stripe_subscription_id: 'sub_h', status: 'trialing', interval: 'year', has_payment_method: false, trial_ends_at: new Date(Date.now() + 3 * day).toISOString() });
   const drafter = { draft: async (q: string) => `Staff are paid for training days at [CONFIRM: rate]. Training is rostered like a normal shift. (Draft for: ${q})` };
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), conversationStore: new FakeConversationStore(), chatModel: previewChatModel, mirrorNps: null,
+  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), conversationStore: new FakeConversationStore(), consoleStore: cstore, chatModel: previewChatModel, mirrorNps: null,
     npsStore: { save: async (r) => { console.log('[preview] rating saved', JSON.stringify(r)); } },
     techStackStore: (() => { const stacks = new Map<string, Record<string, string>>([[a.id, { epos: 'Lightspeed', payments: 'Dojo' }]]); return { get: async (id: string) => stacks.get(id) ?? {}, list: async () => repo.sites.map((x) => ({ id: x.id, name: x.name, stack: stacks.get(x.id) ?? {} })), set: async (id: string, st: Record<string, string>) => { stacks.set(id, st); return st; } }; })(), drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);

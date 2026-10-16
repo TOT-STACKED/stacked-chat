@@ -1600,7 +1600,7 @@ async function initModern() {
       STRIPE_ALLOW_LIVE: process.env.STRIPE_ALLOW_LIVE || undefined,
       FAIR_USE_AI_QUESTIONS: process.env.FAIR_USE_AI_QUESTIONS || undefined, FAIR_USE_STAFF_PER_VENUE: process.env.FAIR_USE_STAFF_PER_VENUE || undefined,
       CRON_SECRET: process.env.CRON_SECRET || undefined, SLACK_WEBHOOK_URL: process.env.SLACK_WEBHOOK_URL || undefined,
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || undefined, INSIGHTS_MODEL: process.env.INSIGHTS_MODEL || undefined, CHAT_MODEL: process.env.CHAT_MODEL || undefined,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || undefined, INSIGHTS_MODEL: process.env.INSIGHTS_MODEL || undefined, CHAT_MODEL: process.env.CHAT_MODEL || undefined, STACKED_STAFF_EMAILS: process.env.STACKED_STAFF_EMAILS || undefined,
       STACKCOLLECT_SUPABASE_URL: process.env.STACKCOLLECT_SUPABASE_URL || undefined, STACKCOLLECT_SUPABASE_KEY: process.env.STACKCOLLECT_SUPABASE_KEY || undefined,
       NODE_ENV: process.env.NODE_ENV || 'development',
       LOG_LEVEL: process.env.LOG_LEVEL || 'info',

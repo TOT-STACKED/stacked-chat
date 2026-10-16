@@ -33,6 +33,10 @@ import { createSupabaseKnowledgeStore, type KnowledgeStore } from './modules/kno
 import { insightsRoutes } from './modules/insights/routes.js';
 import { brandingRoutes } from './modules/branding/routes.js';
 import { chatRoutes } from './modules/chat/routes.js';
+import { consoleRoutes, parseStaff } from './modules/console/routes.js';
+import { consoleAppRoutes } from './modules/console/app-routes.js';
+import { createConsole, type ConsoleService } from './modules/console/service.js';
+import { createSupabaseConsoleStore, type ConsoleStore } from './modules/console/store.js';
 import { chatAppRoutes } from './modules/chat/app-routes.js';
 import { createChat, type Chat } from './modules/chat/service.js';
 import { createAnthropicChatModel, type ChatModel } from './modules/chat/model.js';
@@ -61,6 +65,7 @@ export interface Deps {
   insightsStore?: InsightsStore;
   brandingStore?: BrandingStore;
   conversationStore?: ConversationStore;
+  consoleStore?: ConsoleStore;
   techStackStore?: TechStackStore;
   npsStore?: NpsStore;
   mirrorNps?: NpsMirror | null;
@@ -137,6 +142,10 @@ export async function buildApp(
     mirrorNps: overrides.mirrorNps !== undefined ? overrides.mirrorNps : (config.STACKCOLLECT_SUPABASE_URL && config.STACKCOLLECT_SUPABASE_KEY ? createPortalMirror({ url: config.STACKCOLLECT_SUPABASE_URL, key: config.STACKCOLLECT_SUPABASE_KEY }) : null),
   }) : null;
   const techStackStore = overrides.techStackStore ?? (db ? createSupabaseTechStackStore(db) : null);
+  const consoleStore = overrides.consoleStore ?? (db ? createSupabaseConsoleStore(db) : null);
+  const consoleSvc: ConsoleService | null = consoleStore && billingStore
+    ? createConsole({ store: consoleStore, billing: billingStore, fairUse: { aiQuestionsPerMonth: config.FAIR_USE_AI_QUESTIONS, staffPerVenue: config.FAIR_USE_STAFF_PER_VENUE }, now: overrides.now })
+    : null;
   const insights: Insights | null = insightsStore && knowledge ? createInsights({ store: insightsStore, knowledge, drafter }) : null;
   const billingReason = billingCfg.ok ? 'Billing needs the database to be configured' : billingCfg.reason;
   if (!billing) app.log.info({ reason: billingReason }, 'billing disabled');
@@ -208,6 +217,8 @@ export async function buildApp(
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
+  await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS) }));
+  await app.register(async (instance) => consoleAppRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => insightsRoutes(instance, { insights, store: insightsStore ?? null, gate }));
   const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };
   await app.register(async (instance) => billingRoutes(instance, billingCtx));

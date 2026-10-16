@@ -1,0 +1,102 @@
+[
+ {
+  "label": "Connection / offline",
+  "keywords": [
+   "won't connect",
+   "wont connect",
+   "not connecting",
+   "can't connect",
+   "disconnect",
+   "offline",
+   "dropping",
+   "no connection"
+  ]
+ },
+ {
+  "label": "Errors / crashing",
+  "keywords": [
+   "error",
+   "crash",
+   "frozen",
+   "freezing",
+   "not working",
+   "isn't working",
+   "won't work",
+   "broken",
+   "glitch"
+  ]
+ },
+ {
+  "label": "Syncing",
+  "keywords": [
+   "sync",
+   "out of sync",
+   "resync",
+   "re-sync"
+  ]
+ },
+ {
+  "label": "Printing",
+  "keywords": [
+   "printer",
+   "not printing",
+   "print issue",
+   "kitchen ticket"
+  ]
+ },
+ {
+  "label": "Refunds / voids",
+  "keywords": [
+   "refund",
+   "void",
+   "chargeback"
+  ]
+ },
+ {
+  "label": "Login / access",
+  "keywords": [
+   "login",
+   "log in",
+   "password",
+   "locked out",
+   "can't access"
+  ]
+ },
+ {
+  "label": "Reports / end of day",
+  "keywords": [
+   "report",
+   "end of day",
+   "z-report",
+   "reconcile"
+  ]
+ },
+ {
+  "label": "Payments / settlement",
+  "keywords": [
+   "declined",
+   "settlement",
+   "payout",
+   "transaction failed"
+  ]
+ },
+ {
+  "label": "Menu / setup",
+  "keywords": [
+   "menu",
+   "set up",
+   "setup",
+   "configure",
+   "pricing"
+  ]
+ },
+ {
+  "label": "Missing orders",
+  "keywords": [
+   "missing order",
+   "order not",
+   "lost order",
+   "orders not"
+  ]
+ }
+]
