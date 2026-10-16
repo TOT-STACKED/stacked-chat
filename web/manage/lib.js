@@ -127,3 +127,30 @@ export function bannerFor(state) {
 /** 0..1 for a usage bar (capped, so an over-limit venue shows a full bar). */
 export const usageRatio = (used, cap) => (cap > 0 ? Math.min(1, used / cap) : 0);
 export const venueCountText = (n) => `${n} venue${n === 1 ? '' : 's'}`;
+
+// ---- knowledge (display helpers) -----------------------------------------------------------------------
+export const KIND_LABEL = { document: 'Document', video: 'Video', image: 'Image' };
+export const KIND_ICON = { document: 'shield', video: 'screen', image: 'box' };
+
+export function audienceLabel(item, sites) {
+  if (item.site_id === null) return 'Whole company';
+  return (sites.find((s) => s.id === item.site_id) || {}).name || 'A site';
+}
+
+/** kind: all|document|video|image; audience: all|company|<siteId>; q: free text (title) */
+export function filterKnowledge(items, { kind = 'all', audience = 'all', q = '' } = {}) {
+  const needle = String(q).trim().toLowerCase();
+  return items.filter((i) => {
+    if (kind !== 'all' && i.kind !== kind) return false;
+    if (audience === 'company' && i.site_id !== null) return false;
+    if (audience !== 'all' && audience !== 'company' && i.site_id !== audience) return false;
+    return !needle || i.title.toLowerCase().includes(needle);
+  });
+}
+
+export function knowledgeCounts(items) {
+  const c = { all: items.length, document: 0, video: 0, image: 0, draft: 0 };
+  for (const i of items) { c[i.kind]++; if (i.status === 'draft') c.draft++; }
+  return c;
+}
+export const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');

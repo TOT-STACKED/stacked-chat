@@ -27,9 +27,12 @@ import { loadBillingConfig } from './modules/billing/config.js';
 import { createBilling, type Billing } from './modules/billing/service.js';
 import { createStripeApi, type StripeApi } from './modules/billing/stripe.js';
 import { createSupabaseBillingStore, type BillingStore } from './modules/billing/store.js';
+import { knowledgeRoutes } from './modules/knowledge/routes.js';
+import { createKnowledge, type Knowledge } from './modules/knowledge/service.js';
+import { createSupabaseKnowledgeStore, type KnowledgeStore } from './modules/knowledge/store.js';
 
 declare module 'fastify' {
-  interface FastifyInstance { billing: Billing | null }
+  interface FastifyInstance { billing: Billing | null; knowledge: Knowledge | null }
 }
 
 export interface Deps {
@@ -40,6 +43,7 @@ export interface Deps {
   mailer?: Mailer;
   stripe?: StripeApi;
   billingStore?: BillingStore;
+  knowledgeStore?: KnowledgeStore;
   now?: () => Date;
 }
 
@@ -89,6 +93,9 @@ export async function buildApp(
       })
     : null;
   app.decorate('billing', billing);
+  const knowledgeStore = overrides.knowledgeStore ?? (db ? createSupabaseKnowledgeStore(db) : undefined);
+  const knowledge: Knowledge | null = knowledgeStore ? createKnowledge({ store: knowledgeStore, log: app.log }) : null;
+  app.decorate('knowledge', knowledge);
   const billingReason = billingCfg.ok ? 'Billing needs the database to be configured' : billingCfg.reason;
   if (!billing) app.log.info({ reason: billingReason }, 'billing disabled');
   const gate = async (orgId: string) => { await billing?.assertWritable(orgId); };
@@ -154,6 +161,7 @@ export async function buildApp(
   await app.register(async (instance) => teamRoutes(instance, { repo, gate }));
   await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
+  await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate }));
   const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };
   await app.register(async (instance) => billingRoutes(instance, billingCtx));
   await app.register(async (instance) => billingWebhookRoute(instance, billingCtx));

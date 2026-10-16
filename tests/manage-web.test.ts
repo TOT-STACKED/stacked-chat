@@ -109,3 +109,27 @@ describe('/manage is served safely', () => {
     expect(Object.keys(JSON.parse(body)).sort()).toEqual(['anonKey', 'dev', 'supabaseUrl']);
   });
 });
+
+import { audienceLabel, filterKnowledge, knowledgeCounts } from '../web/manage/lib.js';
+describe('manage lib: knowledge list', () => {
+  const sites = [{ id: 's1', name: 'North' }];
+  const items = [
+    { kind: 'document', title: 'Allergen policy', status: 'published', site_id: null },
+    { kind: 'document', title: 'Opening checklist', status: 'draft', site_id: 's1' },
+    { kind: 'video', title: 'Fire drill', status: 'published', site_id: null },
+  ];
+  it('labels the audience', () => {
+    expect(audienceLabel(items[0], sites)).toBe('Whole company');
+    expect(audienceLabel(items[1], sites)).toBe('North');
+  });
+  it('filters by type, audience and a search word', () => {
+    expect(filterKnowledge(items, { kind: 'video' })).toHaveLength(1);
+    expect(filterKnowledge(items, { audience: 'company' })).toHaveLength(2);
+    expect(filterKnowledge(items, { audience: 's1' })).toHaveLength(1);
+    expect(filterKnowledge(items, { q: ' ALLERGEN ' })).toHaveLength(1);
+    expect(filterKnowledge(items, {})).toHaveLength(3);
+  });
+  it('counts by type and drafts', () => {
+    expect(knowledgeCounts(items)).toEqual({ all: 3, document: 2, video: 1, image: 0, draft: 1 });
+  });
+});

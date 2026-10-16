@@ -74,3 +74,7 @@ Supabase SQL editor (or via a Supabase branch). The whole chain is tested on an 
 ## Billing
 
 Per-venue subscription billing lives in `src/modules/billing/` (Stripe over fetch, no SDK). It is self-contained: pure pricing and gating rules, an idempotent subscription sync, a signed webhook, and fair-use metering, behind `BillingStore` / `StripeApi` interfaces so tests use in-memory fakes. Billing stays off, and fails closed, unless every Stripe setting is present. See `docs/BILLING.md` for pricing, endpoints, setup and the test-mode walkthrough.
+
+## Knowledge
+
+`src/modules/knowledge/` is a catalogue (`knowledge_items`) over the content the chat already reads (`documents`, `videos`, `images`). The catalogue adds a title, a status (draft/published) and an audience (the whole company or one site). A draft lives only in the catalogue, never in the tables the chat reads, so it can never be answered from; publishing copies it in, unpublishing removes it. Existing content is adopted into the catalogue automatically the first time Manage lists it. The legacy chat hides content published for a different site (`modern.knowledgeExcludedFor`, fails open). API keys with `kb:read` can list published items. Team and role targeting come later, with chat sign-in on the new accounts.

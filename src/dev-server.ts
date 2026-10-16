@@ -8,6 +8,7 @@ import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { FakeMailer, FakeRepo } from './testing/fakes.js';
 import { FakeBillingStore, FakeStripe, testBillingConfig } from './testing/billing-fakes.js';
+import { FakeKnowledgeStore } from './testing/knowledge-fakes.js';
 
 async function main() {
   const repo = new FakeRepo();
@@ -50,7 +51,17 @@ async function main() {
       status: process.env.BILLING_DEMO === 'lapsed' ? 'past_due' : 'trialing', interval: 'month',
       trial_ends_at: new Date(Date.now() + 11 * 86_400_000).toISOString(), past_due_since: new Date(Date.now() - 3 * 86_400_000).toISOString() });
   }
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, devMode: true, verifyToken: async (t) => users[t] ?? null });
+  const kstore = new FakeKnowledgeStore();
+  kstore.addOrg(org.id, 'sample', 'sample');
+  for (const x of repo.sites) kstore.sites.push({ id: x.id, org_id: org.id });
+  kstore.addLegacyDoc('sample', 'Allergen policy.pdf', 'All 14 allergens must be declared. Check the allergen matrix before every service and brief every new starter on day one.');
+  kstore.addLegacyDoc('sample', 'Fire safety and evacuation', 'If the alarm sounds, stop service, switch off gas, and lead guests to the assembly point at the car park.');
+  kstore.addLegacyVideo('sample', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'How to void a payment on the till');
+  kstore.addLegacyImage('sample', 'https://example.com/burger.png', 'Signature burger plating');
+  const kb = (await import('./modules/knowledge/service.js')).createKnowledge({ store: kstore });
+  await kb.createDocument(org.id, { title: 'Opening checklist', body: 'Unlock, lights, fridge temperatures, till float, specials board.', site_id: a.id, status: 'published', by: 'alex@example.com' });
+  await kb.createDocument(org.id, { title: 'New staff meal policy (draft)', body: 'Staff meals are £3.50 per shift. Still to confirm with finance.', site_id: null, status: 'draft', by: 'hq@example.com' });
+  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);
   await app.listen({ port, host: '127.0.0.1' });
   console.log(`Manage preview: http://127.0.0.1:${port}/manage/  (sample data, dev sign-in)`);

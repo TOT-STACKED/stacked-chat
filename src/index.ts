@@ -25,6 +25,8 @@ export function createModernHandler(opts: { config: Partial<Config> & Record<str
     ready: appPromise.then(() => undefined),
     /** Legacy server.js calls these. Both never throw and never block the chat. */
     async recordQuestion(siteId: string): Promise<void> { (await appPromise).billing?.recordQuestion(siteId); },
+    /** For the chat: published knowledge that belongs to a different site and so must not be shown to this one. */
+    async knowledgeExcludedFor(siteId: string) { return (await appPromise).knowledge?.excludedFor(siteId) ?? { docs: [], videos: [], images: [] }; },
     async billingStateForSite(siteId: string) { return (await appPromise).billing?.stateForSite(siteId) ?? null; },
     handles(url: string): boolean {
       return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/') || url === '/manage' || url.startsWith('/manage/') || url === '/billing/webhook';

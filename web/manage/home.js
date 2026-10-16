@@ -16,7 +16,7 @@ export async function renderHome(main, ctx) {
       return;
     }
     if (!data) { main.append(h('p', { class: 'muted', text: 'Loading…' })); return; }
-    const { sites, members, billing } = data;
+    const { sites, members, billing, knowledge } = data;
     const live = members.filter((m) => m.status !== 'disabled');
     const invited = live.filter((m) => m.status === 'invited').length;
     const stat = (icon, label, value, sub, href) => h('a', { class: 'card pad stat', href, style: 'text-decoration:none' }, tile(icon, 44),
@@ -24,6 +24,7 @@ export async function renderHome(main, ctx) {
     const cards = [
       stat('people', 'People', String(live.length), invited ? `${invited} invited, not signed in yet` : 'All signed in', '#/people'),
       stat('operations', 'Venues', String(sites.length), sites.length === 1 ? '1 site' : `${sites.length} sites`, '#/people'),
+      stat('knowledge', 'Knowledge', String(knowledge.filter((k) => k.status === 'published').length), `${knowledge.filter((k) => k.status === 'draft').length} drafts`, '#/knowledge'),
     ];
     if (isAdmin && billing) {
       const st = billing.state;
@@ -40,17 +41,18 @@ export async function renderHome(main, ctx) {
       step(live.length > 1, 'Invite your team', 'People get an email with a one-time code. No passwords.', '#/people', 'Invite people'),
     ];
     if (isAdmin && billing) steps.push(step(!!billing.account, 'Start your free trial', '30 days free, no card needed. One price per venue, unlimited staff.', '#/settings/billing', 'Start trial'));
-    steps.push(step(false, 'Add your handbooks', 'Upload policies and training so the AI can answer from them.', '#/knowledge', 'Coming soon'));
+    steps.push(step(knowledge.length > 0, 'Add your knowledge', 'Write down policies and how-tos, or add videos, so the AI can answer from them.', '#/knowledge', 'Add knowledge'));
     main.append(h('div', { class: 'stack' }, h('h2', { text: 'Get set up' }), h('div', { class: 'card steps' }, steps)));
   };
 
   draw(null);
   if (!isManager) { draw(null); return; }
   try {
-    const [s, m, b] = await Promise.all([
+    const [s, m, b, k] = await Promise.all([
       api.get(`/api/v1/orgs/${orgId}/sites`), api.get(`/api/v1/orgs/${orgId}/members`),
       isAdmin ? api.get(`/api/v1/orgs/${orgId}/billing/summary`).catch(() => null) : Promise.resolve(null),
+      api.get(`/api/v1/orgs/${orgId}/knowledge`).catch(() => ({ data: [] })),
     ]);
-    draw({ sites: s.data, members: m.data, billing: b });
+    draw({ sites: s.data, members: m.data, billing: b, knowledge: k.data });
   } catch (e) { clear(main); main.append(pageHeader({ icon: 'home', title: 'Home' }), h('div', { class: 'banner', role: 'alert', text: e.message })); }
 }

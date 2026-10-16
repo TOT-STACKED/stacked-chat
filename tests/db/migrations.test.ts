@@ -340,3 +340,22 @@ describe('008 owners are company-wide', () => {
     expect(await rows(db, 'second@acme.com')).toEqual([{ r: 'site_manager', org_wide: false, status: 'active' }]); // only the first admin is promoted
   });
 });
+
+describe('009 knowledge catalogue', () => {
+  it('is invisible to the public keys and safe to re-run', async () => {
+    const db = await newDb();
+    await db.exec(migrationSql('009_knowledge.sql'));
+    for (const role of ['anon', 'authenticated'] as const) {
+      await expect(asRole(db, role, null, () => db.query('select * from knowledge_items')), role).rejects.toThrow();
+    }
+  });
+  it('limits kinds and statuses, and one document name per organisation', async () => {
+    const db = await newDb();
+    await db.exec(`insert into venues (name, slug) values ('V', 'v')`);
+    const org = (await q(db, "select org_id from venues where slug = 'v'"))[0]?.org_id;
+    await expect(db.exec(`insert into knowledge_items (org_id, kind, title) values ('${org}', 'podcast', 'x')`)).rejects.toThrow();
+    await expect(db.exec(`insert into knowledge_items (org_id, kind, title, status) values ('${org}', 'document', 'x', 'live')`)).rejects.toThrow();
+    await db.exec(`insert into knowledge_items (org_id, kind, title, doc_filename) values ('${org}', 'document', 'Handbook', 'Handbook')`);
+    await expect(db.exec(`insert into knowledge_items (org_id, kind, title, doc_filename) values ('${org}', 'document', 'Again', 'Handbook')`)).rejects.toThrow();
+  });
+});

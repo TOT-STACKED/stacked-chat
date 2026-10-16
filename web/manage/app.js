@@ -4,6 +4,7 @@ import { createApi } from './api.js';
 import { renderPeople } from './people.js';
 import { renderBilling } from './billing.js';
 import { renderHome } from './home.js';
+import { renderKnowledge } from './knowledge.js';
 import { ICONS, avatar, logo, pageHeader, tile } from './ui.js';
 import { ROLE_LABEL, atLeast, bestRole, isManagerAnywhere } from './lib.js';
 
@@ -130,7 +131,6 @@ function drawShell() {
 }
 
 const SOON = {
-  knowledge: ['Knowledge', 'Handbooks, documents and media in one list, aimed at the company, a site, a team or a role.', 'Your handbooks, policies and training in one place.'],
   insights: ['Insights', 'What people ask most, what the AI could not answer, and usage by site and team.', 'What your teams ask, and what the AI could not answer.'],
 };
 const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', settings: 'Billing' };
@@ -158,6 +158,11 @@ function route() {
   if (view === 'settings') {
     if (!atLeast(orgRole, 'hq_admin')) { restricted('Billing', 'settings', 'Plan, venues and invoices.', 'This area is for company admins'); return; }
     renderBilling(main, { api, orgId: state.orgId, orgName: org.name });
+    return;
+  }
+  if (view === 'knowledge') {
+    if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Knowledge', 'knowledge', 'Handbooks, documents and media.', 'This area is for managers'); return; }
+    renderKnowledge(main, { api, memberships: state.memberships, orgId: state.orgId });
     return;
   }
   const [title, , lead] = SOON[view];

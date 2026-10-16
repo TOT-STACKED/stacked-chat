@@ -6808,6 +6808,15 @@ const server = http.createServer(async (req, res) => {
             if (Array.isArray(vR.data) && vR.data[0]) workspaceId = vR.data[0].workspace_id || null;
           }
         } catch(e) { /* venues.workspace_id may not exist yet */ }
+        // Knowledge published for a DIFFERENT site of the same company must not be shown here.
+        // Fails open (nothing hidden) so a lookup problem can never break the chat.
+        const kbHidden = { docs: new Set(), videos: new Set(), images: new Set() };
+        try {
+          if (venue_id && modern && modern.knowledgeExcludedFor) {
+            const ex = await modern.knowledgeExcludedFor(venue_id);
+            (ex.docs || []).forEach(x => kbHidden.docs.add(x)); (ex.videos || []).forEach(x => kbHidden.videos.add(x)); (ex.images || []).forEach(x => kbHidden.images.add(x));
+          }
+        } catch(e) { /* show everything for this company */ }
         try {
           // Scope docs to shared (workspace_id IS NULL) + this workspace's own.
           // IMPORTANT: there are thousands of shared chunks, so a single capped
@@ -6821,7 +6830,7 @@ const server = http.createServer(async (req, res) => {
             let merged = sharedR.data.map(d => Object.assign({ __own: false }, d));
             if (workspaceId) {
               const ownR = await sbFetch('/rest/v1/documents?workspace_id=eq.' + encodeURIComponent(workspaceId) + '&select=filename,content,file_url&limit=400');
-              if (Array.isArray(ownR.data) && ownR.data.length) merged = ownR.data.map(d => Object.assign({ __own: true }, d)).concat(merged);
+              if (Array.isArray(ownR.data) && ownR.data.length) merged = ownR.data.filter(d => !kbHidden.docs.has(d.filename)).map(d => Object.assign({ __own: true }, d)).concat(merged);
             }
             docsR = { data: merged };
           } catch(scopeErr) {
@@ -6948,7 +6957,7 @@ const server = http.createServer(async (req, res) => {
             allVidsR = await sbFetch('/rest/v1/videos?select=id,title,description,category,url,yt_id&order=created_at.desc&limit=200');
           }
           if (Array.isArray(allVidsR.data) && allVidsR.data.length > 0) {
-            preloadedVideos = allVidsR.data;
+            preloadedVideos = allVidsR.data.filter(v => !kbHidden.videos.has(v.id));
             // Score against user message only — not history or AI reply — to stay specific
             const STOP = new Set(['this','that','with','your','have','from','they','will','what','when','about','just','been','some','more','also','into','very','can','how','its','are','was','the','and','for','not','but','you','our','get']);
             const explicitly = /\bvideo\b|\bwatch\b|\btutorial\b|\bguide\b|\bwalkthrough\b|\bdemo\b/i.test(message);
@@ -6980,10 +6989,10 @@ const server = http.createServer(async (req, res) => {
         if (wantsPhoto) {
           try {
             const imgQ = workspaceId
-              ? '/rest/v1/images?or=(tenant.is.null,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=url,title,description&limit=300'
+              ? '/rest/v1/images?or=(tenant.is.null,tenant.eq.' + encodeURIComponent(workspaceId) + ')&select=id,url,title,description&limit=300'
               : '/rest/v1/images?tenant=is.null&select=url,title,description&limit=300';
             let imgR; try { imgR = await sbFetch(imgQ); if (!imgR || (imgR.status && imgR.status >= 400) || !Array.isArray(imgR.data)) throw 0; } catch(e2) { imgR = { data: [] }; }
-            const imgs = Array.isArray(imgR.data) ? imgR.data : [];
+            const imgs = (Array.isArray(imgR.data) ? imgR.data : []).filter(im => !kbHidden.images.has(im.id));
             if (imgs.length) {
               const STOPI = new Set(['this','that','with','your','have','show','see','look','like','picture','photo','image','images','send','what','does','the','and','for','our','can','of','me','please']);
               // Only gated by wantsPhoto, so it's safe to use recent turns to

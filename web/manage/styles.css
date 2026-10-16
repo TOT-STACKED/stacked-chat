@@ -7,16 +7,16 @@
   --radius:14px;--radius-sm:10px;
   --shadow:0 1px 2px rgba(27,26,23,.05),0 1px 1px rgba(27,26,23,.03);
   --shadow-lg:0 24px 60px rgba(27,26,23,.22),0 4px 12px rgba(27,26,23,.08);
-  --display:'Archivo Black','Arial Black',system-ui,sans-serif;--body:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace;
+  --display:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--mono:'Inter',system-ui,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14.5px;line-height:1.5;-webkit-font-smoothing:antialiased;font-feature-settings:'cv11','ss01'}
 a{color:inherit}
 button,input,select,textarea{font:inherit;color:inherit}
 img{display:block}
 .boot{padding:40px;color:var(--muted)}
-.mono{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.mono{font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .muted{color:var(--muted)}
 :focus-visible{outline:3px solid #2F6FED;outline-offset:2px;border-radius:6px}
 
@@ -35,7 +35,7 @@ img{display:block}
 .avatar.sq{border-radius:9px}
 .nav{display:flex;flex-direction:column;gap:2px}
 .navlabel{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);padding:0 10px 6px}
-.nav a,.nav .soonitem{display:flex;align-items:center;gap:12px;padding:7px 10px;border-radius:10px;font-size:15px;font-weight:500;color:var(--ink2);text-decoration:none}
+.nav a,.nav .soonitem{display:flex;align-items:center;gap:12px;padding:7px 10px;border-radius:10px;font-size:14.5px;font-weight:500;color:var(--ink2);text-decoration:none}
 .nav a:hover{background:var(--bg);color:var(--ink)}
 .nav a.on{background:var(--bg);color:var(--ink);font-weight:700;box-shadow:inset 0 0 0 1px var(--line)}
 .nav .soonitem{color:var(--faint);cursor:default}
@@ -58,8 +58,8 @@ img{display:block}
 .ph{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
 .ph .tile{filter:drop-shadow(0 1px 1px rgba(27,26,23,.08))}
 .ph .t{display:flex;flex-direction:column;gap:2px;flex:1 1 280px;min-width:0}
-h1.disp{margin:0;font-family:var(--display);font-weight:400;font-size:28px;letter-spacing:.01em;text-transform:uppercase;line-height:1.1}
-.ph .sub{color:var(--muted);font-size:15px}
+h1.disp{margin:0;font-family:var(--display);font-weight:700;font-size:26px;letter-spacing:-.02em;line-height:1.2}
+.ph .sub{color:var(--muted);font-size:14.5px}
 .actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 h2{font-size:18px;font-weight:700;margin:0;line-height:1.3}
 h3{font-size:16px;font-weight:700;margin:0}
@@ -191,7 +191,7 @@ table.narrow{min-width:480px}
 .signin{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(1200px 500px at 50% -10%,#FFE9D6 0,rgba(255,233,214,0) 60%),var(--bg)}
 .signin .box{width:100%;max-width:420px;display:flex;flex-direction:column;gap:18px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:32px;box-shadow:var(--shadow-lg)}
 .signin .logo img{height:34px}
-.signin h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.01em}
+.signin h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.02em}
 .signin p{margin:0}
 .signin .iconrow{display:flex;gap:8px;justify-content:center;margin-top:4px;opacity:.9}
 .devbox{border:1px dashed var(--line-strong);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
@@ -207,6 +207,17 @@ table.narrow{min-width:480px}
   .top{padding:0 16px}
   .userbox .who{display:none}
   .main{padding:22px 16px}
-  h1.disp{font-size:24px}
+  h1.disp{font-size:22px}
   .tree{max-width:none}
 }
+
+/* knowledge */
+.btn.danger{background:#B3261E;color:#fff}
+.btn.danger:hover{background:#8F1D17}
+.filter{border:1px solid var(--line-strong);border-radius:var(--radius-sm);height:40px;padding:0 12px;background:#fff;font-size:14px}
+.filter.search{min-width:200px}
+.filter:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(27,26,23,.08)}
+.field label.radio{display:flex;gap:10px;align-items:flex-start;font-weight:400;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);cursor:pointer}
+.field label.radio:has(input:checked){border-color:var(--ink);background:var(--bg)}
+.field label.radio input{margin-top:3px}
+.dlg textarea{font-family:inherit}
