@@ -63,8 +63,10 @@ async function enter() {
   try { st.ctx = await api.get('/api/v1/chat/context'); }
   catch (e) { if (e.status !== 401) showSignIn('Something went wrong signing you in. Please try again.'); return; }
   if (!st.ctx.sites.length) { showNoAccess(); return; }
+  // a venue link (/chat/<venue>) opens that venue's chat; otherwise the one used last
+  const wanted = decodeURIComponent((location.pathname.replace(/^\/chat\/?/, '').split('/')[0] || '')).toLowerCase();
   const saved = localStorage.getItem(SITE_KEY);
-  st.site = st.ctx.sites.find((s) => s.site_id === saved) || st.ctx.sites[0];
+  st.site = st.ctx.sites.find((s) => wanted && s.slug.toLowerCase().startsWith(wanted)) || st.ctx.sites.find((s) => s.site_id === saved) || st.ctx.sites[0];
   resetChat(); draw();
 }
 function showNoAccess() {

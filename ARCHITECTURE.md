@@ -98,3 +98,10 @@ Manage → Settings (owners and HQ admins): Company (rename the company and venu
 `src/modules/chat/` answers. For each question it finds what this person may see: published knowledge for the whole company, their venue, or their team (`retrieve.ts`, drafts never), picks the best passages by word overlap, and asks the model with a strict prompt (`prompt.ts`): answer only from that knowledge, cite the source, allergens only from the company's own documents, and a fixed "I don't have that in your knowledge base yet" when it has nothing. The reply, sources, a matching video, and a photo (only if asked for) come back; the conversation is saved to `conversations` (Insights reads it) and the question is metered for fair use. Nothing is pasted into the page as HTML: the page builds DOM nodes from text.
 
 Venue branding from Settings (name, colours, welcome text, logo) styles each venue's chat. Conversations are private to the person and venue. Not yet ported from the old chat: the tech-support vendor playbook, NPS ratings, and the Slack hand-off. Env: `ANTHROPIC_API_KEY`, optional `CHAT_MODEL`.
+
+
+## What was retired (2026-10-16)
+
+The old chat widget is gone: its page template, the operator app shell, and every endpoint only it used (`/chat`, `/history`, `/save-*`, venue sign-up and team endpoints, `/kb-*`, `/storage/sign-upload`, `/admin-summary`, the weekly digest, vendor playbook and Slack/NPS helpers). `/` and `/app` now redirect to `/chat/`, and `/chat/<venue>` opens the new chat on that venue. `server.js` shrank from about 7,700 to about 2,000 lines: it now only loads the modern API and serves the **Stacked team admin dashboard** at `/admin` (password-protected: vendor intelligence, sign-ups, adoption, content), which stays until the Console replaces it.
+
+Everything removed is recoverable from the git tag `legacy-chat-widget` (for example the tech-support vendor playbook, NPS ratings, and the weekly digest, if we port them).

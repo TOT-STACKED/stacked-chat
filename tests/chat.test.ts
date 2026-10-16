@@ -190,7 +190,7 @@ describe('chat API', () => {
   it('lists the venues you can chat at, with branding and suggestions', async () => {
     const mine = (await call('GET', '/api/v1/chat/context', tok.n)).json();
     expect(mine.sites).toHaveLength(1);
-    expect(mine.sites[0]).toMatchObject({ site_name: 'North', org_name: 'Acme', branding: { bot_name: 'Nora', primary_color: '#112233' } });
+    expect(mine.sites[0]).toMatchObject({ site_name: 'North', org_name: 'Acme', slug: expect.any(String), branding: { bot_name: 'Nora', primary_color: '#112233' } });
     expect(mine.sites[0].suggestions.length).toBeGreaterThan(0);
     expect((await call('GET', '/api/v1/chat/context', tok.o)).json().sites.map((x: any) => x.site_name).sort()).toEqual(['North', 'South']);
     expect((await call('GET', '/api/v1/chat/context', tok.x)).json().sites).toEqual([]);
@@ -231,6 +231,16 @@ describe('chat API', () => {
     expect((await call('POST', '/api/v1/chat', tok.n, { site_id: 'nope', message: 'hello' })).statusCode).toBe(400);
     const spec = (await call('GET', '/api/v1/openapi.json', tok.n)).json() as { paths: Record<string, unknown> };
     expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(['/api/v1/chat', '/api/v1/chat/context', '/api/v1/chat/conversations']));
+  });
+  it('venue links open the app, and missing files are real 404s', async () => {
+    const venue = await app.inject({ method: 'GET', url: '/chat/north-abc1' });
+    expect(venue.statusCode).toBe(200); expect(venue.headers['content-type']).toContain('text/html'); expect(venue.body).toContain('chat.js');
+    expect(venue.headers['content-security-policy']).toContain("script-src 'self'");
+    expect((await app.inject({ method: 'GET', url: '/chat/' })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/chat/missing.js' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'POST', url: '/chat/anything' })).statusCode).toBe(404);
+    const bare = await app.inject({ method: 'GET', url: '/chat' });
+    expect(bare.statusCode).toBe(301); expect(bare.headers.location).toBe('/chat/');
   });
   it('serves the chat page safely', async () => {
     const res = await app.inject({ method: 'GET', url: '/chat/config.json' });

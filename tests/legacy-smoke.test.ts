@@ -3,9 +3,9 @@ import vm from 'node:vm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 /**
- * Guards the live widget. All client JS lives inside template literals in server.js, so a
- * syntax error there silently kills every button (and `node --check server.js` can't see it).
- * Boot the real server, fetch each page, and parse every inline <script>.
+ * Guards the Stacked team admin page (client JS lives inside a template literal in server.js, so a
+ * syntax error there silently kills every button and `node --check` can't see it) and the redirects from
+ * the retired chat widget. Boots the real server.
  */
 let proc: ChildProcess;
 let base = '';
@@ -31,34 +31,29 @@ function inlineScripts(html: string): string[] {
   return [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1] ?? '');
 }
 
-describe('legacy pages still render and their client JS parses', () => {
-  for (const path of ['/', '/admin', '/app']) {
-    it(`${path}: 200 and every inline script is valid JavaScript`, async () => {
-      const res = await fetch(base + path);
-      expect(res.status).toBe(200);
-      const html = await res.text();
-      const scripts = inlineScripts(html);
-      expect(scripts.length).toBeGreaterThan(0);
-      for (const code of scripts) expect(() => new vm.Script(code)).not.toThrow();
-    });
-  }
-
-  it('the chat page no longer reads the database directly', async () => {
-    const html = await (await fetch(base + '/')).text();
-    expect(html).not.toContain('/rest/v1/');
+describe('the old widget is gone; the Stacked team admin page still works', () => {
+  it('/admin: 200 and every inline script is valid JavaScript', async () => {
+    const res = await fetch(base + '/admin');
+    expect(res.status).toBe(200);
+    const scripts = inlineScripts(await res.text());
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const code of scripts) expect(() => new vm.Script(code)).not.toThrow();
   });
 
-  it('the chat page no longer uploads to storage with the public key (uploads go via the server)', async () => {
-    const html = await (await fetch(base + '/')).text();
-    expect(html).not.toContain('/storage/v1/object/stacked-videos/');
-    expect(html).not.toContain('/storage/v1/object/public/');
-    expect(html).toContain('/storage/sign-upload');
+  it('the old addresses send people to the new chat', async () => {
+    for (const path of ['/', '/app', '/app/', '/?join=abc', '/app#triage']) {
+      const res = await fetch(base + path, { redirect: 'manual' });
+      expect(res.status, path).toBe(302);
+      expect(res.headers.get('location'), path).toBe('/chat/');
+    }
   });
 
-  it('the signed-upload endpoint refuses anonymous callers', async () => {
-    const res = await fetch(base + '/storage/sign-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venue_id: 'x', kind: 'doc', filename: 'a.pdf', content_type: 'application/pdf', size: 10 }) });
-    expect([401, 503]).toContain(res.status); // 503 here: no service key in the test environment
-    expect((await res.json()).ok).toBe(false);
+  it('the old widget endpoints no longer exist', async () => {
+    for (const [m, p] of [['POST', '/chat'], ['POST', '/history'], ['POST', '/save-conversation'], ['POST', '/save-ticket'], ['POST', '/save-nps'], ['POST', '/save-lead'],
+      ['POST', '/venues'], ['GET', '/venues/search?q=a'], ['POST', '/venue-members'], ['POST', '/kb-upload'], ['POST', '/kb-video'], ['POST', '/kb-image'],
+      ['POST', '/storage/sign-upload'], ['POST', '/admin-summary'], ['GET', '/cron/digest']] as const) {
+      expect((await fetch(base + p, { method: m, redirect: 'manual' })).status, `${m} ${p}`).toBe(404);
+    }
   });
 });
 
@@ -117,7 +112,7 @@ describe('fail-safe: legacy keeps working if the modern API cannot load', () => 
     const port = 4600 + Math.floor(Math.random() * 300);
     const p = await bootLegacy(dir, {}, port);
     try {
-      expect((await fetch(`http://127.0.0.1:${port}/`)).status).toBe(200);
+      expect((await fetch(`http://127.0.0.1:${port}/admin`)).status).toBe(200);
       expect((await fetch(`http://127.0.0.1:${port}/healthz`)).status).toBe(404); // modern absent
     } finally { p.kill(); }
   });
@@ -126,7 +121,7 @@ describe('fail-safe: legacy keeps working if the modern API cannot load', () => 
     const port = 4900 + Math.floor(Math.random() * 300);
     const p = await bootLegacy(process.cwd(), { DISABLE_MODERN_API: '1' }, port);
     try {
-      expect((await fetch(`http://127.0.0.1:${port}/`)).status).toBe(200);
+      expect((await fetch(`http://127.0.0.1:${port}/admin`)).status).toBe(200);
       expect((await fetch(`http://127.0.0.1:${port}/api/v1/openapi.json`)).status).toBe(404);
     } finally { p.kill(); }
   });

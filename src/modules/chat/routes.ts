@@ -31,12 +31,12 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
 
   /** Every venue this person can chat at: their own venue(s), or all of them for company-wide people. */
   async function sitesFor(p: UserPrincipal) {
-    const out: Array<{ org_id: string; org_name: string; site_id: string; site_name: string }> = [];
+    const out: Array<{ org_id: string; org_name: string; site_id: string; site_name: string; slug: string }> = [];
     for (const orgId of new Set(p.memberships.map((m) => m.orgId))) {
       const orgWide = p.memberships.some((m) => m.orgId === orgId && m.siteId === null);
       const only = orgWide ? undefined : p.memberships.filter((m) => m.orgId === orgId && m.siteId).map((m) => m.siteId!);
       const org = await repo().getOrg(orgId);
-      for (const s of await repo().listSites(orgId, only)) out.push({ org_id: orgId, org_name: org?.name ?? 'Your company', site_id: s.id, site_name: s.name });
+      for (const s of await repo().listSites(orgId, only)) out.push({ org_id: orgId, org_name: org?.name ?? 'Your company', site_id: s.id, site_name: s.name, slug: s.slug });
     }
     return out;
   }
@@ -72,7 +72,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     preHandler: app.authenticate,
     schema: {
       tags: ['chat'], summary: 'Who you are and which venues you can chat at, with how each chat looks', security: SECURITY,
-      response: { 200: z.object({ user: z.object({ email: z.string() }), sites: z.array(z.object({ org_id: Id, org_name: z.string(), site_id: Id, site_name: z.string(), branding: Branding, suggestions: z.array(z.string()) })) }), 403: ErrorBody },
+      response: { 200: z.object({ user: z.object({ email: z.string() }), sites: z.array(z.object({ org_id: Id, org_name: z.string(), site_id: Id, site_name: z.string(), slug: z.string(), branding: Branding, suggestions: z.array(z.string()) })) }), 403: ErrorBody },
     },
   }, async (req) => {
     const p = userOnly(req);

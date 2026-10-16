@@ -26,7 +26,8 @@ describe('strangler front door', () => {
     expect(m.handles('/healthz')).toBe(true);
     expect(m.handles('/healthz?deep=true')).toBe(true);
     expect(m.handles('/api/v1/me')).toBe(true);
-    for (const legacy of ['/', '/admin', '/chat', '/api', '/api/v2/x', '/health', '/venues/search?q=a']) {
+    for (const modern of ['/manage/', '/chat', '/chat/', '/chat/north-abc1', '/billing/webhook']) expect(m.handles(modern), modern).toBe(true);
+    for (const legacy of ['/', '/admin', '/api', '/api/v2/x', '/health', '/venues/search?q=a']) {
       expect(m.handles(legacy), legacy).toBe(false);
     }
   });
