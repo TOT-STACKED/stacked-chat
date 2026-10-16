@@ -38,7 +38,7 @@ export function createKnowledge(deps: KnowledgeDeps) {
     const have = (f: (i: ItemRow) => unknown) => new Set(existing.filter((i) => i.status === 'published').map(f).filter(Boolean));
     const docKnown = have((i) => i.doc_filename); const vidKnown = have((i) => i.video_id); const imgKnown = have((i) => i.image_id);
     const [docs, vids, imgs] = await Promise.all([store.docNames(ws), store.videos(ws), store.images(ws)]);
-    const base = { org_id: orgId, status: 'published' as Status, site_id: null, source: 'imported' as const, created_by: null, published_at: now() };
+    const base = { org_id: orgId, status: 'published' as Status, site_id: null, team_id: null, source: 'imported' as const, created_by: null, published_at: now() };
     const fresh: NewItem[] = [];
 
     for (const d of docs.filter((x) => !docKnown.has(x.filename))) {
@@ -103,18 +103,33 @@ export function createKnowledge(deps: KnowledgeDeps) {
     if (clash) throw conflict('There is already a document with that title. Choose another.');
   }
 
+  /**
+   * Turn an audience request into the stored form. A team audience takes its site from the team
+   * (so "Kitchen at North" is aimed at North's kitchen); a company-wide team has no site.
+   */
+  async function resolveAudience(orgId: string, a: { site_id?: string | null; team_id?: string | null }): Promise<{ site_id: string | null; team_id: string | null }> {
+    if (a.team_id) {
+      const t = (await store.teams(orgId)).find((x) => x.id === a.team_id);
+      if (!t) throw badRequest('That team is not part of this organisation');
+      return { site_id: t.site_id, team_id: t.id };
+    }
+    return { site_id: a.site_id ?? null, team_id: null };
+  }
+
   // ---- create -------------------------------------------------------------------------------------------
-  async function createDocument(orgId: string, o: { title: string; body: string; site_id: string | null; status: Status; by: string; source?: ItemRow['source']; source_question?: string | null }): Promise<ItemRow> {
+  async function createDocument(orgId: string, o: { title: string; body: string; site_id: string | null; team_id?: string | null; status: Status; by: string; source?: ItemRow['source']; source_question?: string | null }): Promise<ItemRow> {
     if (o.body.length > MAX_BODY) throw badRequest(`That document is too long (the limit is ${MAX_BODY.toLocaleString('en-GB')} characters)`);
     await assertSite(orgId, o.site_id); await assertFreeTitle(orgId, o.title);
-    let item = await store.insertItem({ org_id: orgId, kind: 'document', title: o.title, status: 'draft', site_id: o.site_id, body: o.body, url: null, description: null, ...noChatRefs, source: o.source ?? 'manager', source_question: o.source_question ?? null, created_by: o.by, published_at: null });
+    const aud = await resolveAudience(orgId, { site_id: o.site_id, team_id: o.team_id ?? null });
+    let item = await store.insertItem({ org_id: orgId, kind: 'document', title: o.title, status: 'draft', site_id: aud.site_id, team_id: aud.team_id, body: o.body, url: null, description: null, ...noChatRefs, source: o.source ?? 'manager', source_question: o.source_question ?? null, created_by: o.by, published_at: null });
     if (o.status === 'published') item = await setStatus(orgId, item, 'published');
     return item;
   }
-  async function createVideo(orgId: string, o: { title: string; url: string; site_id: string | null; status: Status; by: string }): Promise<ItemRow> {
+  async function createVideo(orgId: string, o: { title: string; url: string; site_id: string | null; team_id?: string | null; status: Status; by: string }): Promise<ItemRow> {
     if (!isHttpUrl(o.url)) throw badRequest('Enter a web link that starts with https://');
     await assertSite(orgId, o.site_id);
-    let item = await store.insertItem({ org_id: orgId, kind: 'video', title: o.title, status: 'draft', site_id: o.site_id, body: null, url: o.url, description: null, ...noChatRefs, source: 'manager', source_question: null, created_by: o.by, published_at: null });
+    const aud = await resolveAudience(orgId, { site_id: o.site_id, team_id: o.team_id ?? null });
+    let item = await store.insertItem({ org_id: orgId, kind: 'video', title: o.title, status: 'draft', site_id: aud.site_id, team_id: aud.team_id, body: null, url: o.url, description: null, ...noChatRefs, source: 'manager', source_question: null, created_by: o.by, published_at: null });
     if (o.status === 'published') item = await setStatus(orgId, item, 'published');
     return item;
   }
@@ -132,10 +147,15 @@ export function createKnowledge(deps: KnowledgeDeps) {
   }
 
   // ---- change -------------------------------------------------------------------------------------------
-  async function update(orgId: string, id: string, patch: { title?: string; body?: string; url?: string; description?: string | null; site_id?: string | null; status?: Status }): Promise<ItemRow> {
+  async function update(orgId: string, id: string, patch: { title?: string; body?: string; url?: string; description?: string | null; site_id?: string | null; team_id?: string | null; status?: Status }): Promise<ItemRow> {
     let item = await store.getItem(orgId, id);
     if (!item) throw notFound('Knowledge item not found');
     if (patch.site_id !== undefined) await assertSite(orgId, patch.site_id);
+    if (patch.team_id !== undefined || patch.site_id !== undefined) {
+      // audience fields are sent together: a team wins (and brings its site); otherwise it is the company or one site
+      const aud = await resolveAudience(orgId, { site_id: patch.site_id ?? null, team_id: patch.team_id ?? null });
+      patch = { ...patch, site_id: aud.site_id, team_id: aud.team_id };
+    }
     if (patch.body !== undefined && item.kind !== 'document') throw badRequest('Only documents have text');
     if (patch.body !== undefined && patch.body.length > MAX_BODY) throw badRequest(`That document is too long (the limit is ${MAX_BODY.toLocaleString('en-GB')} characters)`);
     if (patch.url !== undefined && (item.kind === 'document' || !isHttpUrl(patch.url))) throw badRequest('Enter a web link that starts with https://');
@@ -177,7 +197,7 @@ export function createKnowledge(deps: KnowledgeDeps) {
     const none = { docs: [], videos: [], images: [] };
     const orgId = await store.orgOfSite(siteId);
     if (!orgId) return none;
-    const others = (await store.listItems(orgId)).filter((i) => i.status === 'published' && i.site_id !== null && i.site_id !== siteId);
+    const others = (await store.listItems(orgId)).filter((i) => i.status === 'published' && ((i.site_id !== null && i.site_id !== siteId) || i.team_id !== null)); // the old chat cannot tell who is asking, so team-only items stay hidden from it
     return {
       docs: others.map((i) => i.doc_filename).filter((x): x is string => !!x),
       videos: others.map((i) => i.video_id).filter((x): x is number => x != null),
@@ -185,7 +205,7 @@ export function createKnowledge(deps: KnowledgeDeps) {
     };
   }
 
-  return { excludedFor, list, get: (orgId: string, id: string) => store.getItem(orgId, id), createDocument, createVideo, update, remove, view };
+  return { excludedFor, resolveAudience, list, get: (orgId: string, id: string) => store.getItem(orgId, id), createDocument, createVideo, update, remove, view };
 }
 
 export type Knowledge = ReturnType<typeof createKnowledge>;

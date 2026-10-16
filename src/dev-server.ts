@@ -11,6 +11,7 @@ import { FakeBillingStore, FakeStripe, testBillingConfig } from './testing/billi
 import { FakeKnowledgeStore } from './testing/knowledge-fakes.js';
 import { FakeInsightsStore } from './testing/insights-fakes.js';
 import { FakeBrandingStore } from './testing/branding-fakes.js';
+import { FakeConversationStore, previewChatModel } from './testing/chat-fakes.js';
 
 async function main() {
   const repo = new FakeRepo();
@@ -56,6 +57,7 @@ async function main() {
   const kstore = new FakeKnowledgeStore();
   kstore.addOrg(org.id, 'sample', 'sample');
   for (const x of repo.sites) kstore.sites.push({ id: x.id, org_id: org.id });
+  for (const t of repo.teams) kstore.teamRows.push({ id: t.id, org_id: org.id, name: t.name, site_id: t.site_id });
   kstore.addLegacyDoc('sample', 'Allergen policy.pdf', 'All 14 allergens must be declared. Check the allergen matrix before every service and brief every new starter on day one.');
   kstore.addLegacyDoc('sample', 'Fire safety and evacuation', 'If the alarm sounds, stop service, switch off gas, and lead guests to the assembly point at the car park.');
   kstore.addLegacyVideo('sample', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'How to void a payment on the till');
@@ -78,7 +80,7 @@ async function main() {
   for (let i = 0; i < 4; i++) ask(c, 'alex@example.com', 'How do I log a broken fridge?', false, i);
   for (let i = 0; i < 3; i++) ask(a, 'someone@example.com', 'What time does the bar close on Sundays?', true, i);
   const drafter = { draft: async (q: string) => `Staff are paid for training days at [CONFIRM: rate]. Training is rostered like a normal shift. (Draft for: ${q})` };
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
+  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), conversationStore: new FakeConversationStore(), chatModel: previewChatModel, drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);
   await app.listen({ port, host: '127.0.0.1' });
   console.log(`Manage preview: http://127.0.0.1:${port}/manage/  (sample data, dev sign-in)`);

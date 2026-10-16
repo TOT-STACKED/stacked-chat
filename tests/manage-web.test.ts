@@ -168,3 +168,16 @@ describe('manage lib: settings helpers', () => {
     expect(normColour(' #E87830 ')).toBe('#e87830');
   });
 });
+
+import { audienceParams, audienceValue } from '../web/manage/lib.js';
+describe('manage lib: knowledge audience picker', () => {
+  it('round-trips company, site and team audiences', () => {
+    expect(audienceValue({ site_id: null, team_id: null })).toBe('');
+    expect(audienceValue({ site_id: 's1', team_id: null })).toBe('site:s1');
+    expect(audienceValue({ site_id: 's1', team_id: 't1' })).toBe('team:t1'); // a team wins, and brings its own site
+    expect(audienceParams('')).toEqual({ site_id: null, team_id: null });
+    expect(audienceParams('site:s1')).toEqual({ site_id: 's1', team_id: null });
+    expect(audienceParams('team:t1')).toEqual({ site_id: null, team_id: 't1' });
+    expect(audienceLabel({ team_id: 't1', site_id: 's1' }, [{ id: 's1', name: 'North' }], [{ id: 't1', name: 'Kitchen' }])).toBe('Team: Kitchen');
+  });
+});

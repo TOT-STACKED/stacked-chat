@@ -4,7 +4,7 @@ export type Kind = 'document' | 'video' | 'image';
 export type Status = 'draft' | 'published';
 
 export interface ItemRow {
-  id: string; org_id: string; kind: Kind; title: string; status: Status; site_id: string | null;
+  id: string; org_id: string; kind: Kind; title: string; status: Status; site_id: string | null; team_id: string | null;
   body: string | null; url: string | null; description: string | null;
   doc_filename: string | null; video_id: number | null; image_id: string | null;
   source: 'manager' | 'ai_draft' | 'imported'; source_question: string | null; created_by: string | null;
@@ -42,12 +42,14 @@ export interface KnowledgeStore {
   deleteImage(workspace: string, id: string): Promise<void>;
   /** the venues of an organisation (to validate audience targeting) */
   siteIds(orgId: string): Promise<string[]>;
+  /** the organisation's teams (to validate a team audience) */
+  teams(orgId: string): Promise<Array<{ id: string; name: string; site_id: string | null }>>;
   /** which organisation a venue belongs to */
   orgOfSite(siteId: string): Promise<string | null>;
 }
 
 const enc = encodeURIComponent;
-const COLS = 'id,org_id,kind,title,status,site_id,body,url,description,doc_filename,video_id,image_id,source,source_question,created_by,created_at,updated_at,published_at';
+const COLS = 'id,org_id,kind,title,status,site_id,team_id,body,url,description,doc_filename,video_id,image_id,source,source_question,created_by,created_at,updated_at,published_at';
 
 export function createSupabaseKnowledgeStore(db: Db): KnowledgeStore {
   const ok = <T>(r: { status: number; data: T }, what: string): T => {
@@ -128,6 +130,9 @@ export function createSupabaseKnowledgeStore(db: Db): KnowledgeStore {
     },
     async deleteImage(ws, id) {
       ok(await db.rest(`/images?id=eq.${enc(id)}&tenant=eq.${enc(ws)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }), 'delete image');
+    },
+    async teams(orgId) {
+      return ok(await db.rest<Array<{ id: string; name: string; site_id: string | null }>>(`/teams?org_id=eq.${enc(orgId)}&select=id,name,site_id&limit=5000`), 'teams') ?? [];
     },
     async orgOfSite(siteId) {
       return first(ok(await db.rest<Array<{ org_id: string | null }>>(`/venues?id=eq.${enc(siteId)}&select=org_id&limit=1`), 'org of site'))?.org_id ?? null;

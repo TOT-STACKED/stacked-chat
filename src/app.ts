@@ -32,6 +32,11 @@ import { createKnowledge, type Knowledge } from './modules/knowledge/service.js'
 import { createSupabaseKnowledgeStore, type KnowledgeStore } from './modules/knowledge/store.js';
 import { insightsRoutes } from './modules/insights/routes.js';
 import { brandingRoutes } from './modules/branding/routes.js';
+import { chatRoutes } from './modules/chat/routes.js';
+import { chatAppRoutes } from './modules/chat/app-routes.js';
+import { createChat, type Chat } from './modules/chat/service.js';
+import { createAnthropicChatModel, type ChatModel } from './modules/chat/model.js';
+import { createSupabaseConversationStore, type ConversationStore } from './modules/chat/store.js';
 import { createSupabaseBrandingStore, type BrandingStore } from './modules/branding/store.js';
 import { createInsights, type Insights } from './modules/insights/service.js';
 import { createSupabaseInsightsStore, type InsightsStore } from './modules/insights/store.js';
@@ -52,6 +57,9 @@ export interface Deps {
   knowledgeStore?: KnowledgeStore;
   insightsStore?: InsightsStore;
   brandingStore?: BrandingStore;
+  conversationStore?: ConversationStore;
+  chatModel?: ChatModel | null;
+  storage?: { signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>> } | null;
   drafter?: AnswerDrafter | null;
   now?: () => Date;
 }
@@ -107,6 +115,19 @@ export async function buildApp(
   app.decorate('knowledge', knowledge);
   const insightsStore = overrides.insightsStore ?? (db ? createSupabaseInsightsStore(db) : undefined);
   const drafter = overrides.drafter !== undefined ? overrides.drafter : (config.ANTHROPIC_API_KEY ? createAnthropicDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.INSIGHTS_MODEL }) : null);
+  const brandingStore = overrides.brandingStore ?? (db ? createSupabaseBrandingStore(db) : null);
+  const conversationStore = overrides.conversationStore ?? (db ? createSupabaseConversationStore(db) : null);
+  const chatModel = overrides.chatModel !== undefined ? overrides.chatModel : (config.ANTHROPIC_API_KEY ? createAnthropicChatModel({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null);
+  const adopted = new Map<string, number>(); // organisations whose older content we brought into the catalogue recently
+  const chat: Chat | null = knowledge && conversationStore ? createChat({
+    items: async (orgId) => {
+      if (!adopted.has(orgId) || Date.now() - adopted.get(orgId)! > 300_000) { adopted.set(orgId, Date.now()); return knowledge.list(orgId); }
+      return knowledgeStore!.listItems(orgId);
+    },
+    conversations: conversationStore, model: chatModel,
+    signUrls: overrides.storage ? async (urls) => overrides.storage!.signUrls(urls) as Promise<Array<string | null>> : undefined,
+    onAnswered: (siteId) => { void billing?.recordQuestion(siteId); },
+  }) : null;
   const insights: Insights | null = insightsStore && knowledge ? createInsights({ store: insightsStore, knowledge, drafter }) : null;
   const billingReason = billingCfg.ok ? 'Billing needs the database to be configured' : billingCfg.reason;
   if (!billing) app.log.info({ reason: billingReason }, 'billing disabled');
@@ -174,7 +195,9 @@ export async function buildApp(
   await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
   await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate }));
-  await app.register(async (instance) => brandingRoutes(instance, { store: overrides.brandingStore ?? (db ? createSupabaseBrandingStore(db) : null), repo, gate }));
+  await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
+  await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null }));
+  await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => insightsRoutes(instance, { insights, store: insightsStore ?? null, gate }));
   const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };
   await app.register(async (instance) => billingRoutes(instance, billingCtx));

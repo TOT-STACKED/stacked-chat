@@ -16,7 +16,7 @@ const Title = z.string().trim().min(1).max(120);
 const Status = z.enum(['draft', 'published']);
 const ItemOut = z.object({
   id: Id, org_id: Id, kind: z.enum(['document', 'video', 'image']), title: z.string(), status: Status, site_id: Id.nullable(),
-  url: z.string().nullable(), description: z.string().nullable(), source: z.enum(['manager', 'ai_draft', 'imported']), created_by: z.string().nullable(),
+  team_id: Id.nullable(), url: z.string().nullable(), description: z.string().nullable(), source: z.enum(['manager', 'ai_draft', 'imported']), created_by: z.string().nullable(),
   created_at: z.string(), updated_at: z.string(), published_at: z.string().nullable(), chars: z.number().nullable(),
 });
 const ItemDetail = ItemOut.extend({ body: z.string().nullable() });
@@ -62,8 +62,8 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
   });
 
   const Create = z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('document'), title: Title, body: z.string().max(600_000), site_id: Id.nullable().optional(), status: Status.default('draft') }),
-    z.object({ kind: z.literal('video'), title: Title, url: z.string().trim().url().max(2000), site_id: Id.nullable().optional(), status: Status.default('draft') }),
+    z.object({ kind: z.literal('document'), title: Title, body: z.string().max(600_000), site_id: Id.nullable().optional(), team_id: Id.nullable().optional(), status: Status.default('draft') }),
+    z.object({ kind: z.literal('video'), title: Title, url: z.string().trim().url().max(2000), site_id: Id.nullable().optional(), team_id: Id.nullable().optional(), status: Status.default('draft') }),
   ]);
   r.post('/api/v1/orgs/:orgId/knowledge', {
     preHandler: app.authenticate,
@@ -77,11 +77,13 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
     const actor = userOnly(req);
     assertOrgAccess(req, orgId);
     await ctx.gate(orgId);
-    const b = req.body; const siteId = b.site_id ?? null;
+    const b = req.body;
+    const aud = await kb().resolveAudience(orgId, { site_id: b.site_id ?? null, team_id: b.team_id ?? null });
+    const siteId = aud.site_id;
     if (!canWrite(actor, orgId, siteId)) throw forbidden(siteId ? 'You cannot add knowledge for this site' : 'Only company admins can add knowledge for the whole company');
     const item = b.kind === 'document'
-      ? await kb().createDocument(orgId, { title: b.title, body: b.body, site_id: siteId, status: b.status, by: actor.email })
-      : await kb().createVideo(orgId, { title: b.title, url: b.url, site_id: siteId, status: b.status, by: actor.email });
+      ? await kb().createDocument(orgId, { title: b.title, body: b.body, site_id: b.site_id ?? null, team_id: b.team_id ?? null, status: b.status, by: actor.email })
+      : await kb().createVideo(orgId, { title: b.title, url: b.url, site_id: b.site_id ?? null, team_id: b.team_id ?? null, status: b.status, by: actor.email });
     reply.status(201);
     return { ...knowledgeView(item), body: item.body };
   });
@@ -125,7 +127,7 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
     schema: {
       tags: ['knowledge'], summary: 'Edit, retarget (company or one site), publish or unpublish', security: SECURITY,
       params: z.object({ orgId: Id, id: Id }),
-      body: z.object({ title: Title.optional(), body: z.string().max(600_000).optional(), url: z.string().trim().url().max(2000).optional(), description: z.string().max(500).nullable().optional(), site_id: Id.nullable().optional(), status: Status.optional() })
+      body: z.object({ title: Title.optional(), body: z.string().max(600_000).optional(), url: z.string().trim().url().max(2000).optional(), description: z.string().max(500).nullable().optional(), site_id: Id.nullable().optional(), team_id: Id.nullable().optional(), status: Status.optional() })
         .refine((b) => Object.keys(b).length > 0, 'Nothing to change'),
       response: { 200: ItemDetail, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody, 409: ErrorBody },
     },
@@ -137,7 +139,10 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
     const item = await kb().get(orgId, id);
     if (!item || !canSee(actor, orgId, item)) throw notFound('Knowledge item not found');
     if (!canWrite(actor, orgId, item.site_id)) throw forbidden('You cannot change this item');
-    if (req.body.site_id !== undefined && !canWrite(actor, orgId, req.body.site_id)) throw forbidden('You cannot move this item there');
+    if (req.body.site_id !== undefined || req.body.team_id !== undefined) {
+      const aud = await kb().resolveAudience(orgId, { site_id: req.body.site_id ?? null, team_id: req.body.team_id ?? null });
+      if (!canWrite(actor, orgId, aud.site_id)) throw forbidden('You cannot move this item there');
+    }
     const updated = await kb().update(orgId, id, req.body);
     return { ...knowledgeView(updated), body: updated.body };
   });

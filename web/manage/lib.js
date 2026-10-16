@@ -132,9 +132,17 @@ export const venueCountText = (n) => `${n} venue${n === 1 ? '' : 's'}`;
 export const KIND_LABEL = { document: 'Document', video: 'Video', image: 'Image' };
 export const KIND_ICON = { document: 'shield', video: 'screen', image: 'box' };
 
-export function audienceLabel(item, sites) {
+export function audienceLabel(item, sites, teams = []) {
+  if (item.team_id) return `Team: ${(teams.find((t) => t.id === item.team_id) || {}).name || 'a team'}`;
   if (item.site_id === null) return 'Whole company';
   return (sites.find((s) => s.id === item.site_id) || {}).name || 'A site';
+}
+/** The audience picker uses one value: '' (company), 'site:<id>' or 'team:<id>'. */
+export function audienceValue(item) { return item && item.team_id ? `team:${item.team_id}` : item && item.site_id ? `site:${item.site_id}` : ''; }
+export function audienceParams(value) {
+  if (String(value).startsWith('team:')) return { site_id: null, team_id: value.slice(5) };
+  if (String(value).startsWith('site:')) return { site_id: value.slice(5), team_id: null };
+  return { site_id: null, team_id: null };
 }
 
 /** kind: all|document|video|image; audience: all|company|<siteId>; q: free text (title) */

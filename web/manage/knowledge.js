@@ -1,22 +1,27 @@
 import { clear, h, modal, toast } from './dom.js';
-import { KIND_ICON, KIND_LABEL, atLeast, audienceLabel, bestRole, canManage, filterKnowledge, knowledgeCounts, shortDate } from './lib.js';
+import { KIND_ICON, KIND_LABEL, atLeast, audienceLabel, audienceParams, audienceValue, bestRole, canManage, filterKnowledge, knowledgeCounts, shortDate } from './lib.js';
 import { pageHeader, tile } from './ui.js';
 
 /** Knowledge: everything the AI can answer from, with who it is for and whether it is live. */
 export async function renderKnowledge(main, ctx) {
   const { api, memberships, orgId } = ctx;
-  const st = { items: [], sites: [], kind: 'all', audience: 'all', q: '', loading: true, error: null };
+  const st = { items: [], sites: [], teams: [], kind: 'all', audience: 'all', q: '', loading: true, error: null };
   const base = `/api/v1/orgs/${orgId}/knowledge`;
   const orgAdmin = atLeast(bestRole(memberships, orgId, null), 'hq_admin');
   /** where this person may publish: the whole company (admins) and the sites they run */
-  const scopes = () => [...(orgAdmin ? [{ id: '', name: 'Whole company' }] : []), ...st.sites.filter((s) => canManage(memberships, orgId, s.id)).map((s) => ({ id: s.id, name: s.name }))];
+  const siteName = (id) => (st.sites.find((s) => s.id === id) || {}).name || 'a site';
+  const scopes = () => [
+    ...(orgAdmin ? [{ id: '', name: 'Whole company' }] : []),
+    ...st.sites.filter((s) => canManage(memberships, orgId, s.id)).map((s) => ({ id: `site:${s.id}`, name: s.name })),
+    ...st.teams.filter((t) => canManage(memberships, orgId, t.site_id)).map((t) => ({ id: `team:${t.id}`, name: `Team: ${t.name} (${t.site_id ? siteName(t.site_id) : 'whole company'})` })),
+  ];
   const canEditItem = (i) => canManage(memberships, orgId, i.site_id);
 
   async function load() {
     st.loading = true; st.error = null; draw();
     try {
-      const [k, s] = await Promise.all([api.get(base), api.get(`/api/v1/orgs/${orgId}/sites`)]);
-      st.items = k.data; st.sites = s.data;
+      const [k, s, t] = await Promise.all([api.get(base), api.get(`/api/v1/orgs/${orgId}/sites`), api.get(`/api/v1/orgs/${orgId}/teams`)]);
+      st.items = k.data; st.sites = s.data; st.teams = t.data;
     } catch (e) { st.error = e.message; }
     st.loading = false; draw();
   }
@@ -64,7 +69,7 @@ export async function renderKnowledge(main, ctx) {
         return h('tr', null,
           h('td', null, h('div', { class: 'person' }, tile(KIND_ICON[i.kind], 36), h('div', { class: 'pm' }, h('span', { class: 'name', text: i.title }),
             h('span', { class: 'email', text: KIND_LABEL[i.kind] + (i.chars ? ` · ${i.chars.toLocaleString('en-GB')} characters` : '') + (i.source === 'imported' ? ' · added earlier' : '') + (i.source === 'ai_draft' ? ' · AI draft, check before publishing' : '') })))),
-          h('td', null, h('span', { class: `badge ${i.site_id === null ? 'role-staff' : 'role-site_manager'}`, text: audienceLabel(i, st.sites) })),
+          h('td', null, h('span', { class: `badge ${i.team_id ? 'role-hq_admin' : i.site_id === null ? 'role-staff' : 'role-site_manager'}`, text: audienceLabel(i, st.sites, st.teams) })),
           h('td', null, h('span', { class: 'status' }, h('span', { class: `dot ${i.status === 'published' ? 'active' : 'invited'}` }), i.status === 'published' ? 'Published' : 'Draft')),
           h('td', { class: 'muted', text: shortDate(i.updated_at) }),
           h('td', { class: 'act' }, editable && [
@@ -81,7 +86,8 @@ export async function renderKnowledge(main, ctx) {
   }
 
   async function uploadFiles(files) {
-    const site = (scopes()[0] || { id: '' }).id;
+    const aud = audienceParams((scopes().find((s) => !s.id.startsWith('team:')) || { id: '' }).id);
+    const site = aud.site_id || '';
     const made = []; const failed = [];
     for (const [n, f] of files.entries()) {
       toast(files.length > 1 ? `Reading ${f.name} (${n + 1} of ${files.length})…` : `Reading ${f.name}…`);
@@ -114,15 +120,15 @@ export async function renderKnowledge(main, ctx) {
       const body = isDoc ? h('textarea', { id: 'k-body', rows: 10, placeholder: 'Write or paste the text. Plain text is fine.', style: 'min-height:220px' }) : null;
       if (body) body.value = existing ? existing.body || '' : '';
       const url = !isDoc ? h('input', { type: 'text', id: 'k-url', value: existing ? existing.url || '' : '', placeholder: 'https://www.youtube.com/watch?v=…' }) : null;
-      const sc = scopes(); const startSite = existing ? (existing.site_id || '') : (sc[0] || { id: '' }).id;
-      const options = sc.some((s) => s.id === startSite) || !existing ? sc : [{ id: startSite, name: audienceLabel(existing, st.sites) }, ...sc];
+      const sc = scopes(); const startSite = existing ? audienceValue(existing) : (sc[0] || { id: '' }).id;
+      const options = sc.some((s) => s.id === startSite) || !existing ? sc : [{ id: startSite, name: audienceLabel(existing, st.sites, st.teams) }, ...sc];
       const audience = h('select', { id: 'k-aud' }, options.map((s) => h('option', { value: s.id, selected: s.id === startSite }, s.name)));
       const live = h('input', { type: 'radio', name: 'k-status', value: 'published', id: 'k-pub', checked: existing ? existing.status === 'published' : false });
       const draft = h('input', { type: 'radio', name: 'k-status', value: 'draft', id: 'k-draft', checked: existing ? existing.status !== 'published' : true });
       const save = h('button', { class: 'btn cta', onclick: submit }, editing ? 'Save' : isDoc ? 'Save document' : 'Add video');
       async function submit() {
         clear(err);
-        const payload = { title: title.value.trim(), site_id: audience.value || null, status: live.checked ? 'published' : 'draft' };
+        const payload = { title: title.value.trim(), ...audienceParams(audience.value), status: live.checked ? 'published' : 'draft' };
         if (isDoc) payload.body = body.value; else payload.url = url.value.trim();
         if (!payload.title) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Give it a title.' })); return; }
         save.disabled = true; save.textContent = 'Saving…';

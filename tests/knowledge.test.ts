@@ -250,3 +250,30 @@ describe('HTTP: who may do what', () => {
     expect(Object.keys(spec.paths)).toEqual(expect.arrayContaining(['/api/v1/orgs/{orgId}/knowledge', '/api/v1/orgs/{orgId}/knowledge/{id}']));
   });
 });
+
+describe('team audience', () => {
+  const T = 'team-kitchen';
+  beforeEach(() => { store.teamRows.push({ id: T, org_id: ORG, name: 'Kitchen', site_id: north.id }, { id: 'team-hq', org_id: ORG, name: 'Compliance', site_id: null }); });
+  it('a team audience takes the team\'s site, and a company-wide team has none', async () => {
+    const a = await doc({ title: 'Kitchen close', team_id: T });
+    expect(a).toMatchObject({ team_id: T, site_id: north.id });
+    const b = await doc({ title: 'Compliance checks', team_id: 'team-hq' });
+    expect(b).toMatchObject({ team_id: 'team-hq', site_id: null });
+  });
+  it('rejects a team from another organisation', async () => {
+    store.teamRows.push({ id: 'foreign', org_id: 'other', name: 'Theirs', site_id: null });
+    await expect(doc({ title: 'x', team_id: 'foreign' })).rejects.toMatchObject({ statusCode: 400 });
+  });
+  it('moving an item between company, site and team keeps the audience consistent', async () => {
+    const d = await doc({ title: 'Moves around', status: 'published' });
+    expect(await kb.update(ORG, d.id, { site_id: south.id, team_id: null })).toMatchObject({ site_id: south.id, team_id: null });
+    expect(await kb.update(ORG, d.id, { team_id: T })).toMatchObject({ team_id: T, site_id: north.id });
+    expect(await kb.update(ORG, d.id, { site_id: null, team_id: null })).toMatchObject({ team_id: null, site_id: null });
+    expect(await chatText('Moves around')).toContain('allergen matrix'); // still published through the moves
+  });
+  it('the old chat cannot tell who is asking, so team-only knowledge stays hidden from it', async () => {
+    await doc({ title: 'Team only', team_id: T, status: 'published' });
+    expect((await kb.excludedFor(north.id)).docs).toContain('Team only');
+    expect((await kb.excludedFor(south.id)).docs).toContain('Team only');
+  });
+});

@@ -14,7 +14,7 @@ export function createModernHandler(opts: { config: Partial<Config> & Record<str
   const storage = config.SUPABASE_SERVICE_KEY
     ? createStorage({ supabaseUrl: config.SUPABASE_URL, serviceKey: config.SUPABASE_SERVICE_KEY })
     : null;
-  const appPromise = buildApp(config).then(async (app) => {
+  const appPromise = buildApp(config, { storage }).then(async (app) => {
     await app.ready();
     return app;
   });
@@ -29,7 +29,7 @@ export function createModernHandler(opts: { config: Partial<Config> & Record<str
     async knowledgeExcludedFor(siteId: string) { return (await appPromise).knowledge?.excludedFor(siteId) ?? { docs: [], videos: [], images: [] }; },
     async billingStateForSite(siteId: string) { return (await appPromise).billing?.stateForSite(siteId) ?? null; },
     handles(url: string): boolean {
-      return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/') || url === '/manage' || url.startsWith('/manage/') || url === '/billing/webhook';
+      return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/') || url === '/manage' || url.startsWith('/manage/') || url === '/billing/webhook' || url.startsWith('/chat/');
     },
     async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
       res.setHeader('Access-Control-Allow-Origin', '*');

@@ -24,6 +24,10 @@ const stem = (w: string) => w.replace(/(ing|ed|es|s)$/, (m) => (w.length - m.len
  * meaningful words. "Can I swap a shift?" and "can i swap shifts" both give "shift swap".
  * Empty for chit-chat ("hi", "thanks"), which is then ignored.
  */
+export function significantWords(q: string): string[] {
+  return q.toLowerCase().replace(/[^a-z0-9\s']/g, ' ').split(/\s+/).map((w) => w.replace(/'s$/, '').replace(/'/g, ''))
+    .filter((w) => w.length > 2 && !STOP.has(w)).map(stem).filter((w) => w.length > 1);
+}
 export function questionKey(q: string): string {
   const words = q.toLowerCase().replace(/[^a-z0-9\s']/g, ' ').split(/\s+/).map((w) => w.replace(/'s$/, '').replace(/'/g, ''))
     .filter((w) => w.length > 2 && !STOP.has(w)).map(stem).filter((w) => w.length > 1);

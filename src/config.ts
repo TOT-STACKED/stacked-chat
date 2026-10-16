@@ -30,6 +30,8 @@ const schema = z.object({
   /** Insights: lets Stacked Chat write DRAFT answers for questions it could not answer. Optional: without it, drafts are blank templates. */
   ANTHROPIC_API_KEY: z.string().optional(),
   INSIGHTS_MODEL: z.string().default('claude-sonnet-4-6'),
+  /** The model that answers staff questions in the chat. */
+  CHAT_MODEL: z.string().default('claude-sonnet-4-6'),
   SLACK_WEBHOOK_URL: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   NODE_ENV: z.string().default('development'),

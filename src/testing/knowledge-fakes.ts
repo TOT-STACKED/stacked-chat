@@ -6,6 +6,7 @@ export class FakeKnowledgeStore implements KnowledgeStore {
   items: ItemRow[] = [];
   orgs = new Map<string, { workspace_id: string | null; slug: string }>();
   sites: Array<{ id: string; org_id: string }> = [];
+  teamRows: Array<{ id: string; org_id: string; name: string; site_id: string | null }> = [];
   docs: Array<{ workspace_id: string; filename: string; content: string; chunk_index: number; file_url: string | null; created_at: string }> = [];
   vids: Array<WorkspaceVideo & { tenant: string; type?: string }> = [];
   imgs: Array<WorkspaceImage & { tenant: string }> = [];
@@ -59,6 +60,7 @@ export class FakeKnowledgeStore implements KnowledgeStore {
     const row = { id: randomUUID(), ...i, created_at: new Date().toISOString(), tenant: ws }; this.imgs.push(row); return row.id;
   }
   async deleteImage(ws: string, id: string) { this.imgs = this.imgs.filter((i) => !(i.tenant === ws && i.id === id)); }
+  async teams(orgId: string) { return this.teamRows.filter((t) => t.org_id === orgId).map(({ id, name, site_id }) => ({ id, name, site_id })); }
   async siteIds(orgId: string) { return this.sites.filter((s) => s.org_id === orgId).map((s) => s.id); }
   async orgOfSite(siteId: string) { return this.sites.find((s) => s.id === siteId)?.org_id ?? null; }
 }
