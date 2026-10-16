@@ -10,6 +10,7 @@ import { FakeMailer, FakeRepo } from './testing/fakes.js';
 import { FakeBillingStore, FakeStripe, testBillingConfig } from './testing/billing-fakes.js';
 import { FakeKnowledgeStore } from './testing/knowledge-fakes.js';
 import { FakeInsightsStore } from './testing/insights-fakes.js';
+import { FakeBrandingStore } from './testing/branding-fakes.js';
 
 async function main() {
   const repo = new FakeRepo();
@@ -77,7 +78,7 @@ async function main() {
   for (let i = 0; i < 4; i++) ask(c, 'alex@example.com', 'How do I log a broken fridge?', false, i);
   for (let i = 0; i < 3; i++) ask(a, 'someone@example.com', 'What time does the bar close on Sundays?', true, i);
   const drafter = { draft: async (q: string) => `Staff are paid for training days at [CONFIRM: rate]. Training is rostered like a normal shift. (Draft for: ${q})` };
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
+  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);
   await app.listen({ port, host: '127.0.0.1' });
   console.log(`Manage preview: http://127.0.0.1:${port}/manage/  (sample data, dev sign-in)`);

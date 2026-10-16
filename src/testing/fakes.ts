@@ -30,6 +30,8 @@ export class FakeRepo implements Repo {
   async linkUser(email: string, userId: string) { for (const m of this.members) if (m.email === email.toLowerCase() && m.user_id === null) m.user_id = userId; }
   async getOrg(id: string) { return this.orgs.find((o) => o.id === id) ?? null; }
   async listSites(orgId: string, only?: string[]) { return this.sites.filter((s) => s.org_id === orgId && (!only || only.includes(s.id))); }
+  async renameOrg(id: string, name: string) { const o = this.orgs.find((x) => x.id === id)!; o.name = name; return o; }
+  async renameSite(id: string, name: string) { const x = this.sites.find((s) => s.id === id)!; x.name = name; return x; }
   async getSite(id: string) { return this.sites.find((s) => s.id === id) ?? null; }
   async listMembers(orgId: string, siteId?: string | null) {
     return this.members.filter((m) => m.org_id === orgId && (siteId === undefined || m.site_id === siteId));

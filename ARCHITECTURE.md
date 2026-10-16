@@ -86,3 +86,7 @@ Uploads: `POST /api/v1/orgs/:orgId/knowledge/upload?filename=...` takes the raw 
 `src/modules/insights/` reads the chat's stored conversations and answers: what is asked most, what the AI could not answer, and usage by team and site. Same-meaning questions are grouped by a key of their meaningful words (`analyze.ts`). "Could not answer" is detected from the AI's own reply (the phrase list the old admin used). Site managers see only the venues they run. The screen shows aggregates only, never who asked.
 
 "Write the answer" creates a DRAFT in Knowledge (`source: ai_draft`, `source_question` = the question key, so it is never drafted twice). With `ANTHROPIC_API_KEY` set, a model writes a short starting point using only the company's own published documents, with `[CONFIRM: ...]` wherever policy is unknown (`drafter.ts`); without it, or on any failure, the draft is a blank template. Nothing an AI writes is ever published automatically.
+
+## Settings
+
+Manage → Settings (owners and HQ admins): Company (rename the company and venues), Chat and branding (per venue: chat name, welcome heading and message, main colour, logo link), API keys, and Billing. The chat page is built by pasting branding values straight into HTML, CSS and attributes, so `src/modules/branding/validate.ts` keeps them to plain text (no angle brackets, quotes, backslashes, braces, backticks or `$`), colours to `#RRGGBB`, and logos to `https://` links. Removing "Powered by Stacked Chat" (`white_label`) is deliberately not self-serve. Webhooks are not built yet.

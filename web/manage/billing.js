@@ -34,7 +34,8 @@ export async function renderBilling(main, ctx) {
   function draw() {
     clear(main);
     const d = st.data;
-    main.append(pageHeader({ icon: 'billing', title: 'Billing', sub: 'One price per venue. Unlimited staff.' }));
+    if (!ctx.embedded) main.append(pageHeader({ icon: 'billing', title: 'Billing', sub: 'One price per venue. Unlimited staff.' }));
+    else main.append(h('div', { class: 'sechead' }, h('h2', { text: 'Billing' }), h('span', { class: 'muted', text: 'One price per venue. Unlimited staff.' })));
     const body = h('div', { class: 'stack' });
     main.append(body);
     if (st.error) {

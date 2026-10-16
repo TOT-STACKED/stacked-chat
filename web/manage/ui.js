@@ -3,7 +3,7 @@ import { initials } from './lib.js';
 
 /** Stacked's own icon set (assets/icon-*.png). One place that says which icon means what. */
 export const ICONS = {
-  home: 'screen', knowledge: 'shield', people: 'people', insights: 'chart', settings: 'till', billing: 'till',
+  home: 'screen', knowledge: 'shield', people: 'people', insights: 'chart', settings: 'box', billing: 'till',
   communicate: 'wifi', training: 'food-safety', operations: 'truck', empty: 'box', rewards: 'jar',
 };
 

@@ -1,3 +1,11 @@
+/** The most helpful message in an error body: the first specific validation problem if there is one. */
+function explain(data) {
+  const e = data && data.error;
+  if (!e) return 'Something went wrong';
+  const first = Array.isArray(e.details) && e.details[0] && e.details[0].message;
+  return e.code === 'validation_error' && first ? first : e.message || 'Something went wrong';
+}
+
 export class ApiError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
@@ -13,7 +21,7 @@ export function createApi(auth, onSessionEnded) {
     });
     const data = await res.json().catch(() => null);
     if (res.status === 401) { onSessionEnded(); throw new ApiError(401, 'unauthorized', 'Please sign in again'); }
-    if (!res.ok) throw new ApiError(res.status, data && data.error && data.error.code, (data && data.error && data.error.message) || 'Something went wrong');
+    if (!res.ok) throw new ApiError(res.status, data && data.error && data.error.code, explain(data));
     return data;
   }
   /** Send a file as the raw request body (the server reads the text out of it). */

@@ -52,6 +52,13 @@ export function createSupabaseRepo(db: Db): Repo {
       return one(must(await db.rest<OrgRow[]>(`/organisations?id=eq.${enc(orgId)}&select=id,name,slug&limit=1`), 'get org'));
     },
 
+    async renameOrg(orgId, name) {
+      return one(must(await db.rest<OrgRow[]>(`/organisations?id=eq.${enc(orgId)}&select=id,name,slug`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: { name } }), 'rename org'))!;
+    },
+    async renameSite(siteId, name) {
+      return one(must(await db.rest<SiteRow[]>(`/venues?id=eq.${enc(siteId)}&select=id,org_id,name,slug,created_at`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: { name } }), 'rename site'))!;
+    },
+
     async listSites(orgId, onlySiteIds) {
       let q = `/venues?org_id=eq.${enc(orgId)}&select=id,org_id,name,slug,created_at&order=name.asc`;
       if (onlySiteIds) {

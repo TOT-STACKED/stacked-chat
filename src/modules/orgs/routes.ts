@@ -47,6 +47,37 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     }));
   }
 
+  // ---- the organisation itself --------------------------------------------------------------
+  const OrgOut = z.object({ id: Id, name: z.string(), slug: z.string() });
+  const CompanyName = z.string().trim().min(2).max(80).refine((v) => !/[<>]/.test(v), 'Names cannot contain < or >');
+
+  r.get('/api/v1/orgs/:orgId', {
+    preHandler: app.authenticate,
+    schema: { tags: ['organisations'], summary: 'The organisation', security: SECURITY, params: z.object({ orgId: Id }), response: { 200: OrgOut, 404: ErrorBody } },
+  }, async (req) => {
+    const { orgId } = req.params;
+    assertOrgAccess(req, orgId);
+    const org = await repo().getOrg(orgId);
+    if (!org) throw notFound('Organisation not found');
+    return org;
+  });
+
+  r.patch('/api/v1/orgs/:orgId', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['organisations'], summary: 'Rename the organisation (owners and HQ admins)', security: SECURITY,
+      params: z.object({ orgId: Id }), body: z.object({ name: CompanyName }),
+      response: { 200: OrgOut, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody },
+    },
+  }, async (req) => {
+    const { orgId } = req.params;
+    const actor = userOnly(req);
+    assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
+    if (!atLeast(bestRole(actor, orgId, null), 'hq_admin')) throw forbidden('Only organisation admins can change company details');
+    return repo().renameOrg(orgId, req.body.name);
+  });
+
   // ---- sites -------------------------------------------------------------------------------
   r.get('/api/v1/orgs/:orgId/sites', {
     preHandler: app.authenticate,
@@ -93,6 +124,23 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
       }
       throw conflict('Could not create a unique site, please try again');
     });
+  });
+
+  r.patch('/api/v1/orgs/:orgId/sites/:siteId', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['organisations'], summary: 'Rename a site (owners and HQ admins)', security: SECURITY,
+      params: z.object({ orgId: Id, siteId: Id }), body: z.object({ name: CompanyName }),
+      response: { 200: SiteOut, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody },
+    },
+  }, async (req) => {
+    const { orgId, siteId } = req.params;
+    const actor = userOnly(req);
+    assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
+    if (!atLeast(bestRole(actor, orgId, null), 'hq_admin')) throw forbidden('Only organisation admins can rename sites');
+    await assertSiteInOrg(repo(), orgId, siteId);
+    return repo().renameSite(siteId, req.body.name);
   });
 
   // ---- members -----------------------------------------------------------------------------

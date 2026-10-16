@@ -165,3 +165,21 @@ export function wherePhrase(item) {
 }
 /** Bar width (0..100) relative to the biggest value in the list. */
 export const barPercent = (value, max) => (max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0);
+
+// ---- settings (display helpers) -----------------------------------------------------------------------------
+/** Only the access levels that do something today are offered when creating a key. */
+export const KEY_SCOPES = [['sites:read', 'Read sites'], ['teams:read', 'Read teams'], ['members:read', 'Read people'], ['kb:read', 'Read knowledge']];
+export const scopeLabel = (s) => (KEY_SCOPES.find(([k]) => k === s) || [s, s])[1];
+export function keyStatus(k, now = new Date()) {
+  if (k.revoked) return 'Revoked';
+  if (k.expires_at && new Date(k.expires_at) < now) return 'Expired';
+  return 'Active';
+}
+export const isHexColour = (v) => /^#[0-9a-fA-F]{6}$/.test(String(v || '').trim());
+/** Lower-case so "#E87830" and "#e87830" compare equal; used to decide whether anything changed. */
+export const normColour = (v) => String(v || '').trim().toLowerCase();
+export function lastUsedText(iso, now = new Date()) {
+  if (!iso) return 'Never';
+  const days = Math.floor((now - new Date(iso)) / 86_400_000);
+  return days <= 0 ? 'Today' : days === 1 ? 'Yesterday' : days < 30 ? `${days} days ago` : shortDate(iso);
+}

@@ -145,3 +145,26 @@ describe('manage lib: insights wording', () => {
     expect(barPercent(10, 10)).toBe(100); expect(barPercent(5, 10)).toBe(50); expect(barPercent(0.1, 100)).toBe(4); expect(barPercent(3, 0)).toBe(0);
   });
 });
+
+import { isHexColour, keyStatus, lastUsedText, normColour, scopeLabel, KEY_SCOPES } from '../web/manage/lib.js';
+describe('manage lib: settings helpers', () => {
+  it('only offers key access that does something today, with friendly names', () => {
+    expect(KEY_SCOPES.map(([k]) => k)).toEqual(['sites:read', 'teams:read', 'members:read', 'kb:read']);
+    expect(scopeLabel('kb:read')).toBe('Read knowledge'); expect(scopeLabel('odd:scope')).toBe('odd:scope');
+  });
+  it('knows a key status', () => {
+    const now = new Date('2026-10-16T12:00:00Z');
+    expect(keyStatus({ revoked: true }, now)).toBe('Revoked');
+    expect(keyStatus({ revoked: false, expires_at: '2026-10-01T00:00:00Z' }, now)).toBe('Expired');
+    expect(keyStatus({ revoked: false, expires_at: null }, now)).toBe('Active');
+  });
+  it('words last used plainly', () => {
+    const now = new Date('2026-10-16T12:00:00Z');
+    expect(lastUsedText(null, now)).toBe('Never'); expect(lastUsedText('2026-10-16T01:00:00Z', now)).toBe('Today');
+    expect(lastUsedText('2026-10-15T01:00:00Z', now)).toBe('Yesterday'); expect(lastUsedText('2026-10-11T12:00:00Z', now)).toBe('5 days ago');
+  });
+  it('checks colours', () => {
+    expect(isHexColour('#E87830')).toBe(true); expect(isHexColour('red')).toBe(false); expect(isHexColour('#fff')).toBe(false);
+    expect(normColour(' #E87830 ')).toBe('#e87830');
+  });
+});

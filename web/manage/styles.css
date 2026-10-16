@@ -234,3 +234,12 @@ table.narrow{min-width:480px}
 .barrow .bl{width:140px;font-weight:600;flex:none}
 .barrow .bar{flex:1}
 .barrow .br{width:80px;text-align:right;font-size:13px;flex:none}
+
+/* settings */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.brandprev{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--bg)}
+.brandprev .pm{display:flex;flex-direction:column;min-width:0}
+.dotc{width:28px;height:28px;border-radius:50%;flex:none}
+code.keycode{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:3px 8px}
+code.keybox{display:block;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:#fff;border:1px solid var(--line-strong);border-radius:12px;padding:14px}
+.toolbar>.sechead{flex:1 1 320px}

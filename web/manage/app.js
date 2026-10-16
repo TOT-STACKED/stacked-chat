@@ -2,7 +2,7 @@ import { clear, h, toast } from './dom.js';
 import { createAuth } from './auth.js';
 import { createApi } from './api.js';
 import { renderPeople } from './people.js';
-import { renderBilling } from './billing.js';
+import { renderSettings } from './settings.js';
 import { renderHome } from './home.js';
 import { renderKnowledge } from './knowledge.js';
 import { renderInsights } from './insights.js';
@@ -13,7 +13,7 @@ const root = document.getElementById('app');
 let cfg; let auth; let api;
 const state = { memberships: [], orgs: [], orgId: null };
 
-const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['settings', 'Billing']];
+const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['settings', 'Settings']];
 const SOON_NAV = [['communicate', 'Communicate'], ['training', 'Training'], ['operations', 'Operations']];
 
 // ---- sign in -------------------------------------------------------------------------------
@@ -98,6 +98,16 @@ function showNoAccess() {
     h('button', { class: 'btn line', onclick: signOut }, 'Sign out'))));
 }
 
+/** After a rename: reload the names Manage shows (switcher, sidebar) and redraw. */
+async function refreshOrgs() {
+  try {
+    const me = await api.get('/api/v1/me');
+    state.memberships = (me.memberships || []).map((m) => ({ orgId: m.organisation.id, orgName: m.organisation.name, siteId: m.site ? m.site.id : null, siteName: m.site ? m.site.name : null, role: m.role }));
+    state.orgs = [...new Map(state.memberships.map((m) => [m.orgId, m.orgName || 'Your company'])).entries()].map(([id, name]) => ({ id, name }));
+    const keep = location.hash; drawShell(); location.hash = keep; route();
+  } catch (e) { /* the name is saved; it will show on the next load */ }
+}
+
 function signOut() { auth.signOut(); showSignIn(); }
 
 let main; let crumb;
@@ -134,7 +144,7 @@ function drawShell() {
 const SOON = {
   insights: ['Insights', 'What people ask most, what the AI could not answer, and usage by site and team.', 'What your teams ask, and what the AI could not answer.'],
 };
-const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', settings: 'Billing' };
+const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', settings: 'Settings' };
 
 function route() {
   if (!main) return;
@@ -157,8 +167,9 @@ function route() {
     return;
   }
   if (view === 'settings') {
-    if (!atLeast(orgRole, 'hq_admin')) { restricted('Billing', 'settings', 'Plan, venues and invoices.', 'This area is for company admins'); return; }
-    renderBilling(main, { api, orgId: state.orgId, orgName: org.name });
+    if (!atLeast(orgRole, 'hq_admin')) { restricted('Settings', 'settings', 'Company details, chat, API keys and billing.', 'This area is for company admins'); return; }
+    const section = (location.hash.replace('#/', '').split('?')[0].split('/')[1]) || 'company';
+    renderSettings(main, { api, memberships: state.memberships, orgId: state.orgId, orgName: org.name, section, onChange: refreshOrgs });
     return;
   }
   if (view === 'knowledge') {

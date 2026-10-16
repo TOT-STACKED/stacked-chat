@@ -31,6 +31,8 @@ import { knowledgeRoutes } from './modules/knowledge/routes.js';
 import { createKnowledge, type Knowledge } from './modules/knowledge/service.js';
 import { createSupabaseKnowledgeStore, type KnowledgeStore } from './modules/knowledge/store.js';
 import { insightsRoutes } from './modules/insights/routes.js';
+import { brandingRoutes } from './modules/branding/routes.js';
+import { createSupabaseBrandingStore, type BrandingStore } from './modules/branding/store.js';
 import { createInsights, type Insights } from './modules/insights/service.js';
 import { createSupabaseInsightsStore, type InsightsStore } from './modules/insights/store.js';
 import { createAnthropicDrafter, type AnswerDrafter } from './modules/insights/drafter.js';
@@ -49,6 +51,7 @@ export interface Deps {
   billingStore?: BillingStore;
   knowledgeStore?: KnowledgeStore;
   insightsStore?: InsightsStore;
+  brandingStore?: BrandingStore;
   drafter?: AnswerDrafter | null;
   now?: () => Date;
 }
@@ -171,6 +174,7 @@ export async function buildApp(
   await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
   await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate }));
+  await app.register(async (instance) => brandingRoutes(instance, { store: overrides.brandingStore ?? (db ? createSupabaseBrandingStore(db) : null), repo, gate }));
   await app.register(async (instance) => insightsRoutes(instance, { insights, store: insightsStore ?? null, gate }));
   const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };
   await app.register(async (instance) => billingRoutes(instance, billingCtx));

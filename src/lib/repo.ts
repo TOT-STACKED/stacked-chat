@@ -21,6 +21,8 @@ export interface Repo {
   /** Attach an auth user id to any not-yet-linked member rows with this email (first sign-in). */
   linkUser(email: string, userId: string): Promise<void>;
   getOrg(orgId: string): Promise<OrgRow | null>;
+  renameOrg(orgId: string, name: string): Promise<OrgRow>;
+  renameSite(siteId: string, name: string): Promise<SiteRow>;
   listSites(orgId: string, onlySiteIds?: string[]): Promise<SiteRow[]>;
   getSite(siteId: string): Promise<SiteRow | null>;
   listMembers(orgId: string, siteId?: string | null): Promise<MemberRow[]>;
