@@ -1,4 +1,5 @@
 import { clear, h, toast } from './dom.js';
+import { pageHeader, tile } from './ui.js';
 import { INTERVAL_WORD, bannerFor, formatGbp, planName, usageRatio, venueCountText } from './lib.js';
 
 const PRICES = { standard: [45, 450], group: [39, 390], large: [79, 790] };
@@ -33,9 +34,9 @@ export async function renderBilling(main, ctx) {
   function draw() {
     clear(main);
     const d = st.data;
-    main.append(h('div', { class: 'head' }, h('div', { class: 't' }, h('span', { class: 'mono', text: ctx.orgName }), h('h1', { class: 'disp', text: 'Settings' }))));
+    main.append(pageHeader({ icon: 'billing', title: 'Billing', sub: 'One price per venue. Unlimited staff.' }));
     const body = h('div', { class: 'stack' });
-    main.append(h('div', { class: 'cols' }, subnav(), body));
+    main.append(body);
     if (st.error) {
       const off = st.error.status === 503;
       body.append(h('div', { class: off ? 'card pad rule' : 'banner', role: off ? null : 'alert' },
@@ -45,10 +46,8 @@ export async function renderBilling(main, ctx) {
     }
     if (!d) { body.append(h('p', { class: 'muted', text: 'Loading…' })); return; }
 
-    body.append(h('div', { class: 'sechead' }, h('h2', { text: 'Billing' }),
-      h('span', { class: 'muted', text: d.pitch })));
     const banner = bannerFor(d.state);
-    if (banner) body.append(h('div', { class: banner.tone === 'warn' ? 'banner' : 'result', role: 'status' }, banner.text));
+    if (banner) body.append(h('div', { class: banner.tone === 'warn' ? 'banner' : 'banner info', role: 'status' }, banner.text));
 
     // h() drops empty children, but body.append() would print "false": filter first
     body.append(...(d.account ? onPlan(d, banner) : noPlan(d)).filter(Boolean));
@@ -56,7 +55,7 @@ export async function renderBilling(main, ctx) {
   }
 
   function subnav() {
-    return h('nav', { class: 'sub', 'aria-label': 'Settings' },
+    return h('nav', { class: 'subnav', 'aria-label': 'Settings' },
       h('a', { href: '#/settings/billing', class: 'on', 'aria-current': 'page', text: 'Billing' }),
       h('span', { class: 'soonlink', text: 'Company, chat, API keys and webhooks are coming soon' }));
   }
@@ -107,7 +106,9 @@ export async function renderBilling(main, ctx) {
   }
 
   const statusWord = (s) => ({ active: 'Active', past_due: 'Payment overdue', paused: 'Paused', canceled: 'Cancelled', trialing: 'Trial' })[s] || s;
-  const stat = (label, value, sub) => h('div', { class: 'card pad stat' }, h('span', { class: 'mono', text: label }), h('b', { class: 'big', text: value }), sub && h('span', { class: 'muted', text: sub }));
+  const STAT_ICON = { Plan: 'box', Trial: 'jar', Status: 'shield', 'After your trial': 'till', 'Next invoice': 'till' };
+  const stat = (label, value, sub) => h('div', { class: 'card pad stat' }, tile(STAT_ICON[label] || 'box', 44),
+    h('div', { class: 'sb' }, h('span', { class: 'lbl', text: label }), h('b', { class: 'big', text: value }), sub && h('span', { class: 'sub2', text: sub })));
 
   function venuesTable(d) {
     const canEdit = true;

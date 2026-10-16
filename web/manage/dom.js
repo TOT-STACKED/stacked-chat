@@ -37,11 +37,12 @@ export function modal(title, build) {
   const overlay = h('div', { class: 'overlay' });
   const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); if (prev && prev.focus) prev.focus(); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };
-  const dlg = h('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true', 'aria-label': title }, h('h2', { text: title }), build(close));
+  const dlg = h('div', { class: 'dlg', role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+    h('div', { class: 'dlghead' }, h('h2', { text: title }), h('button', { class: 'xbtn', 'aria-label': 'Close', onclick: () => close() }, '×')), build(close));
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
   overlay.append(dlg); root.append(overlay);
   document.addEventListener('keydown', onKey);
-  const first = dlg.querySelector('input,select,textarea,button');
+  const first = dlg.querySelector('input,select,textarea') || dlg.querySelector('button');
   if (first) first.focus();
   return close;
 }

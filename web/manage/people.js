@@ -1,4 +1,5 @@
 import { clear, h, modal, toast } from './dom.js';
+import { avatar, pageHeader } from './ui.js';
 import {
   ROLE_LABEL, bestRole, canEditMember, canManage, atLeast, countMembers, displayName, filterMembers,
   inviteResultText, parseEmails, rolesFor, statusLabel, teamsForScope,
@@ -34,18 +35,17 @@ export async function renderPeople(main, ctx) {
   function draw() {
     clear(main);
     const canInvite = manageable().length > 0;
-    main.append(
-      h('div', { class: 'head' },
-        h('div', { class: 't' }, h('span', { class: 'mono', text: `${orgName} / ${scopeLabel()}` }), h('h1', { class: 'disp', text: 'People' })),
-        h('div', { class: 'actions' }, canInvite && h('button', { class: 'btn cta', onclick: openInvite }, 'Invite people')),
-      ),
-    );
+    main.append(pageHeader({
+      icon: 'people', title: 'People',
+      sub: st.loading ? 'Loading…' : `${scopeLabel()}: ${filterMembers(st.members, st.sel, 'everyone').filter((m) => m.status !== 'disabled').length} people`,
+      actions: canInvite ? h('button', { class: 'btn cta', onclick: openInvite }, 'Invite people') : null,
+    }));
     if (st.error) {
       main.append(h('div', { class: 'banner', role: 'alert' }, st.error + ' ', h('button', { class: 'lnk', onclick: load }, 'Try again')));
       return;
     }
     if (st.loading) { main.append(h('p', { class: 'muted', text: 'Loading…' })); return; }
-    main.append(h('div', { class: 'cols' }, tree(), h('div', { class: 'tablewrap' }, chips(), table(), ruleCard())));
+    main.append(h('div', { class: 'cols' }, tree(), h('div', { class: 'tablewrap' }, h('div', { class: 'toolbar' }, chips()), table(), ruleCard())));
   }
 
   function tree() {
@@ -67,10 +67,10 @@ export async function renderPeople(main, ctx) {
     const selSite = st.sel.kind === 'site' ? st.sel.id : st.sel.kind === 'team' ? (st.teams.find((t) => t.id === st.sel.id) || {}).site_id ?? null : null;
     const canTeam = canManage(memberships, orgId, st.sel.kind === 'company' ? null : selSite);
     return h('aside', { class: 'card tree' },
-      h('span', { class: 'mono', style: 'margin-bottom:6px', text: 'Company, sites, teams' }),
+      h('span', { class: 'mono', text: 'Company, sites, teams' }),
       node(orgName, c.total, st.sel.kind === 'company', () => select({ kind: 'company' })),
       kids,
-      h('div', { style: 'display:flex;gap:16px;flex-wrap:wrap;margin-top:12px' },
+      h('div', { class: 'treeactions' },
         canAddSite && h('button', { class: 'lnk', onclick: openAddSite }, 'Add a site'),
         canTeam && h('button', { class: 'lnk', onclick: () => openAddTeam(st.sel.kind === 'company' ? null : selSite) }, 'Add a team')),
     );
@@ -97,10 +97,10 @@ export async function renderPeople(main, ctx) {
       const editable = canManage(memberships, orgId, m.site_id) && canEditMember(actorRole, m);
       const teams = m.team_ids.map(teamName).filter(Boolean);
       return h('tr', null,
-        h('td', null, h('span', { class: 'name', text: displayName(m) }), h('span', { class: 'email', text: m.email })),
-        h('td', null, h('span', { class: 'chip', text: ROLE_LABEL[m.role] }), m.site_id && st.sel.kind === 'company' && h('span', { class: 'email', text: siteName(m.site_id) })),
+        h('td', null, h('div', { class: 'person' }, avatar(displayName(m)), h('div', { class: 'pm' }, h('span', { class: 'name', text: displayName(m) }), h('span', { class: 'email', text: m.email })))),
+        h('td', null, h('span', { class: `badge role-${m.role}`, text: ROLE_LABEL[m.role] }), m.site_id && st.sel.kind === 'company' && h('span', { class: 'email', text: siteName(m.site_id) })),
         h('td', { text: teams.length ? teams.join(', ') : '–' }),
-        h('td', { text: statusLabel(m), style: m.status === 'invited' ? 'font-weight:700' : m.status === 'disabled' ? 'color:#8A867C' : null }),
+        h('td', null, h('span', { class: 'status' }, h('span', { class: `dot ${m.status}` }), statusLabel(m))),
         h('td', { class: 'act' },
           editable && m.status === 'invited' && h('button', { class: 'lnk', onclick: () => resend(m) }, 'Resend invite'),
           editable && h('button', { class: 'lnk', onclick: () => openEdit(m) }, 'Edit')),
@@ -112,7 +112,7 @@ export async function renderPeople(main, ctx) {
   }
 
   const ruleCard = () => h('div', { class: 'card pad rule' },
-    h('b', { text: 'One rule for roles' }),
+    h('h3', { text: 'One rule for roles' }),
     h('span', { class: 'muted', text: 'You can give people any role below your own. A site manager can add staff to their site, but cannot promote themselves or someone else to a manager. Owners can give any role. A company always keeps at least one owner.' }));
 
   function select(sel) { st.sel = sel; draw(); }

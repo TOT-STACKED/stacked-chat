@@ -3,35 +3,23 @@ import { createAuth } from './auth.js';
 import { createApi } from './api.js';
 import { renderPeople } from './people.js';
 import { renderBilling } from './billing.js';
+import { renderHome } from './home.js';
+import { ICONS, avatar, logo, pageHeader, tile } from './ui.js';
 import { ROLE_LABEL, atLeast, bestRole, isManagerAnywhere } from './lib.js';
 
 const root = document.getElementById('app');
 let cfg; let auth; let api;
 const state = { memberships: [], orgs: [], orgId: null };
 
-const ICONS = {
-  home: 'M2 7.5 8 2l6 5.5V14H2z',
-  knowledge: 'M3 2.5h8a2 2 0 0 1 2 2V13.5H5a2 2 0 0 1-2-2zM3 11.5a2 2 0 0 1 2-2h8',
-  people: 'M1.5 13.5c0-2.5 2-4 4.5-4s4.5 1.5 4.5 4M11 3.2a2.2 2.2 0 0 1 0 4.2M12.5 9.7c1.3.5 2 1.7 2 3.8',
-  insights: 'M3 13V8M8 13V3M13 13V6',
-  settings: 'M2 4h5M10 4h4M2 8h2M7 8h7M2 12h8M13 12h1',
-};
-const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['settings', 'Settings']];
-
-function icon(name) {
-  const ns = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  for (const [k, v] of Object.entries({ width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.5, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' })) svg.setAttribute(k, v);
-  const p = document.createElementNS(ns, 'path'); p.setAttribute('d', ICONS[name]); svg.append(p);
-  return svg;
-}
+const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['settings', 'Billing']];
+const SOON_NAV = [['communicate', 'Communicate'], ['training', 'Training'], ['operations', 'Operations']];
 
 // ---- sign in -------------------------------------------------------------------------------
 function showSignIn(message) {
   clear(root);
   let email = '';
   const box = h('div', { class: 'box' });
-  const brand = h('div', { class: 'brand' }, h('b', { text: 'Stacked' }), h('span', { text: 'Manage' }));
+  const brand = logo();
   root.append(h('div', { class: 'signin' }, box));
 
   function stepEmail(note) {
@@ -47,7 +35,7 @@ function showSignIn(message) {
       try { await auth.sendCode(email); stepCode(); }
       catch (e) { go.disabled = false; go.textContent = 'Email me a code'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
     }
-    box.append(...[brand, h('h1', { class: 'disp', text: 'Sign in' }),
+    box.append(...[brand, h('h1', { text: 'Sign in to Manage' }),
       note ? h('div', { class: 'result', text: note }) : null,
       h('p', { class: 'muted', text: "Use the email address your company invited. We'll send you a one-time code, so there's no password to remember." }),
       h('div', { class: 'field' }, h('label', { for: 'si-email', text: 'Email address' }), input), err, go,
@@ -68,7 +56,7 @@ function showSignIn(message) {
       try { await auth.verifyCode(email, code); await enter(); }
       catch (e) { go.disabled = false; go.textContent = 'Sign in'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
     }
-    box.append(brand, h('h1', { class: 'disp', text: 'Check your email' }),
+    box.append(brand, h('h1', { text: 'Check your email' }),
       h('p', { class: 'muted', text: `We sent a code to ${email}. It can take a minute to arrive.` }),
       h('div', { class: 'field' }, h('label', { for: 'si-code', text: 'Code' }), input), err, go,
       h('button', { class: 'lnk', style: 'align-self:flex-start', onclick: () => stepEmail() }, 'Use a different email'));
@@ -102,69 +90,80 @@ async function enter() {
 function showNoAccess() {
   clear(root);
   root.append(h('div', { class: 'signin' }, h('div', { class: 'box' },
-    h('div', { class: 'brand' }, h('b', { text: 'Stacked' }), h('span', { text: 'Manage' })),
-    h('h1', { class: 'disp', text: 'No access yet' }),
+    logo(),
+    h('h1', { text: 'No access yet' }),
     h('p', { class: 'muted', text: `${auth.email() || 'This email address'} isn't part of a company yet. Ask your company's admin to invite you, then sign in again.` }),
     h('button', { class: 'btn line', onclick: signOut }, 'Sign out'))));
 }
 
 function signOut() { auth.signOut(); showSignIn(); }
 
-let main;
+let main; let crumb;
+const chevron = () => { const ns = 'http://www.w3.org/2000/svg'; const svg = document.createElementNS(ns, 'svg'); for (const [k, v] of Object.entries({ width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'chev', 'aria-hidden': 'true' })) svg.setAttribute(k, v); const p = document.createElementNS(ns, 'path'); p.setAttribute('d', 'M4 6l4 4 4-4'); svg.append(p); return svg; };
+
 function drawShell() {
   clear(root);
   const org = state.orgs.find((o) => o.id === state.orgId);
   const role = bestRole(state.memberships, state.orgId, null);
   const best = role || (state.memberships.find((m) => m.orgId === state.orgId) || {}).role;
-  const orgControl = state.orgs.length > 1
-    ? h('select', { 'aria-label': 'Company', onchange: (e) => { state.orgId = e.target.value; localStorage.setItem('stacked_manage_org', state.orgId); drawShell(); route(); } },
-      state.orgs.map((o) => h('option', { value: o.id, selected: o.id === state.orgId }, o.name)))
-    : h('span', { style: 'font-weight:700;font-size:15px', text: org.name });
+  const orgBox = h('div', { class: 'org' }, avatar(org.name, { square: true }),
+    h('div', { class: 'meta' }, h('b', { text: org.name }), h('span', { text: best ? ROLE_LABEL[best] : '' })),
+    state.orgs.length > 1 ? chevron() : null,
+    state.orgs.length > 1 ? h('select', { 'aria-label': 'Switch company', onchange: (e) => { state.orgId = e.target.value; localStorage.setItem('stacked_manage_org', state.orgId); drawShell(); route(); } },
+      state.orgs.map((o) => h('option', { value: o.id, selected: o.id === state.orgId }, o.name))) : null);
   main = h('main', { class: 'main', id: 'main' });
+  crumb = h('span', { class: 'crumbs' });
   root.append(h('div', { class: 'shell' },
     h('aside', { class: 'side' },
-      h('div', { class: 'brand' }, h('b', { text: 'Stacked' }), h('span', { text: 'Manage' })),
-      h('div', { class: 'scope' }, h('span', { class: 'mono', text: 'Viewing' }), orgControl, h('span', { style: 'font-size:13px;color:#B9B4A8', text: best ? ROLE_LABEL[best] : '' })),
-      h('nav', { class: 'nav', 'aria-label': 'Main' }, NAV.map(([k, label]) => h('a', { href: '#/' + k, id: 'nav-' + k }, icon(k), label))),
-      h('div', { class: 'soon' }, h('span', { class: 'mono', text: 'Coming next' }), h('span', { text: 'Communicate' }), h('span', { text: 'Training' }), h('span', { text: 'Operations' })),
-      h('div', { class: 'me' }, h('span', { text: auth.email() }), h('button', { class: 'lnk onDark', onclick: signOut }, 'Sign out'))),
-    main));
+      h('a', { href: '#/home', 'aria-label': 'Stacked Manage home' }, logo()),
+      orgBox,
+      h('nav', { class: 'nav', 'aria-label': 'Main' }, h('span', { class: 'navlabel', text: 'Workspace' }),
+        NAV.map(([k, label]) => h('a', { href: '#/' + k, id: 'nav-' + k }, tile(k, 28), label))),
+      h('nav', { class: 'nav soonwrap', 'aria-label': 'Coming next', style: 'margin-top:8px' }, h('span', { class: 'navlabel', text: 'Coming next' }),
+        SOON_NAV.map(([k, label]) => h('span', { class: 'soonitem' }, tile(k, 28), label, h('span', { class: 'tag', text: 'Soon' })))),
+      h('div', { class: 'grow' })),
+    h('div', { class: 'content' },
+      h('header', { class: 'top' }, crumb,
+        h('div', { class: 'userbox' }, h('div', { class: 'who' }, h('b', { text: auth.email() }), h('span', { text: org.name })),
+          avatar(auth.email() || '?'), h('button', { class: 'btn line small', onclick: signOut }, 'Sign out'))),
+      main)));
 }
 
 const SOON = {
-  home: ['Home', 'A single place for what needs your attention: questions the AI could not answer, drafts to review, pending invites.'],
-  knowledge: ['Knowledge', 'Handbooks, documents and media in one list, aimed at the company, a site, a team or a role.'],
-  insights: ['Insights', 'What people ask most, what the AI could not answer, and usage by site and team.'],
+  knowledge: ['Knowledge', 'Handbooks, documents and media in one list, aimed at the company, a site, a team or a role.', 'Your handbooks, policies and training in one place.'],
+  insights: ['Insights', 'What people ask most, what the AI could not answer, and usage by site and team.', 'What your teams ask, and what the AI could not answer.'],
 };
+const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', settings: 'Billing' };
 
 function route() {
   if (!main) return;
-  const key = (location.hash.replace('#/', '') || 'people').split('?')[0].split('/')[0];
-  const view = NAV.some(([k]) => k === key) ? key : 'people';
+  const key = (location.hash.replace('#/', '') || 'home').split('?')[0].split('/')[0];
+  const view = NAV.some(([k]) => k === key) ? key : 'home';
   document.querySelectorAll('.nav a').forEach((a) => { a.classList.toggle('on', a.id === 'nav-' + view); if (a.id === 'nav-' + view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   clear(main);
   const org = state.orgs.find((o) => o.id === state.orgId);
+  const orgRole = bestRole(state.memberships, state.orgId, null);
+  clear(crumb); crumb.append(h('span', { text: org.name }), h('span', { text: '/' }), h('b', { text: TITLES[view] }));
+  window.scrollTo(0, 0);
+
+  const restricted = (title, icon, lead, text) => main.append(pageHeader({ icon, title, sub: lead }),
+    h('div', { class: 'card empty-state' }, tile('empty', 56), h('b', { text }), h('p', { text: 'If you should have access, ask your company admin to change your role.' })));
+
+  if (view === 'home') { renderHome(main, { api, memberships: state.memberships, orgId: state.orgId, orgName: org.name, isManager: isManagerAnywhere(state.memberships, state.orgId), isAdmin: atLeast(orgRole, 'hq_admin'), email: auth.email() }); return; }
   if (view === 'people') {
-    if (!isManagerAnywhere(state.memberships, state.orgId)) {
-      main.append(h('div', { class: 'head' }, h('div', { class: 't' }, h('span', { class: 'mono', text: org.name }), h('h1', { class: 'disp', text: 'People' }))),
-        h('div', { class: 'card pad rule' }, h('b', { text: 'This area is for managers' }), h('span', { class: 'muted', text: 'Staff use the Stacked Chat app to ask questions. If you should be able to manage people, ask your company admin to change your role.' })));
-      return;
-    }
+    if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('People', 'people', 'Invite people and choose what they can do.', 'This area is for managers'); return; }
     renderPeople(main, { api, memberships: state.memberships, orgId: state.orgId, orgName: org.name });
     return;
   }
   if (view === 'settings') {
-    if (!atLeast(bestRole(state.memberships, state.orgId, null), 'hq_admin')) {
-      main.append(h('div', { class: 'head' }, h('div', { class: 't' }, h('span', { class: 'mono', text: org.name }), h('h1', { class: 'disp', text: 'Settings' }))),
-        h('div', { class: 'card pad rule' }, h('b', { text: 'This area is for company admins' }), h('span', { class: 'muted', text: 'Billing and company settings are managed by owners and HQ admins.' })));
-      return;
-    }
+    if (!atLeast(orgRole, 'hq_admin')) { restricted('Billing', 'settings', 'Plan, venues and invoices.', 'This area is for company admins'); return; }
     renderBilling(main, { api, orgId: state.orgId, orgName: org.name });
     return;
   }
-  const [title, blurb] = SOON[view];
-  main.append(h('div', { class: 'head' }, h('div', { class: 't' }, h('span', { class: 'mono', text: org.name }), h('h1', { class: 'disp', text: title }))),
-    h('div', { class: 'card pad rule' }, h('b', { text: 'Coming soon' }), h('span', { class: 'muted', text: blurb }), h('a', { class: 'lnk', href: '#/people', style: 'align-self:flex-start;text-decoration:none', text: 'Go to People' })));
+  const [title, , lead] = SOON[view];
+  main.append(pageHeader({ icon: view, title, sub: lead }),
+    h('div', { class: 'card empty-state' }, tile(view, 72), h('span', { class: 'badge role-staff', text: 'Coming soon' }), h('h2', { text: `${title} is on its way` }), h('p', { text: SOON[view][1] }),
+      h('a', { class: 'btn line', href: '#/people', text: 'Go to People' })));
 }
 
 async function boot() {
