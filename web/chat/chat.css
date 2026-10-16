@@ -105,3 +105,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .nps .row{display:flex;justify-content:flex-end;align-items:center;gap:14px}
 .nps .btn.small{height:36px;padding:0 16px;font-size:14px}
 .npsthanks{margin:0;color:var(--muted)}
+
+/* ask a person */
+.helpbox{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line2)}
+.helpbox .lnk{font-size:13px;font-weight:500;color:var(--muted)}
+.helpbox b{flex:1 0 100%;font-size:14px;font-weight:600}
+.helpbox textarea{flex:1 0 100%;border:1px solid var(--line-strong);border-radius:10px;padding:8px 10px;resize:vertical;background:#fff;font-size:14px}
+.helpbox .err{flex:1 0 100%}
+.helpbox .row{flex:1 0 100%;display:flex;justify-content:flex-end;align-items:center;gap:14px}
+.helpbox .btn.small{height:36px;padding:0 16px;font-size:14px}
+.helpdone{margin:0;font-size:14px;color:var(--ink2)}

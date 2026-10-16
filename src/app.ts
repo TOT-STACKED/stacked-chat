@@ -41,6 +41,8 @@ import { chatAppRoutes } from './modules/chat/app-routes.js';
 import { createChat, type Chat } from './modules/chat/service.js';
 import { createAnthropicChatModel, type ChatModel } from './modules/chat/model.js';
 import { createSupabaseConversationStore, type ConversationStore } from './modules/chat/store.js';
+import { createHelp, createSupabaseTicketStore, type Help, type TicketStore } from './modules/chat/help.js';
+import { createSlackNotifier, type Notify } from './lib/slack.js';
 import { createPortalMirror, createSupabaseNpsStore, type NpsMirror, type NpsStore } from './modules/chat/nps.js';
 import { techStackRoutes } from './modules/vendors/routes.js';
 import { createSupabaseTechStackStore, type TechStackStore } from './modules/vendors/store.js';
@@ -65,6 +67,8 @@ export interface Deps {
   insightsStore?: InsightsStore;
   brandingStore?: BrandingStore;
   conversationStore?: ConversationStore;
+  ticketStore?: TicketStore;
+  notify?: Notify | null;
   consoleStore?: ConsoleStore;
   techStackStore?: TechStackStore;
   npsStore?: NpsStore;
@@ -141,6 +145,10 @@ export async function buildApp(
     nps: overrides.npsStore ?? (db ? createSupabaseNpsStore(db) : null),
     mirrorNps: overrides.mirrorNps !== undefined ? overrides.mirrorNps : (config.STACKCOLLECT_SUPABASE_URL && config.STACKCOLLECT_SUPABASE_KEY ? createPortalMirror({ url: config.STACKCOLLECT_SUPABASE_URL, key: config.STACKCOLLECT_SUPABASE_KEY }) : null),
   }) : null;
+  const help: Help | null = repo && conversationStore
+    ? createHelp({ repo, tickets: overrides.ticketStore ?? (db ? createSupabaseTicketStore(db) : null), mailer, conversations: conversationStore, publicUrl: config.PUBLIC_URL,
+        notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) })
+    : null;
   const techStackStore = overrides.techStackStore ?? (db ? createSupabaseTechStackStore(db) : null);
   const consoleStore = overrides.consoleStore ?? (db ? createSupabaseConsoleStore(db) : null);
   const consoleSvc: ConsoleService | null = consoleStore && billingStore
@@ -214,7 +222,7 @@ export async function buildApp(
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
   await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate }));
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
-  await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore }));
+  await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS) }));

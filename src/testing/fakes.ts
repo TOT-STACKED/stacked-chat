@@ -90,7 +90,7 @@ export function fakeVerifier(users: Record<string, { userId: string; email: stri
 
 /** Captures invitation emails instead of sending them. */
 export class FakeMailer {
-  sent: Array<{ to: string; subject: string; text: string; html: string }> = [];
+  sent: Array<{ to: string; subject: string; text: string; html: string; replyTo?: string }> = [];
   result: 'sent' | 'skipped' | 'failed' = 'sent';
-  async send(mail: { to: string; subject: string; text: string; html: string }) { this.sent.push(mail); return this.result; }
+  async send(mail: { to: string; subject: string; text: string; html: string; replyTo?: string }) { this.sent.push(mail); return this.result; }
 }

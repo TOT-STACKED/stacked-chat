@@ -139,7 +139,34 @@ function npsCard(m) {
   return h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble' }, card));
 }
 
-function botBubble(m) {
+/** "Ask my manager" (and, for technology faults, "Ask Stacked support") under the latest answer. */
+function helpBlock(m) {
+  const box = h('div', { class: 'helpbox' });
+  const sentence = (list) => (list.length <= 1 ? list[0] || '' : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`);
+  const done = (text) => { m.helpDone = text; clear(box); box.append(h('p', { class: 'helpdone', role: 'status', text })); };
+  const idle = () => {
+    clear(box);
+    box.append(h('button', { class: 'lnk', onclick: () => form('manager') }, 'Ask my manager'), m.support ? h('button', { class: 'lnk', onclick: () => form('stacked') }, 'Ask Stacked support') : null);
+  };
+  const form = (target) => {
+    clear(box);
+    const note = h('textarea', { rows: 2, maxlength: 500, placeholder: target === 'manager' ? 'Add a note for your manager (optional)' : 'Tell support what you have tried (optional)', 'aria-label': 'Note' }); const err = h('div');
+    const send = h('button', { class: 'btn small', onclick: async () => {
+      send.disabled = true; clear(err);
+      try {
+        const r = await api.post('/api/v1/chat/help', { site_id: st.site.site_id, conversation_id: st.conversationId, target, note: note.value.trim() || null });
+        done(target === 'stacked'
+          ? (r.notified.length ? 'Sent to Stacked support. They will be in touch by email.' : 'Logged for Stacked support.')
+          : r.notified.length ? `Sent to ${sentence(r.notified)}. They can reply to you by email.` : "We've logged this, but there is no manager with an email on file yet. Ask your company admin to invite one.");
+      } catch (e) { send.disabled = false; err.append(h('div', { class: 'err', role: 'alert', text: e.message })); }
+    } }, 'Send');
+    box.append(h('b', { text: target === 'manager' ? 'Send this question to your manager?' : 'Send this to Stacked support?' }), note, err, h('div', { class: 'row' }, h('button', { class: 'lnk', onclick: idle }, 'Cancel'), send));
+  };
+  if (m.helpDone) done(m.helpDone); else idle();
+  return box;
+}
+
+function botBubble(m, last) {
   const parts = [];
   if (m.unanswered) parts.push(h('span', { class: 'notin', text: 'Not in your knowledge base yet' }));
   for (const blk of parseBlocks(m.content)) {
@@ -153,6 +180,7 @@ function botBubble(m) {
   for (const i of m.images || []) if (isHttps(i.url)) media.push(h('img', { class: 'pic', src: i.url, alt: i.title }));
   if (media.length) parts.push(h('div', { class: 'media' }, media));
   if (m.support && isHttps(m.support.url)) parts.push(h('a', { class: 'support', href: m.support.url, target: '_blank', rel: 'noopener noreferrer' }, h('span', { text: 'Vendor support' }), h('b', { text: titleCase(m.support.vendor) })));
+  if (last && st.conversationId) parts.push(helpBlock(m));
   return h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble' }, parts));
 }
 
@@ -160,7 +188,8 @@ function drawThread() {
   clear(thread);
   const col = h('div', { class: 'col' });
   if (!st.messages.length && !st.sending) col.append(hello());
-  for (const m of st.messages) col.append(m.role === 'user' ? h('div', { class: 'msg user' }, h('div', { class: 'bubble', text: m.content })) : m.role === 'nps' ? npsCard(m) : botBubble(m));
+  const lastBot = st.messages.map((m) => m.role).lastIndexOf('assistant');
+  st.messages.forEach((m, i) => col.append(m.role === 'user' ? h('div', { class: 'msg user' }, h('div', { class: 'bubble', text: m.content })) : m.role === 'nps' ? npsCard(m) : botBubble(m, i === lastBot && !st.sending)));
   if (st.sending) col.append(h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble', role: 'status', 'aria-label': 'Thinking' }, h('span', { class: 'typing' }, h('i'), h('i'), h('i')))));
   if (st.error) col.append(h('div', { class: 'err', role: 'alert', text: st.error }));
   thread.append(col); thread.scrollTop = thread.scrollHeight;

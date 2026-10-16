@@ -11,10 +11,11 @@ import type { BrandingStore } from '../branding/store.js';
 import type { InsightsStore } from '../insights/store.js';
 import type { TechStackStore } from '../vendors/store.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
+import type { Help } from './help.js';
 import { MAX_MESSAGE, type Chat, type Who } from './service.js';
 
 interface Ctx {
-  chat: Chat | null; repo?: Repo; branding: BrandingStore | null; insights: InsightsStore | null; techStack?: TechStackStore | null;
+  chat: Chat | null; repo?: Repo; branding: BrandingStore | null; insights: InsightsStore | null; techStack?: TechStackStore | null; help?: Help | null;
   perMinute?: number; now?: () => number;
 }
 
@@ -121,6 +122,20 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     const who = await whoAsks(p, req.body.site_id);
     await chat().rate(who, { vendor: req.body.vendor, score: req.body.score, comment: req.body.comment ?? null });
     return { ok: true as const };
+  });
+
+  r.post('/api/v1/chat/help', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['chat'], summary: 'Ask a person: send the latest question to your manager (email) or to Stacked support (Slack)', security: SECURITY,
+      body: z.object({ site_id: Id, conversation_id: z.number().int().positive(), target: z.enum(['manager', 'stacked']).default('manager'), note: z.string().max(600).nullable().optional() }),
+      response: { 200: z.object({ target: z.enum(['manager', 'stacked']), logged: z.boolean(), notified: z.array(z.string()) }), 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody, 503: ErrorBody },
+    },
+  }, async (req) => {
+    const p = userOnly(req);
+    if (!ctx.help) throw new ApiHttpError(503, 'help_unavailable', 'Asking a person is not switched on yet');
+    const who = await whoAsks(p, req.body.site_id);
+    return ctx.help.ask(who, { target: req.body.target, conversation_id: req.body.conversation_id, note: req.body.note ?? null });
   });
 
   r.get('/api/v1/chat/conversations', {

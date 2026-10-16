@@ -122,3 +122,8 @@ Ratings: when the person explicitly asks to rate a vendor the model adds `[NPS:v
 ## server.js is now a front door (2026-10-16)
 
 The old admin dashboard (`/admin`, its password login and its routes) is retired; the Console replaces it. `server.js` is about 80 lines: it starts the server, hands `/chat/`, `/manage/`, `/console/`, `/api/v1/*`, `/billing/webhook` and `/healthz` to the compiled app in `dist/`, answers `/health` for the host (even if the app failed to load), and redirects `/` and `/app` to `/chat/` and `/admin` to `/console/`. No page or route is defined in it any more. `STACKED_ADMIN_PASSWORD` is no longer used and can be deleted from the hosts. Everything that was removed is recoverable from the git tags `legacy-chat-widget` (the whole old server, admin included).
+
+
+## Asking a person (hand-off)
+
+Under the latest answer the chat offers **Ask my manager** (and, when the question was a technology fault, **Ask Stacked support**). `POST /api/v1/chat/help` takes the latest question and the assistant's answer from the person's own conversation, records a row in `tickets`, and then either emails the venue's managers and company admins (`chat/help.ts`: site managers first, never the asker, each once; the email replies straight to the person and links to Knowledge so the answer can be added for everyone) or posts a short alert to Stacked's Slack (`SLACK_WEBHOOK_URL`). A question to a manager stays inside the company: nothing about it goes to Stacked's Slack. Limited to 5 requests an hour per person. Text typed by the person is cleaned and HTML-escaped in the email.

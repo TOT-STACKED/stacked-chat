@@ -1,7 +1,7 @@
 import type { Role } from './permissions.js';
 
 export type SendResult = 'sent' | 'skipped' | 'failed';
-export interface Mail { to: string; subject: string; text: string; html: string }
+export interface Mail { to: string; subject: string; text: string; html: string; /** replies go here (for example the person who asked for help) */ replyTo?: string }
 export interface Mailer { send(mail: Mail): Promise<SendResult> }
 
 /** Resend transport (same provider the weekly digest already uses). Never throws. */
@@ -13,7 +13,7 @@ export function createResendMailer(opts: { apiKey: string; from: string; fetchIm
         const res = await f('https://api.resend.com/emails', {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + opts.apiKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: opts.from, to: [mail.to], subject: mail.subject, text: mail.text, html: mail.html }),
+          body: JSON.stringify({ from: opts.from, to: [mail.to], subject: mail.subject, text: mail.text, html: mail.html, ...(mail.replyTo ? { reply_to: mail.replyTo } : {}) }),
         });
         return res.ok ? 'sent' : 'failed';
       } catch {
@@ -23,7 +23,7 @@ export function createResendMailer(opts: { apiKey: string; from: string; fetchIm
   };
 }
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const ROLE_WORDS: Record<Role, string> = {
   owner: 'an owner', hq_admin: 'an HQ admin', site_manager: 'a site manager', staff: 'a team member', kiosk: 'a shared device',
