@@ -27,6 +27,9 @@ const schema = z.object({
   FAIR_USE_AI_QUESTIONS: z.coerce.number().int().positive().default(2000),
   FAIR_USE_STAFF_PER_VENUE: z.coerce.number().int().positive().default(75),
   CRON_SECRET: z.string().optional(),
+  /** Insights: lets Stacked Chat write DRAFT answers for questions it could not answer. Optional: without it, drafts are blank templates. */
+  ANTHROPIC_API_KEY: z.string().optional(),
+  INSIGHTS_MODEL: z.string().default('claude-sonnet-4-6'),
   SLACK_WEBHOOK_URL: z.string().optional(),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   NODE_ENV: z.string().default('development'),

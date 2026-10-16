@@ -9,6 +9,7 @@ import { loadConfig } from './config.js';
 import { FakeMailer, FakeRepo } from './testing/fakes.js';
 import { FakeBillingStore, FakeStripe, testBillingConfig } from './testing/billing-fakes.js';
 import { FakeKnowledgeStore } from './testing/knowledge-fakes.js';
+import { FakeInsightsStore } from './testing/insights-fakes.js';
 
 async function main() {
   const repo = new FakeRepo();
@@ -61,7 +62,22 @@ async function main() {
   const kb = (await import('./modules/knowledge/service.js')).createKnowledge({ store: kstore });
   await kb.createDocument(org.id, { title: 'Opening checklist', body: 'Unlock, lights, fridge temperatures, till float, specials board.', site_id: a.id, status: 'published', by: 'alex@example.com' });
   await kb.createDocument(org.id, { title: 'New staff meal policy (draft)', body: 'Staff meals are £3.50 per shift. Still to confirm with finance.', site_id: null, status: 'draft', by: 'hq@example.com' });
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, devMode: true, verifyToken: async (t) => users[t] ?? null });
+  const istore = new FakeInsightsStore();
+  for (const x of repo.sites) istore.siteList.push({ id: x.id, org_id: org.id, name: x.name });
+  istore.members.push({ org_id: org.id, email: 'alex@example.com', teams: ['Kitchen'] }, { org_id: org.id, email: 'jordan@example.com', teams: ['Front of house'] }, { org_id: org.id, email: 'sam@example.com', teams: ['Bar'] });
+  const IDK = "I don't have that in my knowledge base yet.";
+  const ask = (site: { id: string }, email: string, q: string, answered = true, daysAgo = 1) =>
+    istore.addConversation(site.id, email, [[q, answered ? 'Here is how that works.' : IDK]], new Date(Date.now() - daysAgo * 86_400_000));
+  for (let i = 0; i < 8; i++) ask(a, 'alex@example.com', 'How do I report an allergen incident?', true, i % 6);
+  for (let i = 0; i < 6; i++) ask(b, 'jordan@example.com', 'Can I swap a shift?', true, i % 5);
+  for (let i = 0; i < 5; i++) ask(a, 'jordan@example.com', 'can i swap shifts', true, i % 5);
+  for (let i = 0; i < 4; i++) ask(a, 'sam@example.com', 'Where is the fire assembly point?', true, i);
+  for (let i = 0; i < 6; i++) ask(i % 2 ? a : b, 'sam@example.com', 'Do we get paid for training days?', false, i);
+  for (let i = 0; i < 5; i++) ask(a, 'alex@example.com', 'Is there a staff meal policy?', false, i);
+  for (let i = 0; i < 4; i++) ask(c, 'alex@example.com', 'How do I log a broken fridge?', false, i);
+  for (let i = 0; i < 3; i++) ask(a, 'someone@example.com', 'What time does the bar close on Sundays?', true, i);
+  const drafter = { draft: async (q: string) => `Staff are paid for training days at [CONFIRM: rate]. Training is rostered like a normal shift. (Draft for: ${q})` };
+  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);
   await app.listen({ port, host: '127.0.0.1' });
   console.log(`Manage preview: http://127.0.0.1:${port}/manage/  (sample data, dev sign-in)`);

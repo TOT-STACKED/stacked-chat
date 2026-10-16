@@ -133,3 +133,15 @@ describe('manage lib: knowledge list', () => {
     expect(knowledgeCounts(items)).toEqual({ all: 3, document: 2, video: 1, image: 0, draft: 1 });
   });
 });
+
+import { answerRateText, asksText, barPercent, wherePhrase } from '../web/manage/lib.js';
+describe('manage lib: insights wording', () => {
+  it('words the numbers plainly', () => {
+    expect(answerRateText(0.634)).toBe('63%'); expect(answerRateText(null)).toBe('No questions yet');
+    expect(asksText(1)).toBe('1 ask'); expect(asksText(5)).toBe('5 asks');
+    expect(wherePhrase({ sites: 0 })).toBe(''); expect(wherePhrase({ sites: 1, site_names: ['North'] })).toBe('North'); expect(wherePhrase({ sites: 3 })).toBe('3 sites');
+  });
+  it('sizes bars against the biggest value, never invisible', () => {
+    expect(barPercent(10, 10)).toBe(100); expect(barPercent(5, 10)).toBe(50); expect(barPercent(0.1, 100)).toBe(4); expect(barPercent(3, 0)).toBe(0);
+  });
+});

@@ -221,3 +221,16 @@ table.narrow{min-width:480px}
 .field label.radio:has(input:checked){border-color:var(--ink);background:var(--bg)}
 .field label.radio input{margin-top:3px}
 .dlg textarea{font-family:inherit}
+
+/* insights */
+.cols>.stack.qcol,.qcol{flex:1 1 380px;min-width:0}
+.qrow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line2)}
+.qrow:last-child{border-bottom:0}
+.qleft{display:flex;gap:14px;flex:1 1 220px;min-width:0}
+.rank{color:var(--faint);font-weight:600;min-width:18px}
+.qtext{display:flex;flex-direction:column;gap:2px;min-width:0}
+.qtext b{font-weight:600}
+.barrow{display:flex;align-items:center;gap:16px}
+.barrow .bl{width:140px;font-weight:600;flex:none}
+.barrow .bar{flex:1}
+.barrow .br{width:80px;text-align:right;font-size:13px;flex:none}

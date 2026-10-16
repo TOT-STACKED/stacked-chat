@@ -63,7 +63,7 @@ export async function renderKnowledge(main, ctx) {
         const editable = canEditItem(i);
         return h('tr', null,
           h('td', null, h('div', { class: 'person' }, tile(KIND_ICON[i.kind], 36), h('div', { class: 'pm' }, h('span', { class: 'name', text: i.title }),
-            h('span', { class: 'email', text: KIND_LABEL[i.kind] + (i.chars ? ` · ${i.chars.toLocaleString('en-GB')} characters` : '') + (i.source === 'imported' ? ' · added earlier' : '') })))),
+            h('span', { class: 'email', text: KIND_LABEL[i.kind] + (i.chars ? ` · ${i.chars.toLocaleString('en-GB')} characters` : '') + (i.source === 'imported' ? ' · added earlier' : '') + (i.source === 'ai_draft' ? ' · AI draft, check before publishing' : '') })))),
           h('td', null, h('span', { class: `badge ${i.site_id === null ? 'role-staff' : 'role-site_manager'}`, text: audienceLabel(i, st.sites) })),
           h('td', null, h('span', { class: 'status' }, h('span', { class: `dot ${i.status === 'published' ? 'active' : 'invited'}` }), i.status === 'published' ? 'Published' : 'Draft')),
           h('td', { class: 'muted', text: shortDate(i.updated_at) }),

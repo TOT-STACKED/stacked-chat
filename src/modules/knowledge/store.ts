@@ -7,7 +7,7 @@ export interface ItemRow {
   id: string; org_id: string; kind: Kind; title: string; status: Status; site_id: string | null;
   body: string | null; url: string | null; description: string | null;
   doc_filename: string | null; video_id: number | null; image_id: string | null;
-  source: 'manager' | 'ai_draft' | 'imported'; created_by: string | null;
+  source: 'manager' | 'ai_draft' | 'imported'; source_question: string | null; created_by: string | null;
   created_at: string; updated_at: string; published_at: string | null;
 }
 export type NewItem = Omit<ItemRow, 'id' | 'created_at' | 'updated_at'>;
@@ -47,7 +47,7 @@ export interface KnowledgeStore {
 }
 
 const enc = encodeURIComponent;
-const COLS = 'id,org_id,kind,title,status,site_id,body,url,description,doc_filename,video_id,image_id,source,created_by,created_at,updated_at,published_at';
+const COLS = 'id,org_id,kind,title,status,site_id,body,url,description,doc_filename,video_id,image_id,source,source_question,created_by,created_at,updated_at,published_at';
 
 export function createSupabaseKnowledgeStore(db: Db): KnowledgeStore {
   const ok = <T>(r: { status: number; data: T }, what: string): T => {

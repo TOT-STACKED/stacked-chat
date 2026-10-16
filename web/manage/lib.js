@@ -154,3 +154,14 @@ export function knowledgeCounts(items) {
   return c;
 }
 export const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+
+// ---- insights (display helpers) ----------------------------------------------------------------------------
+export const answerRateText = (rate) => (rate === null || rate === undefined ? 'No questions yet' : `${Math.round(rate * 100)}%`);
+export const asksText = (n) => `${n} ${n === 1 ? 'ask' : 'asks'}`;
+export function wherePhrase(item) {
+  if (!item.sites) return '';
+  if (item.sites === 1) return item.site_names && item.site_names[0] ? item.site_names[0] : '1 site';
+  return `${item.sites} sites`;
+}
+/** Bar width (0..100) relative to the biggest value in the list. */
+export const barPercent = (value, max) => (max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0);

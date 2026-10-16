@@ -43,13 +43,13 @@ export function createKnowledge(deps: KnowledgeDeps) {
 
     for (const d of docs.filter((x) => !docKnown.has(x.filename))) {
       const { text } = await store.docText(ws, d.filename);
-      fresh.push({ ...base, kind: 'document', title: d.filename, body: text, url: null, description: null, doc_filename: d.filename, video_id: null, image_id: null });
+      fresh.push({ ...base, source_question: null, kind: 'document', title: d.filename, body: text, url: null, description: null, doc_filename: d.filename, video_id: null, image_id: null });
     }
     for (const v of vids.filter((x) => !vidKnown.has(x.id))) {
-      fresh.push({ ...base, kind: 'video', title: v.title || 'Untitled video', body: null, url: v.url, description: v.description || null, doc_filename: null, video_id: v.id, image_id: null });
+      fresh.push({ ...base, source_question: null, kind: 'video', title: v.title || 'Untitled video', body: null, url: v.url, description: v.description || null, doc_filename: null, video_id: v.id, image_id: null });
     }
     for (const i of imgs.filter((x) => !imgKnown.has(x.id))) {
-      fresh.push({ ...base, kind: 'image', title: i.title || 'Untitled image', body: null, url: i.url, description: i.description || null, doc_filename: null, video_id: null, image_id: i.id });
+      fresh.push({ ...base, source_question: null, kind: 'image', title: i.title || 'Untitled image', body: null, url: i.url, description: i.description || null, doc_filename: null, video_id: null, image_id: i.id });
     }
     await store.insertItems(fresh.map((f) => ({ ...f })));
 
@@ -104,17 +104,17 @@ export function createKnowledge(deps: KnowledgeDeps) {
   }
 
   // ---- create -------------------------------------------------------------------------------------------
-  async function createDocument(orgId: string, o: { title: string; body: string; site_id: string | null; status: Status; by: string; source?: ItemRow['source'] }): Promise<ItemRow> {
+  async function createDocument(orgId: string, o: { title: string; body: string; site_id: string | null; status: Status; by: string; source?: ItemRow['source']; source_question?: string | null }): Promise<ItemRow> {
     if (o.body.length > MAX_BODY) throw badRequest(`That document is too long (the limit is ${MAX_BODY.toLocaleString('en-GB')} characters)`);
     await assertSite(orgId, o.site_id); await assertFreeTitle(orgId, o.title);
-    let item = await store.insertItem({ org_id: orgId, kind: 'document', title: o.title, status: 'draft', site_id: o.site_id, body: o.body, url: null, description: null, ...noChatRefs, source: o.source ?? 'manager', created_by: o.by, published_at: null });
+    let item = await store.insertItem({ org_id: orgId, kind: 'document', title: o.title, status: 'draft', site_id: o.site_id, body: o.body, url: null, description: null, ...noChatRefs, source: o.source ?? 'manager', source_question: o.source_question ?? null, created_by: o.by, published_at: null });
     if (o.status === 'published') item = await setStatus(orgId, item, 'published');
     return item;
   }
   async function createVideo(orgId: string, o: { title: string; url: string; site_id: string | null; status: Status; by: string }): Promise<ItemRow> {
     if (!isHttpUrl(o.url)) throw badRequest('Enter a web link that starts with https://');
     await assertSite(orgId, o.site_id);
-    let item = await store.insertItem({ org_id: orgId, kind: 'video', title: o.title, status: 'draft', site_id: o.site_id, body: null, url: o.url, description: null, ...noChatRefs, source: 'manager', created_by: o.by, published_at: null });
+    let item = await store.insertItem({ org_id: orgId, kind: 'video', title: o.title, status: 'draft', site_id: o.site_id, body: null, url: o.url, description: null, ...noChatRefs, source: 'manager', source_question: null, created_by: o.by, published_at: null });
     if (o.status === 'published') item = await setStatus(orgId, item, 'published');
     return item;
   }

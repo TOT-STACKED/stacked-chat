@@ -7,6 +7,7 @@ export const testConfig: Config = {
   RESEND_API_KEY: undefined,
   RESEND_FROM: undefined,
   PUBLIC_URL: 'https://stackedchat.io',
+  INSIGHTS_MODEL: 'claude-sonnet-4-6',
   FAIR_USE_AI_QUESTIONS: 2000,
   FAIR_USE_STAFF_PER_VENUE: 75,
   LOG_LEVEL: 'silent',

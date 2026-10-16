@@ -5,6 +5,7 @@ import { renderPeople } from './people.js';
 import { renderBilling } from './billing.js';
 import { renderHome } from './home.js';
 import { renderKnowledge } from './knowledge.js';
+import { renderInsights } from './insights.js';
 import { ICONS, avatar, logo, pageHeader, tile } from './ui.js';
 import { ROLE_LABEL, atLeast, bestRole, isManagerAnywhere } from './lib.js';
 
@@ -163,6 +164,11 @@ function route() {
   if (view === 'knowledge') {
     if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Knowledge', 'knowledge', 'Handbooks, documents and media.', 'This area is for managers'); return; }
     renderKnowledge(main, { api, memberships: state.memberships, orgId: state.orgId });
+    return;
+  }
+  if (view === 'insights') {
+    if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Insights', 'insights', 'What your teams ask.', 'This area is for managers'); return; }
+    renderInsights(main, { api, memberships: state.memberships, orgId: state.orgId });
     return;
   }
   const [title, , lead] = SOON[view];
