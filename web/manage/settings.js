@@ -3,19 +3,20 @@ import { KEY_SCOPES, isHexColour, keyStatus, lastUsedText, scopeLabel, shortDate
 import { pageHeader, tile } from './ui.js';
 import { renderBilling } from './billing.js';
 
-const SECTIONS = [['company', 'Company'], ['branding', 'Chat and branding'], ['tech-stack', 'Tech stack'], ['api-keys', 'API keys'], ['billing', 'Billing']];
+const SECTIONS = [['company', 'Company'], ['branding', 'Chat and branding'], ['sensitive', 'Sensitive topics'], ['tech-stack', 'Tech stack'], ['api-keys', 'API keys'], ['billing', 'Billing']];
 
 /** Settings: company details, how the chat looks, API keys and billing. Owners and HQ admins only. */
 export function renderSettings(main, ctx) {
   const section = SECTIONS.some(([k]) => k === ctx.section) ? ctx.section : 'company';
   clear(main);
-  main.append(pageHeader({ icon: 'settings', title: 'Settings', sub: 'Company details, how your chat looks, API keys and billing.' }));
+  main.append(pageHeader({ icon: 'settings', title: 'Settings', sub: 'Company details, how your chat looks, sensitive topics, API keys and billing.' }));
   const host = h('div', { class: 'stack' });
   main.append(h('div', { class: 'cols' },
     h('nav', { class: 'subnav', 'aria-label': 'Settings' }, SECTIONS.map(([k, label]) => h('a', { href: `#/settings/${k}`, class: k === section ? 'on' : '', 'aria-current': k === section ? 'page' : null, text: label })),
       h('span', { class: 'soonlink', text: 'Webhooks are coming soon' })), host));
   if (section === 'company') company(host, ctx);
   else if (section === 'branding') branding(host, ctx);
+  else if (section === 'sensitive') sensitive(host, ctx);
   else if (section === 'tech-stack') techStack(host, ctx);
   else if (section === 'api-keys') apiKeys(host, ctx);
   else renderBilling(host, { ...ctx, embedded: true });
@@ -24,6 +25,42 @@ export function renderSettings(main, ctx) {
 const head = (title, sub) => h('div', { class: 'sechead' }, h('h2', { text: title }), sub ? h('span', { class: 'muted', text: sub }) : null);
 const field = (label, id, control, hint) => h('div', { class: 'field' }, h('label', { for: id, text: label }), control, hint ? h('span', { class: 'hint', text: hint }) : null);
 const input = (id, value, extra) => h('input', { type: 'text', id, value: value || '', ...(extra || {}) });
+
+// ---- sensitive topics ---------------------------------------------------------------------------------------
+/** Topics the chat should not handle alone. Each is a switch; everything starts ON. */
+async function sensitive(host, ctx) {
+  const { api, orgId } = ctx; const base = `/api/v1/orgs/${orgId}/sensitive-topics`;
+  const title = 'Sensitive topics'; const sub = 'Some questions are better handled by a person. Choose what Stacked Chat should not handle on its own.';
+  host.append(head(title, sub), h('p', { class: 'muted', text: 'Loading…' }));
+  let topics;
+  try { topics = (await api.get(base)).data; }
+  catch (e) { clear(host); host.append(head(title), h('div', { class: 'banner', role: 'alert', text: e.message })); return; }
+
+  const MODE = { confirm: 'Answers, then asks them to confirm with a manager', manager: 'Does not answer. Sends them to a manager' };
+  function draw() {
+    clear(host); host.append(head(title, sub));
+    host.append(h('div', { class: 'stack' }, topics.map(card)),
+      h('div', { class: 'card pad rule' }, h('h3', { text: 'What staff see' }),
+        h('span', { class: 'muted', text: 'When a question touches a topic that is switched on, staff get a clear message and a highlighted "Ask my manager" button. That sends the question to your managers by email, and they reply straight to the person. Questions the assistant does not answer do not count towards your AI question allowance.' }),
+        h('span', { class: 'muted', text: 'Everything starts switched on. Switching a topic off means staff questions on it are handled like any other question.' })));
+  }
+  function card(t) {
+    const id = `sens-${t.id}`;
+    const box = h('input', { type: 'checkbox', role: 'switch', id, class: 'switch', checked: t.enabled, 'aria-describedby': `${id}-d`, onchange: async () => {
+      const want = box.checked; box.disabled = true;
+      try { topics = (await api.put(`${base}/${t.id}`, { enabled: want })).data; toast(`${t.label}: ${want ? 'on' : 'off'}`); }
+      catch (e) { toast(e.message); }
+      draw();
+    } });
+    return h('div', { class: 'card pad topic' },
+      h('div', { class: 'topichead' },
+        h('div', { class: 'topictext' }, h('label', { for: id, class: 'topictitle', text: t.label }),
+          h('span', { class: `badge ${t.mode === 'manager' ? 'role-hq_admin' : 'role-site_manager'}`, text: MODE[t.mode] })),
+        h('span', { class: `switchwrap ${t.enabled ? 'on' : ''}` }, h('span', { class: 'switchlabel', text: t.enabled ? 'On' : 'Off' }), box)),
+      h('span', { id: `${id}-d`, class: 'muted', text: t.summary }));
+  }
+  draw();
+}
 
 // ---- company ------------------------------------------------------------------------------------------------
 async function company(host, ctx) {

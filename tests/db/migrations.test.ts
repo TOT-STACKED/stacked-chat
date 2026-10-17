@@ -359,3 +359,25 @@ describe('009 knowledge catalogue', () => {
     await expect(db.exec(`insert into knowledge_items (org_id, kind, title, doc_filename) values ('${org}', 'document', 'Again', 'Handbook')`)).rejects.toThrow();
   });
 });
+
+describe('012 sensitive topics', () => {
+  it('is invisible to the public keys and safe to re-run', async () => {
+    const db = await newDb();
+    await db.exec(migrationSql('012_sensitive_topics.sql'));
+    await db.exec(migrationSql('012_sensitive_topics.sql'));
+    for (const role of ['anon', 'authenticated'] as const) {
+      await expect(asRole(db, role, null, () => db.query('select * from sensitive_topic_settings')), role).rejects.toThrow();
+    }
+  });
+  it('only knows the four topics, keeps one row per organisation and topic, and goes when the organisation goes', async () => {
+    const db = await newDb();
+    await db.exec(`insert into venues (name, slug) values ('V', 'v')`);
+    const org = (await q(db, "select org_id from venues where slug = 'v'"))[0]?.org_id;
+    await expect(db.exec(`insert into sensitive_topic_settings (org_id, topic, enabled) values ('${org}', 'payroll', false)`)).rejects.toThrow();
+    await db.exec(`insert into sensitive_topic_settings (org_id, topic, enabled) values ('${org}', 'hr', false)`);
+    await expect(db.exec(`insert into sensitive_topic_settings (org_id, topic, enabled) values ('${org}', 'hr', true)`)).rejects.toThrow();
+    await db.exec(`delete from venues where org_id = '${org}'`);
+    await db.exec(`delete from organisations where id = '${org}'`);
+    expect(await q(db, 'select * from sensitive_topic_settings')).toEqual([]);
+  });
+});

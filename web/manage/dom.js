@@ -1,5 +1,12 @@
 // Tiny DOM helpers. Everything user-supplied goes in as TEXT (never innerHTML), so names and
 // emails can never inject markup.
+// Element.append / prepend turn an empty value into the WORDS "null" / "false" / "undefined" on the page. Screens build
+// optional pieces like `note ? h(...) : null`, so make every append and prepend (all three apps load this file) skip empties.
+for (const method of ['append', 'prepend']) {
+  const native = Element.prototype[method];
+  Element.prototype[method] = function (...nodes) { return native.apply(this, nodes.filter((n) => n != null && n !== false)); };
+}
+
 export function h(tag, props, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props || {})) {

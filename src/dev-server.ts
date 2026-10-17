@@ -11,6 +11,7 @@ import { FakeBillingStore, FakeStripe, testBillingConfig } from './testing/billi
 import { FakeKnowledgeStore } from './testing/knowledge-fakes.js';
 import { FakeInsightsStore } from './testing/insights-fakes.js';
 import { FakeBrandingStore } from './testing/branding-fakes.js';
+import { FakeSensitiveStore } from './testing/sensitive-fakes.js';
 import { FakeConsoleStore } from './testing/console-fakes.js';
 import { FakeConversationStore, previewChatModel } from './testing/chat-fakes.js';
 
@@ -108,7 +109,7 @@ async function main() {
   await store.saveAccount(OB, { stripe_customer_id: 'cus_b', stripe_subscription_id: 'sub_b', status: 'active', interval: 'month', has_payment_method: true });
   await store.saveAccount(OH, { stripe_customer_id: 'cus_h', stripe_subscription_id: 'sub_h', status: 'trialing', interval: 'year', has_payment_method: false, trial_ends_at: new Date(Date.now() + 3 * day).toISOString() });
   const drafter = { draft: async (q: string) => `Staff are paid for training days at [CONFIRM: rate]. Training is rostered like a normal shift. (Draft for: ${q})` };
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), conversationStore: new FakeConversationStore(), consoleStore: cstore, chatModel: previewChatModel, mirrorNps: null,
+  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), sensitiveStore: new FakeSensitiveStore(), conversationStore: new FakeConversationStore(), consoleStore: cstore, chatModel: previewChatModel, mirrorNps: null,
     npsStore: { save: async (r) => { console.log('[preview] rating saved', JSON.stringify(r)); } },
     techStackStore: (() => { const stacks = new Map<string, Record<string, string>>([[a.id, { epos: 'Lightspeed', payments: 'Dojo' }]]); return { get: async (id: string) => stacks.get(id) ?? {}, list: async () => repo.sites.map((x) => ({ id: x.id, name: x.name, stack: stacks.get(x.id) ?? {} })), set: async (id: string, st: Record<string, string>) => { stacks.set(id, st); return st; } }; })(), drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);

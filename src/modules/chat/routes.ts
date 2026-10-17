@@ -96,7 +96,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
       tags: ['chat'], summary: 'Ask a question. Answers come only from knowledge you are allowed to see.', security: SECURITY,
       body: z.object({ site_id: Id, message: z.string().min(1).max(MAX_MESSAGE + 500), conversation_id: z.number().int().positive().optional() }),
       response: {
-        200: z.object({ reply: z.string(), conversation_id: z.number(), unanswered: z.boolean(), sources: z.array(z.object({ id: Id, title: z.string() })), videos: z.array(Media.extend({ type: z.string() })), images: z.array(Media), support: z.object({ vendor: z.string(), url: z.string() }).nullable(), nps: z.object({ vendor: z.string(), forced: z.boolean() }).nullable() }),
+        200: z.object({ reply: z.string(), conversation_id: z.number(), unanswered: z.boolean(), sources: z.array(z.object({ id: Id, title: z.string() })), videos: z.array(Media.extend({ type: z.string() })), images: z.array(Media), support: z.object({ vendor: z.string(), url: z.string() }).nullable(), nps: z.object({ vendor: z.string(), forced: z.boolean() }).nullable(), sensitive: z.object({ topic: z.string(), label: z.string(), mode: z.enum(['confirm', 'manager']) }).nullable() }),
         400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody, 503: ErrorBody,
       },
     },

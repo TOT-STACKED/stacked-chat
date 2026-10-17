@@ -8,6 +8,7 @@ import { buildSystemPrompt } from './prompt.js';
 import type { ChatModel, ChatTurn } from './model.js';
 import { pickMedia, retrievePassages, visibleTo } from './retrieve.js';
 import type { ConversationStore, StoredMessage } from './store.js';
+import { detectSensitive, TOPIC_IDS, withConfirmLine, type TopicId, type TopicMode } from '../sensitive/topics.js';
 
 export interface ChatDeps {
   /** all knowledge items for an organisation (the service filters what this person may see) */
@@ -21,6 +22,8 @@ export interface ChatDeps {
   /** where vendor ratings are saved, and the best-effort copy to the partner portal */
   nps?: NpsStore | null;
   mirrorNps?: NpsMirror | null;
+  /** the sensitive topics switched ON for an organisation. If it fails, every topic counts as on (the safe way round). */
+  sensitive?: (orgId: string) => Promise<ReadonlySet<TopicId>>;
 }
 
 export interface Who {
@@ -37,6 +40,8 @@ export interface Answer {
   support: { vendor: string; url: string } | null;
   /** a vendor the person may want to rate; forced = they asked to */
   nps: { vendor: string; forced: boolean } | null;
+  /** set when the question touched a sensitive topic: "manager" = not answered, a person must; "confirm" = answered, confirm with a manager */
+  sensitive: { topic: TopicId; label: string; mode: TopicMode } | null;
 }
 
 export const MAX_MESSAGE = 2000;
@@ -71,10 +76,24 @@ export function createChat(deps: ChatDeps) {
     const message = input.message.trim();
     if (!message) throw badRequest('Type a question first');
     if (message.length > MAX_MESSAGE) throw badRequest(`That message is too long (the limit is ${MAX_MESSAGE} characters)`);
-    if (!deps.model) throw new ApiHttpError(503, 'assistant_unavailable', 'The assistant is not switched on yet');
 
     const stored = await loadHistory(who, input.conversation_id);
     const history = stored.slice(-HISTORY_TURNS);
+
+    // Sensitive topics (HR, incidents, legal, allergens). Looked at before anything else, and only what the person typed.
+    const on = await deps.sensitive?.(who.orgId).catch(() => null) ?? new Set<TopicId>(TOPIC_IDS);
+    const topic = detectSensitive(message, on);
+    if (topic?.mode === 'manager') {
+      // Not answered by the AI at all: no model call, and it does not count as an AI question. A person picks it up.
+      const reply = topic.routedReply!;
+      const saved: StoredMessage[] = [...stored, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: reply }].slice(-MAX_STORED);
+      let id = input.conversation_id;
+      if (id === undefined) id = await deps.conversations.create({ email: who.email, name: who.name, venue: who.siteName, venue_id: who.siteId, messages: saved });
+      else await deps.conversations.save(id, saved);
+      return { reply, conversation_id: id, unanswered: false, sources: [], videos: [], images: [], support: null, nps: null, sensitive: { topic: topic.id, label: topic.label, mode: topic.mode } };
+    }
+
+    if (!deps.model) throw new ApiHttpError(503, 'assistant_unavailable', 'The assistant is not switched on yet');
     const visible = (await deps.items(who.orgId)).filter((i) => visibleTo(i, who));
 
     // a short follow-up ("and on Sundays?") makes sense only with the previous question, so search with both
@@ -95,7 +114,9 @@ export function createChat(deps: ChatDeps) {
     const raw = await deps.model.complete({ system, messages: turns });
     if (!raw) throw new ApiHttpError(503, 'assistant_unavailable', 'The assistant could not answer just now. Please try again in a moment.');
     const tagged = takeNpsTag(raw);
-    const reply = cleanReply(tagged.reply) || (tagged.vendor ? `Great, rating ${tagged.vendor} now.` : 'Sorry, I could not put an answer together. Please try again.');
+    const cleaned = cleanReply(tagged.reply) || (tagged.vendor ? `Great, rating ${tagged.vendor} now.` : 'Sorry, I could not put an answer together. Please try again.');
+    // allergens: the answer stands, followed by the reminder to confirm with a person
+    const reply = topic?.mode === 'confirm' ? withConfirmLine(cleaned) : cleaned;
     const unanswered = isUnanswered(reply);
 
     const toSave: StoredMessage[] = [...stored, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: reply }].slice(-MAX_STORED);
@@ -116,7 +137,10 @@ export function createChat(deps: ChatDeps) {
     const asked = tagged.vendor ?? vendorAnswerToRatingQuestion(message, turnsBefore);
     const mentioned = asked ? null : vendorFromPerson(message, turnsBefore);
     const nps = asked ? { vendor: asked, forced: true } : mentioned ? { vendor: mentioned, forced: false } : null;
-    return { reply, conversation_id, unanswered, sources: used, videos: vids, images: pick(withMedia.images, withMedia.videos.length), support: supportLink(message, who.techStack ?? null), nps };
+    return {
+      reply, conversation_id, unanswered, sources: used, videos: vids, images: pick(withMedia.images, withMedia.videos.length), support: supportLink(message, who.techStack ?? null), nps,
+      sensitive: topic ? { topic: topic.id, label: topic.label, mode: topic.mode } : null,
+    };
   }
 
   async function list(email: string, siteId: string) {

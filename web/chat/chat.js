@@ -146,7 +146,10 @@ function helpBlock(m) {
   const done = (text) => { m.helpDone = text; clear(box); box.append(h('p', { class: 'helpdone', role: 'status', text })); };
   const idle = () => {
     clear(box);
-    box.append(h('button', { class: 'lnk', onclick: () => form('manager') }, 'Ask my manager'), m.support ? h('button', { class: 'lnk', onclick: () => form('stacked') }, 'Ask Stacked support') : null);
+    // a sensitive topic makes "Ask my manager" the main thing to do next, not a quiet link
+    // (Element.append would print the word "null" for an empty slot, so only real buttons go in)
+    const buttons = [m.sensitive ? h('button', { class: 'btn small', onclick: () => form('manager') }, 'Ask my manager') : h('button', { class: 'lnk', onclick: () => form('manager') }, 'Ask my manager'), m.support ? h('button', { class: 'lnk', onclick: () => form('stacked') }, 'Ask Stacked support') : null].filter(Boolean);
+    box.append(...buttons);
   };
   const form = (target) => {
     clear(box);
@@ -160,7 +163,7 @@ function helpBlock(m) {
           : r.notified.length ? `Sent to ${sentence(r.notified)}. They can reply to you by email.` : "We've logged this, but there is no manager with an email on file yet. Ask your company admin to invite one.");
       } catch (e) { send.disabled = false; err.append(h('div', { class: 'err', role: 'alert', text: e.message })); }
     } }, 'Send');
-    box.append(h('b', { text: target === 'manager' ? 'Send this question to your manager?' : 'Send this to Stacked support?' }), note, err, h('div', { class: 'row' }, h('button', { class: 'lnk', onclick: idle }, 'Cancel'), send));
+    box.append(h('b', { text: target === 'manager' ? (m.sensitive && m.sensitive.mode === 'manager' ? 'Send this to your manager? They will reply to you by email.' : 'Send this question to your manager?') : 'Send this to Stacked support?' }), note, err, h('div', { class: 'row' }, h('button', { class: 'lnk', onclick: idle }, 'Cancel'), send));
   };
   if (m.helpDone) done(m.helpDone); else idle();
   return box;
@@ -168,6 +171,8 @@ function helpBlock(m) {
 
 function botBubble(m, last) {
   const parts = [];
+  if (m.sensitive && m.sensitive.mode === 'manager') parts.push(h('span', { class: 'sens', text: 'This one needs a person' }));
+  else if (m.sensitive) parts.push(h('span', { class: 'sens soft', text: 'Check before you serve' }));
   if (m.unanswered) parts.push(h('span', { class: 'notin', text: 'Not in your knowledge base yet' }));
   for (const blk of parseBlocks(m.content)) {
     const inl = (ps) => ps.map((p) => (p.t === 'b' ? h('strong', { text: p.v }) : document.createTextNode(p.v)));
@@ -203,7 +208,7 @@ async function send(text) {
   try {
     const r = await api.post('/api/v1/chat', { site_id: st.site.site_id, message: text, ...(st.conversationId ? { conversation_id: st.conversationId } : {}) });
     st.conversationId = r.conversation_id;
-    st.messages.push({ role: 'assistant', content: r.reply, unanswered: r.unanswered, sources: r.sources, videos: r.videos, images: r.images, support: r.support });
+    st.messages.push({ role: 'assistant', content: r.reply, unanswered: r.unanswered, sources: r.sources, videos: r.videos, images: r.images, support: r.support, sensitive: r.sensitive || null });
     // a rating card: always when they asked to rate; otherwise once, after a couple of questions about a vendor
     const userTurns = st.messages.filter((m) => m.role === 'user').length;
     if (r.nps && (r.nps.forced || (!st.npsShown && userTurns >= 2))) { if (!r.nps.forced) st.npsShown = true; setTimeout(() => { st.messages.push({ role: 'nps', vendor: r.nps.vendor }); drawThread(); }, 900); }

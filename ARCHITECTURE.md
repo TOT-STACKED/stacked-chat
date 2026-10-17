@@ -133,3 +133,16 @@ Under the latest answer the chat offers **Ask my manager** (and, when the questi
 Stacked staff add a customer in the Console (Customers, Add customer): `POST /api/v1/console/customers` creates the organisation, its first venue and an **owner who is invited by email**, can start the 30-day trial, and pings Stacked's Slack (`console/customers.ts`). There is no self-serve sign-up: customers are added by Stacked, and everyone else joins by invitation.
 
 An invited person is stored as `invited` and becomes `active` the first time they sign in with that email (the one-time code proves the address is theirs): `linkUser` activates invited rows and only links the rest (a disabled person stays disabled). That check runs at most once a minute per person, so an invitation sent while someone is already signed in is picked up without a restart. (This was missing before 2026-10-16: invited people could not get in.)
+
+## Sensitive topics (2026-10-17)
+
+Some questions should not be handled by the AI alone. `src/modules/sensitive/` holds four topics, each with a mode:
+
+- **allergens** (`confirm`): the AI still answers, only from the company's own documents (the allergen rule in `chat/prompt.ts` is always on), and the reply gets "Always confirm with your manager or the kitchen before serving." (before any `Source:` line, not repeated if the answer already says it).
+- **incidents**, **hr**, **legal** (`manager`): the AI is not called. The person gets a fixed reply (incidents includes "call 999") and a promoted **Ask my manager** button. These do not count as AI questions (no `onAnswered`), are saved in the conversation so the button can send them, and are not Insights gaps.
+
+Detection (`topics.ts`) is plain keyword matching on what the person typed, not another AI call, so it is instant, free and testable. Priority when several match: incidents, hr, legal, then allergens. It deliberately errs towards sending a borderline question to a person.
+
+Company admins (owner, hq_admin) switch each topic on or off under Settings, Sensitive topics (`GET /api/v1/orgs/:orgId/sensitive-topics`, `PUT .../:topic`). **Everything is ON by default**: the table `sensitive_topic_settings` (migration 012) only stores the switches an admin has turned off. Reads are cached 30 seconds and cleared on every change; if the database cannot be read, every topic counts as ON (the safe way round). The hand-off email to managers is flagged with the topic while it is on. The chat API returns `sensitive: { topic, label, mode } | null` so the screen can show "This one needs a person" or "Check before you serve".
+
+Shared front-end note: `web/manage/dom.js` makes `Element.append/prepend` ignore null, undefined and false, so optional pieces can never print the words "null" or "false" on a page.

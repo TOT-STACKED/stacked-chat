@@ -198,6 +198,20 @@ table.narrow{min-width:480px}
 
 .mobsignout{display:none}
 
+/* sensitive topics */
+.topic{display:flex;flex-direction:column;gap:10px}
+.topichead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.topictext{display:flex;flex-direction:column;gap:6px;align-items:flex-start;min-width:0}
+.topictitle{font-weight:700;font-size:16px}
+.switchwrap{display:inline-flex;align-items:center;gap:10px;flex:none}
+.switchlabel{font-size:13px;font-weight:600;color:var(--muted);min-width:22px;text-align:right}
+.switchwrap.on .switchlabel{color:var(--ok)}
+input.switch{appearance:none;-webkit-appearance:none;width:46px;height:28px;border-radius:999px;background:var(--line-strong);border:0;position:relative;cursor:pointer;margin:0;transition:background .15s}
+input.switch::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(27,26,23,.3);transition:transform .15s}
+input.switch:checked{background:#2DA85A}
+input.switch:checked::after{transform:translateX(18px)}
+input.switch:disabled{opacity:.6;cursor:wait}
+
 /* ---------- small screens ----------
    Phones and small tablets: a slim top bar (logo, company, sign out), the main sections as a tab bar along the
    bottom, bottom-sheet dialogs, and tables that become cards. */

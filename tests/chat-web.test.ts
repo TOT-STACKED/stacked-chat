@@ -27,3 +27,15 @@ describe('chat page: rendering the assistant text safely', () => {
     expect(youtubeThumb('https://cdn.x/clip.mp4')).toBeNull();
   });
 });
+
+describe('the shared DOM helper', () => {
+  it('never writes the words "null", "false" or "undefined" onto a page (append and prepend skip empty values)', async () => {
+    class FakeElement { got: unknown[] = []; append(...n: unknown[]) { this.got = n; } prepend(...n: unknown[]) { this.got = n; } }
+    (globalThis as unknown as { Element: unknown }).Element = FakeElement;
+    await import('../web/manage/dom.js');
+    const el = new FakeElement(); const node = { nodeType: 1 };
+    el.append(null, node, false, undefined, 'text', 0);
+    expect(el.got).toEqual([node, 'text', 0]);
+    el.prepend(false, node); expect(el.got).toEqual([node]);
+  });
+});

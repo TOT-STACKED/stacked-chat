@@ -48,6 +48,8 @@ import { createPortalMirror, createSupabaseNpsStore, type NpsMirror, type NpsSto
 import { techStackRoutes } from './modules/vendors/routes.js';
 import { createSupabaseTechStackStore, type TechStackStore } from './modules/vendors/store.js';
 import { createSupabaseBrandingStore, type BrandingStore } from './modules/branding/store.js';
+import { createSensitiveSettings, createSupabaseSensitiveStore, type SensitiveStore } from './modules/sensitive/store.js';
+import { sensitiveRoutes } from './modules/sensitive/routes.js';
 import { createInsights, type Insights } from './modules/insights/service.js';
 import { createSupabaseInsightsStore, type InsightsStore } from './modules/insights/store.js';
 import { createAnthropicDrafter, type AnswerDrafter } from './modules/insights/drafter.js';
@@ -67,6 +69,7 @@ export interface Deps {
   knowledgeStore?: KnowledgeStore;
   insightsStore?: InsightsStore;
   brandingStore?: BrandingStore;
+  sensitiveStore?: SensitiveStore;
   conversationStore?: ConversationStore;
   ticketStore?: TicketStore;
   notify?: Notify | null;
@@ -132,6 +135,8 @@ export async function buildApp(
   const insightsStore = overrides.insightsStore ?? (db ? createSupabaseInsightsStore(db) : undefined);
   const drafter = overrides.drafter !== undefined ? overrides.drafter : (config.ANTHROPIC_API_KEY ? createAnthropicDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.INSIGHTS_MODEL }) : null);
   const brandingStore = overrides.brandingStore ?? (db ? createSupabaseBrandingStore(db) : null);
+  const sensitiveStore = overrides.sensitiveStore ?? (db ? createSupabaseSensitiveStore(db) : null);
+  const sensitiveSettings = sensitiveStore ? createSensitiveSettings(sensitiveStore, { now: overrides.now ? () => overrides.now!().getTime() : undefined }) : null;
   const conversationStore = overrides.conversationStore ?? (db ? createSupabaseConversationStore(db) : null);
   const chatModel = overrides.chatModel !== undefined ? overrides.chatModel : (config.ANTHROPIC_API_KEY ? createAnthropicChatModel({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null);
   const adopted = new Map<string, number>(); // organisations whose older content we brought into the catalogue recently
@@ -143,11 +148,13 @@ export async function buildApp(
     conversations: conversationStore, model: chatModel,
     signUrls: overrides.storage ? async (urls) => overrides.storage!.signUrls(urls) as Promise<Array<string | null>> : undefined,
     onAnswered: (siteId) => { void billing?.recordQuestion(siteId); },
+    sensitive: sensitiveSettings ? (orgId) => sensitiveSettings.enabled(orgId) : undefined,
     nps: overrides.npsStore ?? (db ? createSupabaseNpsStore(db) : null),
     mirrorNps: overrides.mirrorNps !== undefined ? overrides.mirrorNps : (config.STACKCOLLECT_SUPABASE_URL && config.STACKCOLLECT_SUPABASE_KEY ? createPortalMirror({ url: config.STACKCOLLECT_SUPABASE_URL, key: config.STACKCOLLECT_SUPABASE_KEY }) : null),
   }) : null;
   const help: Help | null = repo && conversationStore
     ? createHelp({ repo, tickets: overrides.ticketStore ?? (db ? createSupabaseTicketStore(db) : null), mailer, conversations: conversationStore, publicUrl: config.PUBLIC_URL,
+        sensitive: sensitiveSettings ? (orgId) => sensitiveSettings.enabled(orgId) : undefined,
         notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) })
     : null;
   const techStackStore = overrides.techStackStore ?? (db ? createSupabaseTechStackStore(db) : null);
@@ -223,6 +230,7 @@ export async function buildApp(
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
   await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate }));
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
+  await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));

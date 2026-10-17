@@ -7,6 +7,7 @@ import type { Db } from '../../lib/supabase.js';
 import { safeText } from './nps.js';
 import type { ConversationStore, StoredMessage } from './store.js';
 import type { Who } from './service.js';
+import { detectSensitive, TOPIC_IDS, type TopicId } from '../sensitive/topics.js';
 
 export type HelpTarget = 'manager' | 'stacked';
 export interface TicketRow { email: string; name: string | null; venue: string; venue_id: string; issue: string; conversation: StoredMessage[]; status: 'open'; escalated: boolean }
@@ -31,15 +32,17 @@ export function pickRecipients(members: MemberRow[], siteId: string, exceptEmail
   return [...seen.values()].sort((a, b) => Number(members.some((m) => m.email.toLowerCase() === b.email && m.role === 'site_manager')) - Number(members.some((m) => m.email.toLowerCase() === a.email && m.role === 'site_manager')));
 }
 
-export function helpEmail(o: { to: string; toName: string; from: string; fromName: string; venue: string; org: string; question: string; answer: string | null; note: string | null; manageUrl: string }) {
+export function helpEmail(o: { to: string; toName: string; from: string; fromName: string; venue: string; org: string; question: string; answer: string | null; note: string | null; manageUrl: string; flag?: { label: string; answered: boolean } | null }) {
   const subject = `${o.fromName} at ${o.venue} needs help: ${o.question.length > 70 ? o.question.slice(0, 67) + '…' : o.question}`;
-  const lines = [`${o.fromName} (${o.from}) asked the AI assistant at ${o.venue} and wants a person to take a look.`, '', `Question: ${o.question}`];
+  const flagText = o.flag ? (o.flag.answered ? `Flagged as sensitive: ${o.flag.label}. The assistant answered from your documents and asked them to confirm with a manager.` : `Flagged as sensitive: ${o.flag.label}. The assistant did not answer this; it needs a person.`) : null;
+  const lines = [...(flagText ? [flagText, ''] : []), `${o.fromName} (${o.from}) asked the AI assistant at ${o.venue} and wants a person to take a look.`, '', `Question: ${o.question}`];
   if (o.answer) lines.push('', `What the assistant said: ${o.answer.length > 600 ? o.answer.slice(0, 597) + '…' : o.answer}`);
   if (o.note) lines.push('', `Their note: ${o.note}`);
   lines.push('', `Just reply to this email to answer them directly. To help the whole team next time, add the answer in Knowledge:`, o.manageUrl);
   const text = lines.join('\n');
   const para = (t: string) => `<p style="font-size:15px;line-height:1.5;margin:0 0 14px">${t}</p>`;
   const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1B1A17">
+${flagText ? `<div style="background:#FBEDE9;border:1px solid #E9B9AE;color:#9C2F1B;border-radius:12px;padding:10px 14px;margin:0 0 14px;font-size:14px;font-weight:600">${esc(flagText)}</div>` : ''}
 ${para(`<b>${esc(o.fromName)}</b> (${esc(o.from)}) asked the AI assistant at <b>${esc(o.venue)}</b> and wants a person to take a look.`)}
 <div style="background:#F5F3EE;border-radius:12px;padding:14px 16px;margin:0 0 14px"><div style="font-size:12px;color:#6B675F;font-weight:600;margin-bottom:4px">QUESTION</div><div style="font-size:15px">${esc(o.question)}</div></div>
 ${o.answer ? `<div style="border:1px solid #E6E2D8;border-radius:12px;padding:14px 16px;margin:0 0 14px"><div style="font-size:12px;color:#6B675F;font-weight:600;margin-bottom:4px">WHAT THE ASSISTANT SAID</div><div style="font-size:14px;color:#4A473F;white-space:pre-wrap">${esc(o.answer.length > 600 ? o.answer.slice(0, 597) + '…' : o.answer)}</div></div>` : ''}
@@ -50,7 +53,9 @@ ${para('Just reply to this email to answer them directly.')}
   return { to: o.to, subject, text, html, replyTo: o.from };
 }
 
-export interface HelpDeps { repo: Repo; tickets: TicketStore | null; mailer?: Mailer; conversations: ConversationStore; publicUrl: string; notify?: Notify | null; perHour?: number; now?: () => number }
+export interface HelpDeps { repo: Repo; tickets: TicketStore | null; mailer?: Mailer; conversations: ConversationStore; publicUrl: string; notify?: Notify | null; perHour?: number; now?: () => number;
+  /** the sensitive topics switched ON for an organisation (used to flag the email) */
+  sensitive?: (orgId: string) => Promise<ReadonlySet<TopicId>> }
 export interface HelpResult { target: HelpTarget; logged: boolean; notified: string[] }
 
 export function createHelp(deps: HelpDeps) {
@@ -76,10 +81,13 @@ export function createHelp(deps: HelpDeps) {
       return { target: 'stacked', logged, notified: deps.notify ? ['Stacked support'] : [] };
     }
 
+    const on = await deps.sensitive?.(who.orgId).catch(() => null) ?? new Set<TopicId>(TOPIC_IDS);
+    const hit = detectSensitive(question, on);
+    const flag = hit ? { label: hit.label, answered: hit.mode === 'confirm' } : null;
     const to = pickRecipients(await deps.repo.listMembers(who.orgId), who.siteId, who.email).slice(0, 8);
     const notified: string[] = [];
     for (const r of to) {
-      const sent = await deps.mailer?.send(helpEmail({ to: r.email, toName: r.name, from: who.email, fromName: who.name ?? who.email, venue: who.siteName, org: who.orgName, question, answer, note, manageUrl: deps.publicUrl.replace(/\/$/, '') + '/manage/#/knowledge' }));
+      const sent = await deps.mailer?.send(helpEmail({ to: r.email, toName: r.name, from: who.email, fromName: who.name ?? who.email, venue: who.siteName, org: who.orgName, question, answer, note, flag, manageUrl: deps.publicUrl.replace(/\/$/, '') + '/manage/#/knowledge' }));
       if (sent === 'sent') notified.push(r.name);
     }
     return { target: 'manager', logged, notified };
