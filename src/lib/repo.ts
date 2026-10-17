@@ -30,6 +30,8 @@ export interface Repo {
   createMember(m: NewMember): Promise<MemberRow>;
   updateMember(memberId: string, patch: { role?: Role; status?: 'invited' | 'active' | 'disabled' }): Promise<MemberRow>;
   countActiveOwners(orgId: string): Promise<number>;
+  /** Does any organisation already have a member (in any state) with this email? Used so a sign-up cannot create a second company for the same address. */
+  emailInUse(email: string): Promise<boolean>;
   createOrg(o: { name: string; slug: string }): Promise<OrgRow>;
   createSite(s: { org_id: string; name: string; slug: string }): Promise<SiteRow>;
   listTeams(orgId: string): Promise<TeamRow[]>;

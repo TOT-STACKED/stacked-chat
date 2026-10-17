@@ -37,6 +37,7 @@ function showSignIn(note) {
     box.append(h('img', { src: logoSrc, alt: 'Stacked' }), h('h1', { text: 'Ask anything about work' }), note ? h('div', { class: 'err', text: note }) : null,
       h('p', { class: 'muted', text: "Sign in with the email address your company invited. We'll send you a one-time code, so there is no password to remember." }),
       h('div', null, h('label', { for: 'em', text: 'Email address' }), input), err, go,
+      h('p', { class: 'muted', style: 'font-size:13.5px;margin:0' }, 'Own the business? ', h('a', { href: '/start/', text: 'Start a free trial' })),
       cfg.dev ? h('div', { class: 'devbox' }, h('span', { text: 'Local preview: sign in as' }), h('div', null, [['staff', 'Staff'], ['mgr', 'Site manager'], ['owner', 'Owner']].map(([r, l]) => h('button', { onclick: async () => { auth.devSignIn(r); await enter(); } }, l)))) : null);
     input.focus();
   };

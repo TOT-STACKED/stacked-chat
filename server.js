@@ -1,8 +1,9 @@
 // Stacked Chat: a tiny front door. Everything real lives in src/ (TypeScript, compiled to dist/ on install):
-//   /chat/     the staff chat          /manage/   customer admin        /console/  Stacked staff
+//   /start/    owner sign-up           /chat/     the staff chat        /manage/   customer admin
+//   /console/  Stacked staff
 //   /api/v1/*  the API                 /billing/webhook (Stripe)        /healthz   deep health check
 // This file only starts the server, hands those addresses to the compiled app, answers /health for the host,
-// and redirects the old addresses (/, /app, /admin) to their replacements.
+// and redirects the front page (/) to the sign-up page, and the old addresses (/app, /admin) to their replacements.
 const http = require('http');
 const PORT = process.env.PORT || 8080;
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://yuzlfocqovwhqdpitvxj.supabase.co';
@@ -64,8 +65,10 @@ const server = http.createServer(async (req, res) => {
   if (url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'ok' })); return; }
 
   if (req.method === 'GET' || req.method === 'HEAD') {
+    // the front page is where a business owner starts a trial (staff and managers have sign-in links on it)
+    if (url === '/' || url.startsWith('/?')) return redirect(res, '/start/');
     // the old chat widget and operator app
-    if (url === '/' || url.startsWith('/?') || url === '/app' || url === '/app/' || url.startsWith('/app#') || url.startsWith('/app?')) return redirect(res, '/chat/');
+    if (url === '/app' || url === '/app/' || url.startsWith('/app#') || url.startsWith('/app?')) return redirect(res, '/chat/');
     // the old admin dashboard
     if (url === '/admin' || url === '/admin/' || url.startsWith('/admin?')) return redirect(res, '/console/');
   }

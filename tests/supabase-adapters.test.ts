@@ -143,3 +143,17 @@ describe('Supabase repo: teams and sites', () => {
     expect(await repo.deleteTeam('o1', 't1')).toBe(false);
   });
 });
+
+describe('Supabase repo: is this email already in use?', () => {
+  it('looks for any member row with that address (lower-cased, any status) and answers yes or no', async () => {
+    const { db, calls } = recordingDb({ status: 200, data: [{ id: 'm1' }] }, { status: 200, data: [] });
+    const repo = createSupabaseRepo(db);
+    expect(await repo.emailInUse('Priya+Test@OldCrown.CO.uk')).toBe(true);
+    expect(calls[0]!.path).toBe('/members?email=eq.priya%2Btest%40oldcrown.co.uk&select=id&limit=1');
+    expect(await repo.emailInUse('nobody@x.co')).toBe(false);
+  });
+  it('a database error is an error, never a quiet "no" (which would let a duplicate through)', async () => {
+    const { db } = recordingDb({ status: 500, data: null });
+    await expect(createSupabaseRepo(db).emailInUse('a@b.co')).rejects.toThrow();
+  });
+});

@@ -46,3 +46,18 @@ export function inviteEmail(o: { to: string; orgName: string; siteName?: string 
   void who;
   return { to: o.to, subject, text, html };
 }
+
+/** The email a new owner gets when they start a trial themselves (not invited by anyone). */
+export function welcomeEmail(o: { to: string; name?: string | null; orgName: string; url: string }): Mail {
+  const hi = o.name?.trim() ? `Hi ${o.name.trim().split(/\s+/)[0]},` : 'Hello,';
+  const subject = `Welcome to Stacked Chat: your 30-day trial for ${o.orgName} has started`;
+  const line = `${hi} your Stacked Chat account for ${o.orgName} is ready, and your 30-day free trial has started. No card is needed.`;
+  const how = `Open the link below and sign in with this email address (${o.to}). We'll email you a one-time code, so there is no password to set up. Then add your handbooks, allergen guide and how-tos, and invite your team.`;
+  const text = `${line}\n\n${how}\n\n${o.url}\n\nIf you didn't ask for this, you can ignore this email and nothing will happen.`;
+  const html = `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1B1A17">
+<p style="font-size:16px;line-height:1.5;margin:0 0 16px">${esc(line)}</p>
+<p style="font-size:15px;line-height:1.5;margin:0 0 24px;color:#4A473F">${esc(how)}</p>
+<p style="margin:0 0 24px"><a href="${esc(o.url)}" style="background:#E87830;color:#1B1A17;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px;display:inline-block">Open Stacked Chat</a></p>
+<p style="font-size:13px;color:#6B675F;margin:0">If you didn't ask for this, you can ignore this email and nothing will happen.</p></div>`;
+  return { to: o.to, subject, text, html };
+}

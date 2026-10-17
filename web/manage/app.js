@@ -43,6 +43,7 @@ function showSignIn(message) {
       note ? h('div', { class: 'result', text: note }) : null,
       h('p', { class: 'muted', text: "Use the email address your company invited. We'll send you a one-time code, so there's no password to remember." }),
       h('div', { class: 'field' }, h('label', { for: 'si-email', text: 'Email address' }), input), err, go,
+      h('p', { class: 'muted', style: 'font-size:13.5px;margin:0' }, 'Run a hospitality business and new to Stacked Chat? ', h('a', { href: '/start/', text: 'Start your free trial' })),
       cfg.dev ? devBox() : null].filter(Boolean));
     input.focus();
   }

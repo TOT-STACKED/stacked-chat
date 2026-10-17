@@ -31,11 +31,15 @@ describe('the front door', () => {
     expect((await (await fetch(base + '/healthz')).json()).status).toBe('ok');
   });
   it('serves the apps and the API through it', async () => {
-    for (const p of ['/chat/', '/manage/', '/console/']) expect((await fetch(base + p)).status, p).toBe(200);
+    for (const p of ['/start/', '/chat/', '/manage/', '/console/']) expect((await fetch(base + p)).status, p).toBe(200);
     expect((await (await fetch(base + '/api/v1/openapi.json')).json()).openapi).toBe('3.1.0');
   });
   it('sends the retired addresses to their replacements', async () => {
-    for (const p of ['/', '/app', '/app/', '/?join=abc', '/app#triage']) {
+    for (const p of ['/', '/?join=abc']) { // the front page is where an owner starts a trial
+      const res = await fetch(base + p, { redirect: 'manual' });
+      expect([res.status, res.headers.get('location')], p).toEqual([302, '/start/']);
+    }
+    for (const p of ['/app', '/app/', '/app#triage']) {
       const res = await fetch(base + p, { redirect: 'manual' });
       expect([res.status, res.headers.get('location')], p).toEqual([302, '/chat/']);
     }

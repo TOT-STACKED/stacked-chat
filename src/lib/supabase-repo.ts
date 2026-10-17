@@ -42,6 +42,11 @@ export function createSupabaseRepo(db: Db): Repo {
       return [...seen.values()];
     },
 
+    async emailInUse(email) {
+      const r = await db.rest<Array<{ id: string }>>(`/members?email=eq.${enc(email.toLowerCase())}&select=id&limit=1`);
+      return (must(r, 'email in use') ?? []).length > 0;
+    },
+
     async linkUser(email, userId) {
       // Signing in with the invited address proves it is theirs (the one-time code went there):
       // an invited person becomes active; anyone else (for example someone disabled) is only linked.

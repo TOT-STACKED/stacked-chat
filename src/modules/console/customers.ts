@@ -1,11 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { ApiHttpError, conflict } from '../../lib/errors.js';
-import { inviteEmail, type Mailer, type SendResult } from '../../lib/email.js';
+import { inviteEmail, welcomeEmail, type Mailer, type SendResult } from '../../lib/email.js';
 import type { Repo } from '../../lib/repo.js';
 import type { Notify } from '../../lib/slack.js';
 import type { Billing } from '../billing/service.js';
 
-export interface NewCustomer { company_name: string; venue_name?: string | null; owner_email: string; owner_name?: string | null; start_trial: boolean }
+export interface NewCustomer { company_name: string; venue_name?: string | null; owner_email: string; owner_name?: string | null; start_trial: boolean;
+  /** the owner signed themselves up (they get a welcome email, not an invitation from "the Stacked team") */ self_serve?: boolean }
 export interface CustomerCreated {
   org_id: string; site_id: string; member_id: string;
   invite: SendResult;
@@ -28,8 +29,11 @@ export function createCustomers(deps: { repo: Repo; mailer?: Mailer; publicUrl: 
     const site = await repo.createSite({ org_id: org.id, name: venueName, slug: `${slugify(venueName)}-${randomBytes(2).toString('hex')}` });
     const owner = await repo.createMember({ org_id: org.id, site_id: null, email: c.owner_email, display_name: c.owner_name?.trim() || null, role: 'owner', status: 'invited' });
 
+    const url = deps.publicUrl.replace(/\/$/, '') + '/manage/';
     const invite: SendResult = deps.mailer
-      ? await deps.mailer.send(inviteEmail({ to: owner.email, orgName: org.name, siteName: null, inviter: 'The Stacked team', role: 'owner', url: deps.publicUrl.replace(/\/$/, '') + '/manage/' }))
+      ? await deps.mailer.send(c.self_serve
+        ? welcomeEmail({ to: owner.email, name: c.owner_name, orgName: org.name, url })
+        : inviteEmail({ to: owner.email, orgName: org.name, siteName: null, inviter: 'The Stacked team', role: 'owner', url }))
       : 'skipped';
 
     let trial: CustomerCreated['trial'] = 'skipped';
@@ -38,7 +42,7 @@ export function createCustomers(deps: { repo: Repo; mailer?: Mailer; publicUrl: 
       else { try { await deps.billing.startOrAddCard(org.id, { interval: 'month', email: owner.email }); trial = 'started'; } catch { trial = 'failed'; } }
     }
 
-    await deps.notify?.(`🎉 *New customer:* ${org.name}\n*Owner:* ${owner.email}\n*First venue:* ${site.name}\n*Added by:* ${staffEmail.toLowerCase()}${trial === 'started' ? '\n*Trial:* 30 days started' : ''}`);
+    await deps.notify?.(`${c.self_serve ? '🎉 *New self-serve sign-up:*' : '🎉 *New customer:*'} ${org.name}\n*Owner:* ${owner.email}\n*First venue:* ${site.name}\n*${c.self_serve ? 'Source' : 'Added by'}:* ${staffEmail.toLowerCase()}${trial === 'started' ? '\n*Trial:* 30 days started' : ''}`);
     return { org_id: org.id, site_id: site.id, member_id: owner.id, invite, trial };
   }
   return { create };

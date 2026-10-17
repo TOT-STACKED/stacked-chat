@@ -23,7 +23,7 @@ export function createModernHandler(opts: { config: Partial<Config> & Record<str
     storage,
     ready: appPromise.then(() => undefined),
     handles(url: string): boolean {
-      return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/') || url === '/manage' || url.startsWith('/manage/') || url === '/billing/webhook' || url === '/chat' || url.startsWith('/chat/') || url.startsWith('/chat?') || url === '/console' || url.startsWith('/console/');
+      return url === '/healthz' || url.startsWith('/healthz?') || url === '/api/v1' || url.startsWith('/api/v1/') || url === '/manage' || url.startsWith('/manage/') || url === '/billing/webhook' || url === '/chat' || url.startsWith('/chat/') || url.startsWith('/chat?') || url === '/console' || url.startsWith('/console/') || url === '/start' || url.startsWith('/start/') || url.startsWith('/start?');
     },
     async handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
       res.setHeader('Access-Control-Allow-Origin', '*');

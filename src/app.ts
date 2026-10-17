@@ -50,6 +50,9 @@ import { createSupabaseTechStackStore, type TechStackStore } from './modules/ven
 import { createSupabaseBrandingStore, type BrandingStore } from './modules/branding/store.js';
 import { createSensitiveSettings, createSupabaseSensitiveStore, type SensitiveStore } from './modules/sensitive/store.js';
 import { sensitiveRoutes } from './modules/sensitive/routes.js';
+import { createSignup } from './modules/signup/service.js';
+import { signupRoutes } from './modules/signup/routes.js';
+import { startAppRoutes } from './modules/signup/app-routes.js';
 import { createInsights, type Insights } from './modules/insights/service.js';
 import { createSupabaseInsightsStore, type InsightsStore } from './modules/insights/store.js';
 import { createAnthropicDrafter, type AnswerDrafter } from './modules/insights/drafter.js';
@@ -70,6 +73,8 @@ export interface Deps {
   insightsStore?: InsightsStore;
   brandingStore?: BrandingStore;
   sensitiveStore?: SensitiveStore;
+  /** tests: tighter or looser sign-up limits */
+  signupLimits?: { perIpPerHour?: number; perEmailPerHour?: number; allPerHour?: number };
   conversationStore?: ConversationStore;
   ticketStore?: TicketStore;
   notify?: Notify | null;
@@ -234,8 +239,10 @@ export async function buildApp(
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
-  await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS), idempotency,
-    customers: repo ? createCustomers({ repo, mailer, publicUrl: config.PUBLIC_URL, billing, notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) }) : null }));
+  const customers = repo ? createCustomers({ repo, mailer, publicUrl: config.PUBLIC_URL, billing, notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) }) : null;
+  await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS), idempotency, customers }));
+  await app.register(async (instance) => signupRoutes(instance, { signup: repo && customers ? createSignup({ repo, customers }) : null, now: overrides.now ? () => overrides.now!().getTime() : undefined, ...overrides.signupLimits }));
+  await app.register(async (instance) => startAppRoutes(instance));
   await app.register(async (instance) => consoleAppRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => insightsRoutes(instance, { insights, store: insightsStore ?? null, gate }));
   const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };

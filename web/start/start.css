@@ -1,0 +1,28 @@
+/* The owner sign-up page. Builds on Manage's stylesheet (tokens, fields, buttons); this adds the two-column layout. */
+body{background:radial-gradient(1100px 480px at 70% -8%,#FFE9D6 0,rgba(255,233,214,0) 60%),var(--bg)}
+.start{min-height:100vh;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:56px;max-width:1080px;margin:0 auto;padding:56px 24px;align-items:center}
+.pitch{display:flex;flex-direction:column;gap:22px}
+.pitch .logo img{height:34px}
+.pitch h1{margin:0;font-size:40px;line-height:1.1;letter-spacing:-.025em;font-weight:700}
+.pitch .lead{margin:0;font-size:17px;color:var(--ink2);max-width:30em}
+.points{display:flex;flex-direction:column;gap:16px;margin-top:6px}
+.point{display:flex;gap:14px;align-items:flex-start}
+.point b{display:block;font-size:15.5px}
+.point span{color:var(--muted);font-size:14.5px}
+.formcard{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;gap:16px}
+.formcard h2{margin:0;font-size:22px;letter-spacing:-.015em}
+.formcard p{margin:0}
+.formcard .btn.cta{height:46px;font-size:15px}
+.fine{font-size:13px;color:var(--muted)}
+.signinlinks{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:14px;color:var(--muted);border-top:1px solid var(--line2);padding-top:14px}
+.signinlinks a{color:var(--ink);font-weight:600}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.done{display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.done .tick{width:44px;height:44px;border-radius:50%;background:var(--ok-bg);color:var(--ok);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700}
+@media (max-width:860px){
+  .start{grid-template-columns:1fr;gap:28px;padding:28px 16px 40px;align-items:start}
+  .pitch h1{font-size:30px}
+  .pitch .lead{font-size:16px}
+  .formcard{padding:22px;border-radius:18px}
+  input,select,textarea{font-size:16px}
+}
