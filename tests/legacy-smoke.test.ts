@@ -43,6 +43,8 @@ describe('the front door', () => {
       const res = await fetch(base + p, { redirect: 'manual' });
       expect([res.status, res.headers.get('location')], p).toEqual([302, '/chat/']);
     }
+    const ico = await fetch(base + '/favicon.ico', { redirect: 'manual' });
+    expect([ico.status, ico.headers.get('location')]).toEqual([302, '/manage/assets/favicon-32.png']);
     for (const p of ['/admin', '/admin/']) {
       const res = await fetch(base + p, { redirect: 'manual' });
       expect([res.status, res.headers.get('location')], p).toEqual([302, '/console/']);

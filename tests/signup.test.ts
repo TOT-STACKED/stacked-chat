@@ -127,3 +127,17 @@ describe('the sign-up API and page', () => {
     expect(mailer.sent[0]!.subject).toContain("You've been invited"); expect(mailer.sent[0]!.text).toContain('The Stacked team');
   });
 });
+
+describe('the site icon', () => {
+  it('every page declares it, the files exist, and /favicon.ico leads to one', async () => {
+    const app = await buildApp(testConfig, {});
+    for (const page of ['/start/', '/chat/', '/manage/', '/console/']) {
+      const html = (await app.inject({ method: 'GET', url: page })).body;
+      expect(html, page).toContain('rel="icon"'); expect(html, page).toContain('/manage/assets/favicon-32.png'); expect(html, page).toContain('rel="apple-touch-icon"');
+    }
+    for (const f of ['favicon-32.png', 'favicon-192.png', 'apple-touch-icon.png']) {
+      const r = await app.inject({ method: 'GET', url: '/manage/assets/' + f });
+      expect([r.statusCode, r.headers['content-type']], f).toEqual([200, 'image/png']);
+    }
+  });
+});

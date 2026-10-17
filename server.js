@@ -65,6 +65,8 @@ const server = http.createServer(async (req, res) => {
   if (url === '/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ status: 'ok' })); return; }
 
   if (req.method === 'GET' || req.method === 'HEAD') {
+    // browsers ask for /favicon.ico by default; the pages declare their own icon, this covers the rest
+    if (url === '/favicon.ico') return redirect(res, '/manage/assets/favicon-32.png');
     // the front page is where a business owner starts a trial (staff and managers have sign-in links on it)
     if (url === '/' || url.startsWith('/?')) return redirect(res, '/start/');
     // the old chat widget and operator app
