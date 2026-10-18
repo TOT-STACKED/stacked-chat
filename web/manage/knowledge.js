@@ -50,7 +50,7 @@ export async function renderKnowledge(main, ctx) {
       h('button', { class: `pill ${st.kind === k ? 'on' : ''}`, onclick: () => { st.kind = k; draw(); } }, `${label} ${c[k]}`)));
     const audience = h('select', { class: 'filter', 'aria-label': 'Audience', onchange: (e) => { st.audience = e.target.value; draw(); } },
       h('option', { value: 'all', selected: st.audience === 'all' }, 'All audiences'), h('option', { value: 'company', selected: st.audience === 'company' }, 'Whole company'),
-      st.sites.map((s) => h('option', { value: s.id, selected: st.audience === s.id }, s.name)));
+      st.sites.map((s) => h('option', { value: s.id, selected: st.audience === s.id }, `${s.name} (and whole company)`)));
     const search = h('input', { class: 'filter search', type: 'search', placeholder: 'Search titles', 'aria-label': 'Search', value: st.q });
     search.addEventListener('input', () => { st.q = search.value; drawTable(); });
     return h('div', { class: 'toolbar' }, seg, h('div', { class: 'actions' }, audience, search));

@@ -151,7 +151,8 @@ export function filterKnowledge(items, { kind = 'all', audience = 'all', q = '' 
   return items.filter((i) => {
     if (kind !== 'all' && i.kind !== kind) return false;
     if (audience === 'company' && i.site_id !== null) return false;
-    if (audience !== 'all' && audience !== 'company' && i.site_id !== audience) return false;
+    // picking a venue shows what that venue's staff see: its own items plus everything aimed at the whole company
+    if (audience !== 'all' && audience !== 'company' && i.site_id !== null && i.site_id !== audience) return false;
     return !needle || i.title.toLowerCase().includes(needle);
   });
 }

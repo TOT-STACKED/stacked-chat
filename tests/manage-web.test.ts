@@ -125,7 +125,8 @@ describe('manage lib: knowledge list', () => {
   it('filters by type, audience and a search word', () => {
     expect(filterKnowledge(items, { kind: 'video' })).toHaveLength(1);
     expect(filterKnowledge(items, { audience: 'company' })).toHaveLength(2);
-    expect(filterKnowledge(items, { audience: 's1' })).toHaveLength(1);
+    expect(filterKnowledge(items, { audience: 's1' })).toHaveLength(3); // the venue's own item plus both company-wide ones
+    expect(filterKnowledge(items, { audience: 's2' })).toHaveLength(2); // a venue with nothing of its own still sees company-wide items
     expect(filterKnowledge(items, { q: ' ALLERGEN ' })).toHaveLength(1);
     expect(filterKnowledge(items, {})).toHaveLength(3);
   });
