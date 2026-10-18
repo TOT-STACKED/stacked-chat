@@ -117,3 +117,13 @@ button,input,select,textarea{font:inherit;color:inherit}
 .helpbox .row{flex:1 0 100%;display:flex;justify-content:flex-end;align-items:center;gap:14px}
 .helpbox .btn.small{height:36px;padding:0 16px;font-size:14px}
 .helpdone{margin:0;font-size:14px;color:var(--ink2)}
+
+/* Stacked mark as the assistant's picture */
+.bar .brand img.mark{height:32px;width:32px;border-radius:10px;flex:none}
+.face img,.dotbig img{width:100%;height:100%;border-radius:inherit;display:block;object-fit:cover}
+.bot .face:has(img),.hello .dotbig:has(img){background:none}
+/* voice */
+.mic{flex:none;width:42px;height:42px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mic.on{background:#D92D20;border-color:#D92D20;color:#fff;animation:listen 1.4s ease-in-out infinite}
+@keyframes listen{0%,100%{box-shadow:0 0 0 0 rgba(217,45,32,.45)}50%{box-shadow:0 0 0 8px rgba(217,45,32,0)}}
+@media (prefers-reduced-motion:reduce){.mic.on{animation:none}}

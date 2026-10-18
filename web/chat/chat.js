@@ -14,8 +14,9 @@ const svg = (d, size = 20, extra = {}) => {
   for (const p of [].concat(d)) { const e = document.createElementNS(ns, 'path'); e.setAttribute('d', p); s.append(e); }
   return s;
 };
-const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18' };
+const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z' };
 const logoSrc = '/manage/assets/logo-stacked.png';
+const markSrc = '/manage/assets/favicon-192.png'; // the Stacked mark: the chat wears it unless a venue brings its own logo
 const isHttps = (u) => /^https:\/\//i.test(String(u || ''));
 
 // ---- sign in -----------------------------------------------------------------------------------------------
@@ -79,11 +80,42 @@ function showNoAccess() {
 function signOut() { auth.signOut(); st.ctx = null; showSignIn(); }
 function resetChat() { st.conversationId = null; st.messages = []; st.error = null; st.npsShown = false; }
 
+const ownLogo = () => isHttps(st.site.branding.logo_url);
+/** The assistant's picture: the Stacked mark, or the first letter in the venue's colour when they use their own logo. */
+const faceBits = () => (ownLogo() ? { text: brandName()[0].toUpperCase() } : null);
+const faceImg = () => h('img', { src: markSrc, alt: '', width: 64, height: 64, draggable: 'false' });
+function face(cls) { return h('div', { class: cls, 'aria-hidden': 'true', ...(faceBits() || {}) }, ownLogo() ? null : faceImg()); }
 function brandName() { return (st.site.branding.bot_name || 'Stacked Chat'); }
 function applyBrand() {
   const c = /^#[0-9a-fA-F]{6}$/.test(st.site.branding.primary_color || '') ? st.site.branding.primary_color : '#E87830';
   document.documentElement.style.setProperty('--brand', c); document.documentElement.style.setProperty('--brand-ink', readableOn(c));
   document.title = brandName();
+}
+
+// ---- voice -------------------------------------------------------------------------------------------------
+// Speech to text through the browser (Chrome, Edge, Safari). The words land in the box so they can be checked, then sent.
+const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let listening = null;
+function micButton() {
+  if (!Recognition) return null; // e.g. Firefox: no button rather than a broken one
+  const btn = h('button', { class: 'mic', type: 'button', 'aria-label': 'Ask by voice', title: 'Ask by voice' }, svg(ICON.mic));
+  const setState = (on) => { btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on ? 'true' : 'false'); btn.setAttribute('aria-label', on ? 'Stop listening' : 'Ask by voice'); btn.replaceChildren(svg(on ? ICON.stop : ICON.mic)); };
+  btn.addEventListener('click', () => {
+    if (listening) { listening.stop(); return; }
+    const rec = new Recognition(); const before = input.value.trim();
+    rec.lang = 'en-GB'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+    rec.onresult = (e) => {
+      const said = [...e.results].map((r) => r[0].transcript).join(' ').trim();
+      input.value = (before ? before + ' ' : '') + said; input.dispatchEvent(new Event('input'));
+    };
+    rec.onerror = (e) => {
+      st.error = e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'Allow the microphone in your browser to ask by voice.' : e.error === 'no-speech' || e.error === 'aborted' ? null : 'Voice did not work just now. You can type instead.';
+      if (st.error) drawThread();
+    };
+    rec.onend = () => { listening = null; setState(false); input.focus(); };
+    try { st.error = null; rec.start(); listening = rec; setState(true); } catch { listening = null; setState(false); }
+  });
+  return btn;
 }
 
 // ---- the chat screen ---------------------------------------------------------------------------------------
@@ -98,11 +130,11 @@ function draw() {
   sendBtn = h('button', { class: 'send', type: 'submit', 'aria-label': 'Send' }, svg(ICON.send));
   input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(160, input.scrollHeight) + 'px'; sendBtn.disabled = st.sending || !input.value.trim(); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
-  const form = h('form', { onsubmit: (e) => { e.preventDefault(); submit(); } }, input, sendBtn);
+  const form = h('form', { onsubmit: (e) => { e.preventDefault(); submit(); } }, input, micButton(), sendBtn);
   root.append(h('div', { class: 'app' },
     h('header', { class: 'bar' },
       h('button', { class: 'iconbtn', 'aria-label': 'Your conversations', onclick: openHistory }, svg(ICON.history)),
-      h('div', { class: 'brand' }, isHttps(b.logo_url) ? h('img', { src: b.logo_url, alt: '' }) : null, h('b', { text: brandName() })),
+      h('div', { class: 'brand' }, ownLogo() ? h('img', { src: b.logo_url, alt: '' }) : h('img', { class: 'mark', src: markSrc, alt: '', width: 32, height: 32 }), h('b', { text: brandName() })),
       venue, h('button', { class: 'iconbtn', 'aria-label': 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus)),
       h('button', { class: 'avatar', title: `Sign out ${auth.email()}`, 'aria-label': `Sign out ${auth.email()}`, style: 'border:0;cursor:pointer', onclick: signOut }, (auth.email()[0] || '?').toUpperCase())),
     thread,
@@ -111,8 +143,8 @@ function draw() {
 }
 
 function hello() {
-  const b = st.site.branding; const first = brandName()[0].toUpperCase();
-  return h('div', { class: 'hello' }, h('div', { class: 'dotbig', 'aria-hidden': 'true', text: first }),
+  const b = st.site.branding;
+  return h('div', { class: 'hello' }, face('dotbig'),
     h('h1', { text: b.welcome_heading || 'Ask anything about work' }),
     h('p', { text: b.welcome_message || 'Handbooks, procedures and how things work here. Ask in your own words.' }),
     h('div', { class: 'chipsrow' }, st.site.suggestions.map((q) => h('button', { class: 'suggest', onclick: () => send(q) }, q))));
@@ -137,7 +169,7 @@ function npsCard(m) {
       h('div', { class: 'row' }, h('button', { class: 'lnk', onclick: () => draw('No problem.') }, 'Skip'), send));
   };
   draw();
-  return h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble' }, card));
+  return h('div', { class: 'msg bot' }, face('face'), h('div', { class: 'bubble' }, card));
 }
 
 /** "Ask my manager" (and, for technology faults, "Ask Stacked support") under the latest answer. */
@@ -187,7 +219,7 @@ function botBubble(m, last) {
   if (media.length) parts.push(h('div', { class: 'media' }, media));
   if (m.support && isHttps(m.support.url)) parts.push(h('a', { class: 'support', href: m.support.url, target: '_blank', rel: 'noopener noreferrer' }, h('span', { text: 'Vendor support' }), h('b', { text: titleCase(m.support.vendor) })));
   if (last && st.conversationId) parts.push(helpBlock(m));
-  return h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble' }, parts));
+  return h('div', { class: 'msg bot' }, face('face'), h('div', { class: 'bubble' }, parts));
 }
 
 function drawThread() {
@@ -196,7 +228,7 @@ function drawThread() {
   if (!st.messages.length && !st.sending) col.append(hello());
   const lastBot = st.messages.map((m) => m.role).lastIndexOf('assistant');
   st.messages.forEach((m, i) => col.append(m.role === 'user' ? h('div', { class: 'msg user' }, h('div', { class: 'bubble', text: m.content })) : m.role === 'nps' ? npsCard(m) : botBubble(m, i === lastBot && !st.sending)));
-  if (st.sending) col.append(h('div', { class: 'msg bot' }, h('div', { class: 'face', 'aria-hidden': 'true', text: brandName()[0].toUpperCase() }), h('div', { class: 'bubble', role: 'status', 'aria-label': 'Thinking' }, h('span', { class: 'typing' }, h('i'), h('i'), h('i')))));
+  if (st.sending) col.append(h('div', { class: 'msg bot' }, face('face'), h('div', { class: 'bubble', role: 'status', 'aria-label': 'Thinking' }, h('span', { class: 'typing' }, h('i'), h('i'), h('i')))));
   if (st.error) col.append(h('div', { class: 'err', role: 'alert', text: st.error }));
   thread.append(col); thread.scrollTop = thread.scrollHeight;
 }
