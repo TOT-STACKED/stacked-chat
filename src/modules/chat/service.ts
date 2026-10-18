@@ -125,9 +125,10 @@ export function createChat(deps: ChatDeps) {
     else await deps.conversations.save(conversation_id, toSave);
     try { deps.onAnswered?.(who.siteId); } catch { /* metering never blocks an answer */ }
 
-    // sources and media only make sense when there was an answer
+    // sources only make sense when there was an answer. A matching video or photo stays even when no document answered it:
+    // the assistant was told it is attached and says so, so dropping it would leave the person looking for something missing
     const used = unanswered ? [] : citedSources(reply, passages);
-    const withMedia = unanswered ? { videos: [], images: [] } : media;
+    const withMedia = media;
     const urls = [...withMedia.videos, ...withMedia.images].map((i) => i.url ?? '');
     const signed = deps.signUrls && urls.length ? await deps.signUrls(urls).catch(() => urls) : urls;
     const pick = (list: ItemRow[], offset: number) => list.map((i, n) => ({ id: i.id, title: i.title, url: signed[offset + n] ?? i.url ?? '' })).filter((x) => x.url);

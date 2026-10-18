@@ -155,13 +155,14 @@ describe('the chat service', () => {
     await expect(chat.ask(me(), { message: '   ' })).rejects.toMatchObject({ statusCode: 400 });
     await expect(chat.ask(me(), { message: 'x'.repeat(2001) })).rejects.toMatchObject({ statusCode: 400 });
   });
-  it('attaches a matching video with a signed link, but none when the answer is "unanswered"', async () => {
+  it('attaches a matching video with a signed link, even when no document answered the question', async () => {
     await kb().createVideo(ORG, { title: 'How to void a payment on the till', url: 'https://cdn.x/clip.mp4', site_id: null, status: 'published', by: 'a@b.co' });
     chat = make(async (urls) => urls.map((u) => u + '?signed=1'));
     const r = await chat.ask(me(), { message: 'video: how do I void a payment on the till?' });
     expect(r.videos).toEqual([expect.objectContaining({ title: 'How to void a payment on the till', url: 'https://cdn.x/clip.mp4?signed=1' })]);
     model.reply = "I don't have that in your knowledge base yet.";
-    expect((await chat.ask(me(), { message: 'video: how do I void a payment on the till?' })).videos).toEqual([]);
+    const again = await chat.ask(me(), { message: 'video: how do I void a payment on the till?' });
+    expect(again.unanswered).toBe(true); expect(again.videos).toHaveLength(1); // the gap is still logged, the video still shows
   });
   it('shows only the sources the answer cites, not everything that was searched', async () => {
     await publish('Fire safety', 'Meet at the car park when the fire alarm sounds.');
