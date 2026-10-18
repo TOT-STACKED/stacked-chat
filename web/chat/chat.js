@@ -100,20 +100,29 @@ function micButton() {
   if (!Recognition) return null; // e.g. Firefox: no button rather than a broken one
   const btn = h('button', { class: 'mic', type: 'button', 'aria-label': 'Ask by voice', title: 'Ask by voice' }, svg(ICON.mic));
   const setState = (on) => { btn.classList.toggle('on', on); btn.setAttribute('aria-pressed', on ? 'true' : 'false'); btn.setAttribute('aria-label', on ? 'Stop listening' : 'Ask by voice'); btn.replaceChildren(svg(on ? ICON.stop : ICON.mic)); };
-  btn.addEventListener('click', () => {
-    if (listening) { listening.stop(); return; }
+  // Tap once to start, tap again to stop. The browser ends a session after every pause, so we quietly start the next one
+  // until the person taps stop (or nothing has been said for IDLE_MS, so the mic never stays open by accident).
+  const IDLE_MS = 30000; let wanted = false; let idle;
+  const armIdle = () => { clearTimeout(idle); idle = setTimeout(() => { wanted = false; if (listening) listening.stop(); else finish(); }, IDLE_MS); };
+  const finish = () => { wanted = false; clearTimeout(idle); setState(false); input.focus(); };
+  const begin = () => {
     const rec = new Recognition(); const before = input.value.trim();
-    rec.lang = 'en-GB'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+    rec.lang = 'en-GB'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
     rec.onresult = (e) => {
-      const said = [...e.results].map((r) => r[0].transcript).join(' ').trim();
+      const said = [...e.results].map((r) => r[0].transcript).join(' ').replace(/\s+/g, ' ').trim();
       input.value = (before ? before + ' ' : '') + said; input.dispatchEvent(new Event('input'));
+      armIdle();
     };
     rec.onerror = (e) => {
-      st.error = e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'Allow the microphone in your browser to ask by voice.' : e.error === 'no-speech' || e.error === 'aborted' ? null : 'Voice did not work just now. You can type instead.';
-      if (st.error) drawThread();
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { wanted = false; st.error = 'Allow the microphone in your browser to ask by voice.'; drawThread(); }
+      else if (e.error !== 'no-speech' && e.error !== 'aborted') { wanted = false; st.error = 'Voice did not work just now. You can type instead.'; drawThread(); }
     };
-    rec.onend = () => { listening = null; setState(false); input.focus(); };
-    try { st.error = null; rec.start(); listening = rec; setState(true); } catch { listening = null; setState(false); }
+    rec.onend = () => { listening = null; if (wanted) { try { begin(); return; } catch { /* fall through and stop */ } } finish(); };
+    st.error = null; rec.start(); listening = rec;
+  };
+  btn.addEventListener('click', () => {
+    if (listening || wanted) { wanted = false; if (listening) listening.stop(); else finish(); return; }
+    try { wanted = true; begin(); setState(true); armIdle(); } catch { finish(); }
   });
   return btn;
 }
