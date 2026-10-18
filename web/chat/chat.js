@@ -215,7 +215,7 @@ function botBubble(m, last) {
   const parts = [];
   if (m.sensitive && m.sensitive.mode === 'manager') parts.push(h('span', { class: 'sens', text: 'This one needs a person' }));
   else if (m.sensitive) parts.push(h('span', { class: 'sens soft', text: 'Check before you serve' }));
-  if (m.unanswered) parts.push(h('span', { class: 'notin', text: 'Not in your knowledge base yet' }));
+  if (m.unanswered && !(m.videos && m.videos.length)) parts.push(h('span', { class: 'notin', text: 'Not in your knowledge base yet' }));
   for (const blk of parseBlocks(m.content)) {
     const inl = (ps) => ps.map((p) => (p.t === 'b' ? h('strong', { text: p.v }) : document.createTextNode(p.v)));
     if (blk.type === 'p') parts.push(h('p', null, inl(blk.parts)));

@@ -125,11 +125,11 @@ export function createKnowledge(deps: KnowledgeDeps) {
     if (o.status === 'published') item = await setStatus(orgId, item, 'published');
     return item;
   }
-  async function createVideo(orgId: string, o: { title: string; url: string; site_id: string | null; team_id?: string | null; status: Status; by: string }): Promise<ItemRow> {
+  async function createVideo(orgId: string, o: { title: string; url: string; description?: string | null; site_id: string | null; team_id?: string | null; status: Status; by: string }): Promise<ItemRow> {
     if (!isHttpUrl(o.url)) throw badRequest('Enter a web link that starts with https://');
     await assertSite(orgId, o.site_id);
     const aud = await resolveAudience(orgId, { site_id: o.site_id, team_id: o.team_id ?? null });
-    let item = await store.insertItem({ org_id: orgId, kind: 'video', title: o.title, status: 'draft', site_id: aud.site_id, team_id: aud.team_id, body: null, url: o.url, description: null, ...noChatRefs, source: 'manager', source_question: null, created_by: o.by, published_at: null });
+    let item = await store.insertItem({ org_id: orgId, kind: 'video', title: o.title, status: 'draft', site_id: aud.site_id, team_id: aud.team_id, body: null, url: o.url, description: o.description ?? null, ...noChatRefs, source: 'manager', source_question: null, created_by: o.by, published_at: null });
     if (o.status === 'published') item = await setStatus(orgId, item, 'published');
     return item;
   }

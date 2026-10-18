@@ -103,7 +103,7 @@ export function createChat(deps: ChatDeps) {
 
     const system = buildSystemPrompt({
       botName: who.botName || 'Stacked Chat', orgName: who.orgName, siteName: who.siteName, personName: who.name,
-      passages, hasVideo: media.videos.length > 0, hasImage: media.images.length > 0,
+      passages, hasVideo: media.videos.length > 0, videoNotes: media.videos.map((v) => (v.description ? `${v.title}: ${v.description}` : v.title)), hasImage: media.images.length > 0,
       vendorNotes: pickProfiles(message, history.map((m) => ({ role: m.role, content: m.content })), who.techStack ?? null).map((k) => PROFILES[k]!),
       techStack: who.techStack ?? null, techCategories: TECH_CATEGORIES,
     });

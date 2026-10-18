@@ -151,6 +151,11 @@ describe('the chat service', () => {
     await expect(chat.ask(me(), { message: 'How long are breaks?' })).rejects.toMatchObject({ statusCode: 503 });
     expect(convs.rows).toHaveLength(0); expect(answered).toEqual([]);
   });
+  it('tells the assistant what the attached video is, from its title and description only', () => {
+    const p = buildSystemPrompt({ botName: 'Nora', orgName: 'Acme', siteName: 'North', personName: 'Amy', passages: [], hasVideo: true, videoNotes: ['Managing Guest Feedback: Taking feedback on the spot and logging it'], hasImage: false });
+    expect(p).toContain('Managing Guest Feedback: Taking feedback on the spot and logging it');
+    expect(p).toMatch(/never guess/i);
+  });
   it('rejects empty and over-long messages', async () => {
     await expect(chat.ask(me(), { message: '   ' })).rejects.toMatchObject({ statusCode: 400 });
     await expect(chat.ask(me(), { message: 'x'.repeat(2001) })).rejects.toMatchObject({ statusCode: 400 });

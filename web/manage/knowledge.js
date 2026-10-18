@@ -120,6 +120,8 @@ export async function renderKnowledge(main, ctx) {
       const body = isDoc ? h('textarea', { id: 'k-body', rows: 10, placeholder: 'Write or paste the text. Plain text is fine.', style: 'min-height:220px' }) : null;
       if (body) body.value = existing ? existing.body || '' : '';
       const url = !isDoc ? h('input', { type: 'text', id: 'k-url', value: existing ? existing.url || '' : '', placeholder: 'https://www.youtube.com/watch?v=…' }) : null;
+      const desc = !isDoc ? h('textarea', { id: 'k-desc', rows: 3, maxlength: 500, placeholder: 'e.g. How to take feedback from a guest, respond on the spot and log it. 6 minutes.' }) : null;
+      if (desc) desc.value = existing ? existing.description || '' : '';
       const sc = scopes(); const startSite = existing ? audienceValue(existing) : (sc[0] || { id: '' }).id;
       const options = sc.some((s) => s.id === startSite) || !existing ? sc : [{ id: startSite, name: audienceLabel(existing, st.sites, st.teams) }, ...sc];
       const audience = h('select', { id: 'k-aud' }, options.map((s) => h('option', { value: s.id, selected: s.id === startSite }, s.name)));
@@ -129,7 +131,7 @@ export async function renderKnowledge(main, ctx) {
       async function submit() {
         clear(err);
         const payload = { title: title.value.trim(), ...audienceParams(audience.value), status: live.checked ? 'published' : 'draft' };
-        if (isDoc) payload.body = body.value; else payload.url = url.value.trim();
+        if (isDoc) payload.body = body.value; else { payload.url = url.value.trim(); payload.description = desc.value.trim() || null; }
         if (!payload.title) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Give it a title.' })); return; }
         save.disabled = true; save.textContent = 'Saving…';
         try {
@@ -141,6 +143,7 @@ export async function renderKnowledge(main, ctx) {
         note ? h('div', { class: 'banner info', role: 'status', text: note }) : null,
         h('div', { class: 'field' }, h('label', { for: 'k-title', text: 'Title' }), title),
         isDoc ? h('div', { class: 'field' }, h('label', { for: 'k-body', text: 'Text' }), body) : h('div', { class: 'field' }, h('label', { for: 'k-url', text: 'Video link' }), url, h('span', { class: 'hint', text: 'A YouTube, Vimeo or direct video link.' })),
+        !isDoc ? h('div', { class: 'field' }, h('label', { for: 'k-desc', text: 'What is it about?' }), desc, h('span', { class: 'hint', text: 'The assistant uses this to introduce the video to your team, and to find it when they ask.' })) : null,
         h('div', { class: 'field' }, h('label', { for: 'k-aud', text: 'Who is it for?' }), audience),
         h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'Status' }),
           h('label', { class: 'radio' }, draft, h('span', null, h('b', { text: 'Draft' }), h('span', { class: 'hint', text: ' Private. The AI does not use it yet.' }))),

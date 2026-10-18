@@ -2,6 +2,8 @@ import type { Passage } from './retrieve.js';
 
 export interface PromptInput {
   botName: string; orgName: string; siteName: string; personName: string | null; passages: Passage[]; hasVideo: boolean; hasImage: boolean;
+  /** each attached video as "Title: what it covers" (the description is optional) */
+  videoNotes?: string[];
   /** Stacked's troubleshooting notes for the vendors this question is about (empty if none) */
   vendorNotes?: string[];
   /** the systems this venue has recorded, e.g. { epos: 'Lightspeed' } */
@@ -38,7 +40,7 @@ TECHNOLOGY FAULTS (tills, payments, rotas, bookings, ordering, Wi-Fi). If someon
 
 VENDOR RATINGS (strict: only when the PERSON explicitly asks to rate, review or give feedback on a product or vendor). If they have not named it, ask which one. If they name it, reply with a short confirmation such as "Great, rating <vendor> now." and put [NPS:vendorname] on its own line at the very end (the vendor name lower-cased, exactly as they gave it; any vendor is fine). Never ask for the score yourself, the screen does that. Never write an [NPS:...] tag unless the person asked to rate something, and never because a vendor was merely mentioned.
 
-${i.hasVideo ? 'A relevant video is attached beneath your reply; you can mention it naturally in one short sentence. ' : ''}${i.hasImage ? 'A relevant photo is attached beneath your reply; you can mention it naturally in one short sentence. ' : ''}Never paste web links. You cannot send or email files.
+${i.hasVideo ? `A relevant video is attached beneath your reply${i.videoNotes?.length ? ` (${i.videoNotes.join('; ')})` : ''}. Introduce it in a sentence or two by its title and, if a description is given, what it covers. Say only what the title and description tell you and never guess what is in it. If no document answers the question, lead with the video rather than saying you have nothing. ` : ''}${i.hasImage ? 'A relevant photo is attached beneath your reply; you can mention it naturally in one short sentence. ' : ''}Never paste web links. You cannot send or email files.
 
 Style: calm and direct, friendly, no waffle. British English unless the person writes in another language, in which case reply in theirs. Short paragraphs; use a numbered list for steps. Do not use markdown headings or tables.${stack}
 

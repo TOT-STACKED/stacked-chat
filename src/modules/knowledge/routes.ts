@@ -63,7 +63,7 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
 
   const Create = z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('document'), title: Title, body: z.string().max(600_000), site_id: Id.nullable().optional(), team_id: Id.nullable().optional(), status: Status.default('draft') }),
-    z.object({ kind: z.literal('video'), title: Title, url: z.string().trim().url().max(2000), site_id: Id.nullable().optional(), team_id: Id.nullable().optional(), status: Status.default('draft') }),
+    z.object({ kind: z.literal('video'), title: Title, url: z.string().trim().url().max(2000), description: z.string().trim().max(500).nullable().optional(), site_id: Id.nullable().optional(), team_id: Id.nullable().optional(), status: Status.default('draft') }),
   ]);
   r.post('/api/v1/orgs/:orgId/knowledge', {
     preHandler: app.authenticate,
@@ -83,7 +83,7 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!canWrite(actor, orgId, siteId)) throw forbidden(siteId ? 'You cannot add knowledge for this site' : 'Only company admins can add knowledge for the whole company');
     const item = b.kind === 'document'
       ? await kb().createDocument(orgId, { title: b.title, body: b.body, site_id: b.site_id ?? null, team_id: b.team_id ?? null, status: b.status, by: actor.email })
-      : await kb().createVideo(orgId, { title: b.title, url: b.url, site_id: b.site_id ?? null, team_id: b.team_id ?? null, status: b.status, by: actor.email });
+      : await kb().createVideo(orgId, { title: b.title, url: b.url, description: b.description || null, site_id: b.site_id ?? null, team_id: b.team_id ?? null, status: b.status, by: actor.email });
     reply.status(201);
     return { ...knowledgeView(item), body: item.body };
   });
