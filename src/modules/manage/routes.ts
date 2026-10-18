@@ -17,7 +17,7 @@ export async function manageRoutes(app: FastifyInstance, opts: { config: Config;
     "script-src 'self'",
     "style-src 'self' https://fonts.googleapis.com",
     "font-src https://fonts.gstatic.com",
-    "img-src 'self' data:",
+    `img-src 'self' data: ${supabaseOrigin}`, // stored pictures are shown from private storage by short-lived signed links
     `connect-src 'self' ${supabaseOrigin}`,
     "base-uri 'none'", "form-action 'self'", "frame-ancestors 'none'",
   ].join('; ');

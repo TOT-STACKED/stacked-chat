@@ -31,14 +31,14 @@ export async function renderKnowledge(main, ctx) {
     const canAdd = scopes().length > 0;
     main.append(pageHeader({
       icon: 'knowledge', title: 'Knowledge', sub: 'Everything your AI can answer from, and who it is for.',
-      actions: canAdd ? [h('button', { class: 'btn line', onclick: () => openForm('video') }, 'Add a video'), h('button', { class: 'btn line', onclick: () => openForm('document') }, 'Write a document'), uploadButton('btn cta', 'Upload a file')] : null,
+      actions: canAdd ? [h('button', { class: 'btn line', onclick: () => openForm('video') }, 'Add a video'), imageButton('btn line', 'Add an image'), h('button', { class: 'btn line', onclick: () => openForm('document') }, 'Write a document'), uploadButton('btn cta', 'Upload a file')] : null,
     }));
     if (st.error) { main.append(h('div', { class: 'banner', role: 'alert' }, st.error + ' ', h('button', { class: 'lnk', onclick: load }, 'Try again'))); return; }
     if (st.loading) { main.append(h('p', { class: 'muted', text: 'Loading…' })); return; }
     if (!st.items.length) {
       main.append(h('div', { class: 'card empty-state' }, tile('empty', 64), h('h2', { text: 'Add your first piece of knowledge' }),
         h('p', { text: 'Upload a PDF or Word handbook, write down a policy or a how-to, or add a video. Your AI answers from what you publish here. Drafts stay private until you publish them.' }),
-        canAdd ? h('div', { class: 'actions', style: 'justify-content:center' }, uploadButton('btn cta', 'Upload a file'), h('button', { class: 'btn line', onclick: () => openForm('document') }, 'Write a document')) : null));
+        canAdd ? h('div', { class: 'actions', style: 'justify-content:center' }, uploadButton('btn cta', 'Upload a file'), h('button', { class: 'btn line', onclick: () => openForm('document') }, 'Write a document'), imageButton('btn line', 'Add an image')) : null));
       return;
     }
     main.append(toolbar(), table());
@@ -85,6 +85,34 @@ export async function renderKnowledge(main, ctx) {
     return h('span', { style: 'display:inline-block' }, input, h('button', { class: cls, onclick: () => input.click() }, label));
   }
 
+  /** A button that opens the picture picker. Big phone photos are shrunk first so they upload quickly and can be read. */
+  function imageButton(cls, label) {
+    const input = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/webp', style: 'display:none', 'aria-label': 'Choose a picture' });
+    input.addEventListener('change', () => { const f = input.files[0]; input.value = ''; if (f) uploadImage(f); });
+    return h('span', { style: 'display:inline-block' }, input, h('button', { class: cls, onclick: () => input.click() }, label));
+  }
+  async function shrink(file) {
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return file;
+    try {
+      const bmp = await createImageBitmap(file);
+      const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+      if (k === 1 && file.size < 1.5 * 1024 * 1024) return file;
+      const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+      const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.88));
+      return blob && blob.size < file.size ? blob : file;
+    } catch { return file; }
+  }
+  async function uploadImage(file) {
+    const site = (audienceParams((scopes().find((s) => !s.id.startsWith('team:')) || { id: '' }).id).site_id) || '';
+    toast(`Adding ${file.name}…`);
+    try {
+      const made = await api.upload(`${base}/upload-image?filename=${encodeURIComponent(file.name)}${site ? `&site_id=${site}` : ''}`, await shrink(file));
+      await load();
+      openForm('image', made, 'Say what it is, then choose who it is for and publish. Until you do, the AI will not use it. Tip: use “Read the text from this picture” for spec cards and menus.');
+    } catch (e) { modal('We could not add that picture', (close) => h('div', { class: 'stack' }, h('p', { class: 'muted', style: 'margin:0', text: e.message }), h('div', { class: 'row' }, h('button', { class: 'btn cta', onclick: close }, 'OK')))); }
+  }
+
   async function uploadFiles(files) {
     const aud = audienceParams((scopes().find((s) => !s.id.startsWith('team:')) || { id: '' }).id);
     const site = aud.site_id || '';
@@ -113,37 +141,50 @@ export async function renderKnowledge(main, ctx) {
 
   /** Create (existing == null) or edit. */
   function openForm(kind, existing, note) {
-    const isDoc = kind === 'document'; const editing = !!existing;
+    const isDoc = kind === 'document'; const isImg = kind === 'image'; const editing = !!existing;
     modal(editing ? `Edit ${KIND_LABEL[kind].toLowerCase()}` : isDoc ? 'Write a document' : 'Add a video', (close) => {
       const err = h('div');
-      const title = h('input', { type: 'text', id: 'k-title', maxlength: 120, value: existing ? existing.title : '', placeholder: isDoc ? 'e.g. Allergen policy' : 'e.g. Fire drill walkthrough' });
+      const title = h('input', { type: 'text', id: 'k-title', maxlength: 120, value: existing ? existing.title : '', placeholder: isDoc ? 'e.g. Allergen policy' : isImg ? 'e.g. Espresso martini' : 'e.g. Fire drill walkthrough' });
       const body = isDoc ? h('textarea', { id: 'k-body', rows: 10, placeholder: 'Write or paste the text. Plain text is fine.', style: 'min-height:220px' }) : null;
       if (body) body.value = existing ? existing.body || '' : '';
-      const url = !isDoc ? h('input', { type: 'text', id: 'k-url', value: existing ? existing.url || '' : '', placeholder: 'https://www.youtube.com/watch?v=…' }) : null;
-      const desc = !isDoc ? h('textarea', { id: 'k-desc', rows: 3, maxlength: 500, placeholder: 'e.g. How to take feedback from a guest, respond on the spot and log it. 6 minutes.' }) : null;
+      const url = !isDoc && !isImg ? h('input', { type: 'text', id: 'k-url', value: existing ? existing.url || '' : '', placeholder: 'https://www.youtube.com/watch?v=…' }) : null;
+      const desc = !isDoc ? h('textarea', { id: 'k-desc', rows: isImg ? 8 : 3, maxlength: isImg ? 4000 : 500, placeholder: isImg ? 'e.g. Espresso martini. 50ml vodka, 25ml coffee liqueur, 30ml fresh espresso, shake hard, strain into a chilled coupe, 3 beans to garnish.' : 'e.g. How to take feedback from a guest, respond on the spot and log it. 6 minutes.' }) : null;
       if (desc) desc.value = existing ? existing.description || '' : '';
       const sc = scopes(); const startSite = existing ? audienceValue(existing) : (sc[0] || { id: '' }).id;
       const options = sc.some((s) => s.id === startSite) || !existing ? sc : [{ id: startSite, name: audienceLabel(existing, st.sites, st.teams) }, ...sc];
       const audience = h('select', { id: 'k-aud' }, options.map((s) => h('option', { value: s.id, selected: s.id === startSite }, s.name)));
       const live = h('input', { type: 'radio', name: 'k-status', value: 'published', id: 'k-pub', checked: existing ? existing.status === 'published' : false });
       const draft = h('input', { type: 'radio', name: 'k-status', value: 'draft', id: 'k-draft', checked: existing ? existing.status !== 'published' : true });
-      const save = h('button', { class: 'btn cta', onclick: submit }, editing ? 'Save' : isDoc ? 'Save document' : 'Add video');
+      const save = h('button', { class: 'btn cta', onclick: submit }, editing ? 'Save' : isDoc ? 'Save document' : isImg ? 'Save picture' : 'Add video');
+      const readBtn = isImg && existing ? h('button', { class: 'btn line', type: 'button', onclick: readPicture }, 'Read the text from this picture') : null;
+      async function readPicture() {
+        readBtn.disabled = true; readBtn.textContent = 'Reading…';
+        try {
+          const r = await api.post(`${base}/${existing.id}/read-picture`, {});
+          desc.value = desc.value.trim() ? `${desc.value.trim()}\n\n${r.text}` : r.text;
+          toast('Done. Check it against the picture before you publish: it can misread handwriting.');
+        } catch (e) { toast(e.message); }
+        readBtn.disabled = false; readBtn.textContent = 'Read the text from this picture';
+      }
       async function submit() {
         clear(err);
         const payload = { title: title.value.trim(), ...audienceParams(audience.value), status: live.checked ? 'published' : 'draft' };
-        if (isDoc) payload.body = body.value; else { payload.url = url.value.trim(); payload.description = desc.value.trim() || null; }
+        if (isDoc) payload.body = body.value; else if (isImg) payload.description = desc.value.trim() || null; else { payload.url = url.value.trim(); payload.description = desc.value.trim() || null; }
         if (!payload.title) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Give it a title.' })); return; }
         save.disabled = true; save.textContent = 'Saving…';
         try {
           if (editing) await api.patch(`${base}/${existing.id}`, payload); else await api.post(base, { kind, ...payload });
           close(); toast(payload.status === 'published' ? 'Saved and published' : 'Saved as a draft'); await load();
-        } catch (e) { save.disabled = false; save.textContent = editing ? 'Save' : isDoc ? 'Save document' : 'Add video'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
+        } catch (e) { save.disabled = false; save.textContent = editing ? 'Save' : isDoc ? 'Save document' : isImg ? 'Save picture' : 'Add video'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
       }
       return h('div', { class: 'stack' },
         note ? h('div', { class: 'banner info', role: 'status', text: note }) : null,
         h('div', { class: 'field' }, h('label', { for: 'k-title', text: 'Title' }), title),
-        isDoc ? h('div', { class: 'field' }, h('label', { for: 'k-body', text: 'Text' }), body) : h('div', { class: 'field' }, h('label', { for: 'k-url', text: 'Video link' }), url, h('span', { class: 'hint', text: 'A YouTube, Vimeo or direct video link.' })),
-        !isDoc ? h('div', { class: 'field' }, h('label', { for: 'k-desc', text: 'What is it about?' }), desc, h('span', { class: 'hint', text: 'The assistant uses this to introduce the video to your team, and to find it when they ask.' })) : null,
+        isDoc ? h('div', { class: 'field' }, h('label', { for: 'k-body', text: 'Text' }), body)
+          : isImg ? (existing && existing.preview_url ? h('img', { src: existing.preview_url, alt: existing.title, style: 'max-width:100%;max-height:260px;border-radius:12px;align-self:flex-start;object-fit:contain' }) : null)
+          : h('div', { class: 'field' }, h('label', { for: 'k-url', text: 'Video link' }), url, h('span', { class: 'hint', text: 'A YouTube, Vimeo or direct video link.' })),
+        !isDoc ? h('div', { class: 'field' }, h('label', { for: 'k-desc', text: isImg ? 'What is it? Write the details here' : 'What is it about?' }), desc,
+          isImg ? h('div', { class: 'row', style: 'justify-content:flex-start;gap:10px;align-items:center' }, readBtn, h('span', { class: 'hint', text: 'Staff can ask about anything written here, and the picture shows with the answer.' })) : h('span', { class: 'hint', text: 'The assistant uses this to introduce the video to your team, and to find it when they ask.' })) : null,
         h('div', { class: 'field' }, h('label', { for: 'k-aud', text: 'Who is it for?' }), audience),
         h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'Status' }),
           h('label', { class: 'radio' }, draft, h('span', null, h('b', { text: 'Draft' }), h('span', { class: 'hint', text: ' Private. The AI does not use it yet.' }))),

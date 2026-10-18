@@ -41,6 +41,7 @@ import { createSupabaseConsoleStore, type ConsoleStore } from './modules/console
 import { chatAppRoutes } from './modules/chat/app-routes.js';
 import { createChat, type Chat } from './modules/chat/service.js';
 import { createAnthropicChatModel, type ChatModel } from './modules/chat/model.js';
+import { createAnthropicPictureReader, type PictureReader } from './modules/knowledge/vision.js';
 import { createSupabaseConversationStore, type ConversationStore } from './modules/chat/store.js';
 import { createHelp, createSupabaseTicketStore, type Help, type TicketStore } from './modules/chat/help.js';
 import { createSlackNotifier, type Notify } from './lib/slack.js';
@@ -83,7 +84,9 @@ export interface Deps {
   npsStore?: NpsStore;
   mirrorNps?: NpsMirror | null;
   chatModel?: ChatModel | null;
-  storage?: { signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>> } | null;
+  storage?: { signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>>; uploadObject?(path: string, data: Uint8Array, contentType: string): Promise<string> } | null;
+  /** reads writing off pictures (spec cards, menus); null = switched off */
+  pictureReader?: PictureReader | null;
   drafter?: AnswerDrafter | null;
   now?: () => Date;
 }
@@ -233,7 +236,8 @@ export async function buildApp(
   await app.register(async (instance) => teamRoutes(instance, { repo, gate }));
   await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
-  await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate }));
+  const pictureReader = overrides.pictureReader !== undefined ? overrides.pictureReader : (config.ANTHROPIC_API_KEY ? createAnthropicPictureReader({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null);
+  await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate, files: overrides.storage ?? null, reader: pictureReader }));
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
   await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));

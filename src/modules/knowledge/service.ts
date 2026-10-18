@@ -134,6 +134,14 @@ export function createKnowledge(deps: KnowledgeDeps) {
     return item;
   }
 
+  async function createImage(orgId: string, o: { title: string; url: string; description?: string | null; site_id: string | null; team_id?: string | null; status: Status; by: string }): Promise<ItemRow> {
+    await assertSite(orgId, o.site_id);
+    const aud = await resolveAudience(orgId, { site_id: o.site_id, team_id: o.team_id ?? null });
+    let item = await store.insertItem({ org_id: orgId, kind: 'image', title: o.title, status: 'draft', site_id: aud.site_id, team_id: aud.team_id, body: null, url: o.url, description: o.description ?? null, ...noChatRefs, source: 'manager', source_question: null, created_by: o.by, published_at: null });
+    if (o.status === 'published') item = await setStatus(orgId, item, 'published');
+    return item;
+  }
+
   async function setStatus(orgId: string, item: ItemRow, status: Status): Promise<ItemRow> {
     if (item.status === status) return item;
     const ws = await workspaceOf(orgId, true);
@@ -205,7 +213,7 @@ export function createKnowledge(deps: KnowledgeDeps) {
     };
   }
 
-  return { excludedFor, resolveAudience, list, get: (orgId: string, id: string) => store.getItem(orgId, id), createDocument, createVideo, update, remove, view };
+  return { excludedFor, resolveAudience, list, get: (orgId: string, id: string) => store.getItem(orgId, id), createDocument, createVideo, createImage, update, remove, view };
 }
 
 export type Knowledge = ReturnType<typeof createKnowledge>;

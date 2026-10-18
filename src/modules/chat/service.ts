@@ -6,7 +6,7 @@ import { pickProfiles, supportLink, takeNpsTag, vendorAnswerToRatingQuestion, ve
 import { checkNps, type NpsMirror, type NpsStore } from './nps.js';
 import { buildSystemPrompt } from './prompt.js';
 import type { ChatModel, ChatTurn } from './model.js';
-import { pickMedia, retrievePassages, visibleTo } from './retrieve.js';
+import { imagesBehind, pickMedia, retrievePassages, visibleTo } from './retrieve.js';
 import type { ConversationStore, StoredMessage } from './store.js';
 import { detectSensitive, TOPIC_IDS, withConfirmLine, type TopicId, type TopicMode } from '../sensitive/topics.js';
 
@@ -98,8 +98,10 @@ export function createChat(deps: ChatDeps) {
 
     // a short follow-up ("and on Sundays?") makes sense only with the previous question, so search with both
     const lastQuestion = [...stored].reverse().find((m) => m.role === 'user')?.content ?? '';
-    const passages = retrievePassages(visible.filter((i) => i.kind === 'document'), `${message} ${message.split(/\s+/).length < 6 ? lastQuestion : ''}`);
-    const media = pickMedia(visible, message);
+    const passages = retrievePassages(visible.filter((i) => i.kind === 'document' || i.kind === 'image'), `${message} ${message.split(/\s+/).length < 6 ? lastQuestion : ''}`);
+    const picked = pickMedia(visible, message);
+    const behind = imagesBehind(visible, passages).filter((i) => !picked.images.some((p) => p.id === i.id));
+    const media = { videos: picked.videos, images: [...picked.images, ...behind].slice(0, 1) };
 
     const system = buildSystemPrompt({
       botName: who.botName || 'Stacked Chat', orgName: who.orgName, siteName: who.siteName, personName: who.name,

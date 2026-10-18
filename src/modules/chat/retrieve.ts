@@ -50,10 +50,12 @@ export function retrievePassages(items: ItemRow[], question: string, limit = 5):
   if (!words.length) return [];
   const scored: Passage[] = [];
   for (const item of items) {
-    if (item.kind !== 'document' || !item.body) continue;
+    // a picture's description (a spec typed in, or read off a photo of a spec card) answers questions like a document does
+    const source = item.kind === 'document' ? item.body : item.kind === 'image' ? item.description : null;
+    if (!source) continue;
     const titleWords = new Set(significantWords(item.title));
     const titleHits = words.filter((w) => matches(w, titleWords)).length;
-    for (const text of splitPassages(item.body)) {
+    for (const text of splitPassages(source)) {
       const have = new Set(significantWords(text));
       const hits = words.filter((w) => matches(w, have)).length;
       const score = hits + titleHits * 2;
@@ -69,6 +71,12 @@ export function retrievePassages(items: ItemRow[], question: string, limit = 5):
 
 const wantsVideo = (q: string) => /\b(video|watch|tutorial|walkthrough|demo|show me how)\b/i.test(q);
 const wantsPhoto = (q: string) => /\b(photo|photos|picture|pictures|image|images|pic|pics|looks?\s+like)\b/i.test(q);
+
+/** Pictures whose own description supplied the best passages: show them with the answer, even if nobody said "photo". */
+export function imagesBehind(items: ItemRow[], passages: Passage[], max = 1): ItemRow[] {
+  const ids = [...new Set(passages.slice(0, 2).map((p) => p.item_id))];
+  return ids.map((id) => items.find((i) => i.id === id && i.kind === 'image')).filter((i): i is ItemRow => !!i).slice(0, max);
+}
 
 /** A video worth attaching (one), and a photo only when the person asked to see one. */
 export function pickMedia(items: ItemRow[], question: string): { videos: ItemRow[]; images: ItemRow[] } {

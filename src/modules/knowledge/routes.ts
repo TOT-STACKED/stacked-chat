@@ -1,16 +1,21 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { badRequest, forbidden, notFound } from '../../lib/errors.js';
+import { ApiHttpError, badRequest, forbidden, notFound } from '../../lib/errors.js';
 import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
 import { assertOrgAccess, userOnly } from '../access.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import { MAX_UPLOAD_BYTES, extractText, titleFromFilename } from './extract.js';
+import { MAX_IMAGE_BYTES, imageFileName, imageTitle, sniffImage } from './image.js';
+import { MAX_READABLE_BYTES, type PictureReader } from './vision.js';
+import { buildPath } from '../../lib/storage.js';
 import type { Knowledge } from './service.js';
 import { knowledgeView } from './service.js';
 import type { ItemRow } from './store.js';
 
-interface Ctx { knowledge: Knowledge | null; gate: (orgId: string) => Promise<void> }
+/** Private file storage for pictures, and the model that reads writing off them. Either can be absent (the buttons then say so). */
+export interface FileStore { signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>>; uploadObject?(path: string, data: Uint8Array, contentType: string): Promise<string> }
+interface Ctx { knowledge: Knowledge | null; gate: (orgId: string) => Promise<void>; files?: FileStore | null; reader?: PictureReader | null }
 
 const Title = z.string().trim().min(1).max(120);
 const Status = z.enum(['draft', 'published']);
@@ -19,11 +24,18 @@ const ItemOut = z.object({
   team_id: Id.nullable(), url: z.string().nullable(), description: z.string().nullable(), source: z.enum(['manager', 'ai_draft', 'imported']), created_by: z.string().nullable(),
   created_at: z.string(), updated_at: z.string(), published_at: z.string().nullable(), chars: z.number().nullable(),
 });
-const ItemDetail = ItemOut.extend({ body: z.string().nullable() });
+const ItemDetail = ItemOut.extend({ body: z.string().nullable(), preview_url: z.string().nullable().optional() });
 
 export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const kb = (): Knowledge => { if (!ctx.knowledge) throw notFound('Knowledge is not available'); return ctx.knowledge; };
+
+  /** A short-lived link a browser can show a stored picture from (the bucket is private). */
+  const previewUrl = async (i: ItemRow): Promise<string | null> => {
+    if (i.kind !== 'image' || !i.url) return null;
+    const [u] = ctx.files ? await ctx.files.signUrls([i.url]).catch(() => [i.url]) : [i.url];
+    return u ?? null;
+  };
 
   /** May this person manage knowledge for this audience (null = the whole company)? Same rule as managing people. */
   const canWrite = (p: Principal, orgId: string, siteId: string | null) => p.kind === 'user' && canManageMembers(p, orgId, siteId);
@@ -58,7 +70,7 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
     await kb().list(orgId); // adopts anything new first, so a just-added old item can be opened
     const item = await kb().get(orgId, id);
     if (!item || !canSee(p, orgId, item)) throw notFound('Knowledge item not found');
-    return { ...knowledgeView(item), body: item.body };
+    return { ...knowledgeView(item), body: item.body, preview_url: await previewUrl(item) };
   });
 
   const Create = z.discriminatedUnion('kind', [
@@ -122,12 +134,77 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
     return { ...knowledgeView(item), body: item.body };
   });
 
+  // Upload a picture (PNG, JPEG or WebP): saved to private storage and added as a DRAFT image to describe and publish.
+  for (const type of ['image/png', 'image/jpeg', 'image/webp']) {
+    app.addContentTypeParser(type, { parseAs: 'buffer', bodyLimit: MAX_IMAGE_BYTES + 1024 }, (_req, body, done) => done(null, body));
+  }
+  r.post('/api/v1/orgs/:orgId/knowledge/upload-image', {
+    bodyLimit: MAX_IMAGE_BYTES + 1024,
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['knowledge'], security: SECURITY,
+      summary: 'Upload a picture (PNG, JPEG or WebP, up to 10 MB). It is saved as a draft to describe and publish.',
+      params: z.object({ orgId: Id }),
+      querystring: z.object({ filename: z.string().trim().min(1).max(200), site_id: Id.optional() }),
+      response: { 201: ItemDetail, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody, 502: ErrorBody, 503: ErrorBody },
+    },
+  }, async (req, reply) => {
+    const { orgId } = req.params;
+    const actor = userOnly(req);
+    assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
+    const siteId = req.query.site_id ?? null;
+    if (!canWrite(actor, orgId, siteId)) throw forbidden(siteId ? 'You cannot add knowledge for this site' : 'Only company admins can add knowledge for the whole company');
+    if (!ctx.files?.uploadObject) throw new ApiHttpError(503, 'storage_unavailable', 'Picture uploads are not switched on yet');
+    if (!Buffer.isBuffer(req.body)) throw badRequest('Send the picture itself as the request body');
+    const type = sniffImage(req.body);
+    const path = buildPath('image', orgId, imageFileName(req.query.filename, type));
+    let url: string;
+    try { url = await ctx.files.uploadObject(path, req.body, type); }
+    catch (e) { req.log.error({ orgId, err: String((e as Error).message) }, 'picture upload failed'); throw new ApiHttpError(502, 'storage_failed', 'We could not save that picture. Please try again.'); }
+    const item = await kb().createImage(orgId, { title: imageTitle(req.query.filename), url, site_id: siteId, status: 'draft', by: actor.email });
+    reply.status(201);
+    req.log.info({ orgId, bytes: req.body.length, type }, 'picture upload');
+    return { ...knowledgeView(item), body: null, preview_url: await previewUrl(item) };
+  });
+
+  // Read the writing off a stored picture (a spec card, a menu page). Nothing is saved: the text comes back to be checked.
+  r.post('/api/v1/orgs/:orgId/knowledge/:id/read-picture', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['knowledge'], security: SECURITY,
+      summary: 'Read the text from a picture so it can be checked and saved as its description. Nothing is saved by this call.',
+      params: z.object({ orgId: Id, id: Id }),
+      response: { 200: z.object({ text: z.string() }), 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 502: ErrorBody, 503: ErrorBody },
+    },
+  }, async (req) => {
+    const { orgId, id } = req.params;
+    const actor = userOnly(req);
+    assertOrgAccess(req, orgId);
+    await ctx.gate(orgId);
+    const item = await kb().get(orgId, id);
+    if (!item || item.kind !== 'image' || !item.url || !canSee(actor, orgId, item)) throw notFound('Picture not found');
+    if (!canWrite(actor, orgId, item.site_id)) throw forbidden('You cannot change this item');
+    if (!ctx.reader || !ctx.files) throw new ApiHttpError(503, 'reader_unavailable', 'Reading text from pictures is not switched on yet');
+    const [signed] = await ctx.files.signUrls([item.url]);
+    let data: Buffer;
+    try {
+      const res = await fetch(signed ?? item.url);
+      if (!res.ok) throw new Error(String(res.status));
+      data = Buffer.from(await res.arrayBuffer());
+    } catch { throw new ApiHttpError(502, 'picture_unavailable', 'We could not open that picture. Please try again.'); }
+    if (data.length > MAX_READABLE_BYTES) throw badRequest('That picture is too large to read. Upload a smaller version (under 5 MB).');
+    const text = await ctx.reader.read({ data, mediaType: sniffImage(data) });
+    if (!text) throw new ApiHttpError(502, 'reader_failed', 'We could not read that picture just now. You can type the details in instead.');
+    return { text };
+  });
+
   r.patch('/api/v1/orgs/:orgId/knowledge/:id', {
     preHandler: app.authenticate,
     schema: {
       tags: ['knowledge'], summary: 'Edit, retarget (company or one site), publish or unpublish', security: SECURITY,
       params: z.object({ orgId: Id, id: Id }),
-      body: z.object({ title: Title.optional(), body: z.string().max(600_000).optional(), url: z.string().trim().url().max(2000).optional(), description: z.string().max(500).nullable().optional(), site_id: Id.nullable().optional(), team_id: Id.nullable().optional(), status: Status.optional() })
+      body: z.object({ title: Title.optional(), body: z.string().max(600_000).optional(), url: z.string().trim().url().max(2000).optional(), description: z.string().max(4000).nullable().optional(), site_id: Id.nullable().optional(), team_id: Id.nullable().optional(), status: Status.optional() })
         .refine((b) => Object.keys(b).length > 0, 'Nothing to change'),
       response: { 200: ItemDetail, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody, 409: ErrorBody },
     },

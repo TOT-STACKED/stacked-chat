@@ -169,6 +169,16 @@ describe('the chat service', () => {
     const again = await chat.ask(me(), { message: 'video: how do I void a payment on the till?' });
     expect(again.unanswered).toBe(true); expect(again.videos).toHaveLength(1); // the gap is still logged, the video still shows
   });
+  it('answers from a picture\'s details and shows that picture with the answer, without anyone asking for a photo', async () => {
+    await kb().createImage(ORG, { title: 'Espresso martini', url: 'https://cdn.x/em.jpg', description: 'Espresso martini: 50ml vodka, 25ml coffee liqueur, 30ml espresso. Shake hard, strain into a coupe.', site_id: null, status: 'published', by: 'a@b.co' });
+    chat = make(async (urls) => urls.map((u) => u + '?signed=1'));
+    model.reply = 'Use 25ml of coffee liqueur.\nSource: Espresso martini';
+    const r = await chat.ask(me(), { message: 'how much coffee liqueur in an espresso martini?' });
+    expect(r.unanswered).toBe(false);
+    expect(r.images).toEqual([expect.objectContaining({ title: 'Espresso martini', url: 'https://cdn.x/em.jpg?signed=1' })]);
+    expect(r.sources.map((x) => x.title)).toEqual(['Espresso martini']);
+    expect(model.calls.at(-1)!.system).toContain('25ml coffee liqueur');
+  });
   it('shows only the sources the answer cites, not everything that was searched', async () => {
     await publish('Fire safety', 'Meet at the car park when the fire alarm sounds.');
     await publish('Handbook', 'Breaks are twenty minutes. Fire alarm tests are on Fridays.');

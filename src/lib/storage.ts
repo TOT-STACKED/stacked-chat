@@ -113,6 +113,15 @@ export function createStorage(opts: StorageOptions) {
     return { path, uploadUrl: base + '/storage/v1' + (j.url.startsWith('/') ? '' : '/') + j.url, url: canonicalUrl(path) };
   }
 
+  /** Store bytes at a server-chosen path (service key; never overwrites). Returns the canonical stored URL. */
+  async function uploadObject(path: string, data: Uint8Array, contentType: string): Promise<string> {
+    const res = await f(`${base}/storage/v1/object/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`, {
+      method: 'POST', headers: { apikey: opts.serviceKey, Authorization: 'Bearer ' + opts.serviceKey, 'Content-Type': contentType, 'x-upsert': 'false' }, body: data as unknown as BodyInit,
+    });
+    if (!res.ok) throw new Error(`Could not store the file (${res.status})`);
+    return canonicalUrl(path);
+  }
+
   /**
    * Tenant check for URLs a venue admin registers: a URL in our bucket must sit inside THAT venue's
    * own folders, so one venue can never register (and so read) another venue's files.
@@ -124,7 +133,7 @@ export function createStorage(opts: StorageOptions) {
     return [`${venueId}/`, `images/${venueId}/`, `docs/${venueId}/`].some((pre) => p.startsWith(pre));
   }
 
-  return { pathFromUrl, canonicalUrl, signUrls, createUpload, ownsUrl, bucket };
+  return { pathFromUrl, canonicalUrl, signUrls, createUpload, uploadObject, ownsUrl, bucket };
 }
 
 export type Storage = ReturnType<typeof createStorage>;
