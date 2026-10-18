@@ -31,6 +31,17 @@ export function splitPassages(body: string, max = 900): string[] {
   return out;
 }
 
+const bigrams = (w: string) => { const b: string[] = []; for (let i = 0; i < w.length - 1; i++) b.push(w.slice(i, i + 2)); return b; };
+/** Typo tolerance for phones typed mid-service ("openoing", "restrautn"): long words that start alike and share most letter pairs. */
+export function near(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length < 5 || b.length < 5 || a[0] !== b[0] || Math.abs(a.length - b.length) > 3) return false;
+  const x = bigrams(a); const y = new Set(bigrams(b));
+  const shared = x.filter((g) => y.has(g)).length;
+  return (2 * shared) / (x.length + y.size) >= 0.55;
+}
+const matches = (word: string, have: Set<string>) => have.has(word) || [...have].some((h) => near(word, h));
+
 export interface Passage { item_id: string; title: string; text: string; score: number }
 
 /** The passages that best match the question. Titles count extra. Nothing is returned if nothing matches. */
@@ -41,10 +52,10 @@ export function retrievePassages(items: ItemRow[], question: string, limit = 5):
   for (const item of items) {
     if (item.kind !== 'document' || !item.body) continue;
     const titleWords = new Set(significantWords(item.title));
-    const titleHits = words.filter((w) => titleWords.has(w)).length;
+    const titleHits = words.filter((w) => matches(w, titleWords)).length;
     for (const text of splitPassages(item.body)) {
       const have = new Set(significantWords(text));
-      const hits = words.filter((w) => have.has(w)).length;
+      const hits = words.filter((w) => matches(w, have)).length;
       const score = hits + titleHits * 2;
       if (hits > 0 || titleHits > 0) scored.push({ item_id: item.id, title: item.title, text, score });
     }

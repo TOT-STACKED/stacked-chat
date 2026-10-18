@@ -59,6 +59,11 @@ describe('finding the right passages', () => {
     expect(retrievePassages([handbook, fire], 'What is the wifi password?')).toEqual([]);
     expect(retrievePassages([handbook, fire], 'hi')).toEqual([]);
   });
+  it('copes with typos typed on a phone', () => {
+    const doc = { ...fire, id: 'o1', title: 'Opening a restaurant', body: 'Opening procedures: unlock the restaurant, switch on the ovens and check the fridges.' };
+    expect(retrievePassages([doc], 'what can you tell me about openoing a restrautn?')[0]!.title).toBe('Opening a restaurant');
+    expect(retrievePassages([doc], 'what is the wifi password?')).toEqual([]);
+  });
   it('title matches count extra, and one document cannot fill every slot', () => {
     const big = item({ title: 'Big', body: Array.from({ length: 10 }, (_, i) => `Rota paragraph ${i} about shifts and rota changes.`).join('\n\n'.repeat(1) + '\n\n') });
     const r = retrievePassages([big, item({ title: 'Rota rules', body: 'Rota swaps need approval.' })], 'rota shifts', 5);
