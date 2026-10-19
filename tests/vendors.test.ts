@@ -134,6 +134,15 @@ describe('the chat uses the playbook', () => {
     reply = 'You could try Stampede for guest wifi.';
     expect((await chat().ask(who(), { message: 'guest wifi keeps dropping at the bar' })).nps).toBeNull();
   });
+  it('a stray rating tag on an unrelated question is ignored, and a product named earlier does not trigger a card later', async () => {
+    reply = 'Here are the steps.\n[NPS:lightspeed]';
+    expect((await chat().ask(who(), { message: 'how do I make a margarita?' })).nps).toBeNull();
+    reply = 'Here are the steps.';
+    const c = chat();
+    await c.ask(who(), { message: 'how do I fix the dojo terminal' });
+    const later = await c.ask(who(), { message: 'have you got a picture of the margarita serve', conversation_id: undefined });
+    expect(later.nps).toBeNull();
+  });
   it('saves a rating with the venue and person, copies it to the portal, and refuses when switched off', async () => {
     await chat().rate(who(), { vendor: 'Sky', score: 8, comment: 'solid' });
     await new Promise((r) => setTimeout(r, 5));

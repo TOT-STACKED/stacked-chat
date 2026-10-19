@@ -7,6 +7,11 @@ const root = document.getElementById('app');
 let cfg; let auth; let api;
 const st = { ctx: null, site: null, conversationId: null, messages: [], sending: false, error: null, npsShown: false };
 const SITE_KEY = 'stacked_chat_site';
+// Ratings already given or skipped are remembered for 30 days, so a vendor is not asked about again and again.
+const RATED_KEY = 'stacked_chat_rated'; const RATED_DAYS = 30;
+const ratedMap = () => { try { return JSON.parse(localStorage.getItem(RATED_KEY) || '{}') || {}; } catch { return {}; } };
+const recentlyRated = (v) => { const t = ratedMap()[String(v).toLowerCase()]; return !!t && Date.now() - t < RATED_DAYS * 864e5; };
+const markRated = (v) => { try { const m = ratedMap(); m[String(v).toLowerCase()] = Date.now(); localStorage.setItem(RATED_KEY, JSON.stringify(m)); } catch { /* private mode: fine */ } };
 
 const svg = (d, size = 20, extra = {}) => {
   const ns = 'http://www.w3.org/2000/svg'; const s = document.createElementNS(ns, 'svg');
@@ -166,7 +171,7 @@ function npsCard(m) {
   let score = null;
   const draw = (done) => {
     clear(card);
-    if (done) { card.append(h('p', { class: 'npsthanks', text: done })); return; }
+    if (done) { m.done = true; markRated(m.vendor); card.append(h('p', { class: 'npsthanks', text: done })); return; }
     const err = h('div'); const comment = h('textarea', { rows: 2, maxlength: 500, placeholder: 'Anything you want to add? (optional)', 'aria-label': 'Comment' });
     const send = h('button', { class: 'btn small', disabled: true, onclick: async () => {
       send.disabled = true; clear(err);
@@ -253,7 +258,10 @@ async function send(text) {
     st.messages.push({ role: 'assistant', content: r.reply, unanswered: r.unanswered, sources: r.sources, videos: r.videos, images: r.images, support: r.support, sensitive: r.sensitive || null });
     // a rating card: always when they asked to rate; otherwise once, after a couple of questions about a vendor
     const userTurns = st.messages.filter((m) => m.role === 'user').length;
-    if (r.nps && (r.nps.forced || (!st.npsShown && userTurns >= 2))) { if (!r.nps.forced) st.npsShown = true; setTimeout(() => { st.messages.push({ role: 'nps', vendor: r.nps.vendor }); drawThread(); }, 900); }
+    // One card at a time, and never again for a product already rated or skipped. Asking to rate always works; a nudge only once per chat.
+    const open = r.nps && st.messages.some((x) => x.role === 'nps' && !x.done && x.vendor === r.nps.vendor);
+    const show = r.nps && !open && (r.nps.forced || (!st.npsShown && userTurns >= 2 && !recentlyRated(r.nps.vendor)));
+    if (show) { st.npsShown = true; setTimeout(() => { st.messages.push({ role: 'nps', vendor: r.nps.vendor }); drawThread(); }, 900); }
   } catch (e) {
     if (e.status === 401) return;
     st.error = e.message || 'Something went wrong. Please try again.';

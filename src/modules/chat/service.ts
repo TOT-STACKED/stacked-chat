@@ -10,6 +10,9 @@ import { imagesBehind, pickMedia, retrievePassages, visibleTo } from './retrieve
 import type { ConversationStore, StoredMessage } from './store.js';
 import { detectSensitive, TOPIC_IDS, withConfirmLine, type TopicId, type TopicMode } from '../sensitive/topics.js';
 
+/** words that mean the person themselves is asking to rate or review something */
+const RATE_INTENT = /\b(rate|rating|rated|review|reviews|nps)\b/i;
+
 export interface ChatDeps {
   /** all knowledge items for an organisation (the service filters what this person may see) */
   items: (orgId: string) => Promise<ItemRow[]>;
@@ -137,8 +140,9 @@ export function createChat(deps: ChatDeps) {
     const vids = pick(withMedia.videos, 0).map((v) => ({ ...v, type: /youtu/.test(v.url) ? 'youtube' : 'video' }));
     // ratings: only ever from what the PERSON said, or the assistant's explicit tag (never a vendor mentioned in passing)
     const turnsBefore = history.map((m) => ({ role: m.role, content: m.content }));
-    const asked = tagged.vendor ?? vendorAnswerToRatingQuestion(message, turnsBefore);
-    const mentioned = asked ? null : vendorFromPerson(message, turnsBefore);
+    // the assistant's tag only counts when the person's own message is about rating or reviewing; it must not drift into later turns
+    const asked = (tagged.vendor && RATE_INTENT.test(message) ? tagged.vendor : null) ?? vendorAnswerToRatingQuestion(message, turnsBefore);
+    const mentioned = asked ? null : vendorFromPerson(message, []); // only a product named in THIS message, not one from earlier turns
     const nps = asked ? { vendor: asked, forced: true } : mentioned ? { vendor: mentioned, forced: false } : null;
     return {
       reply, conversation_id, unanswered, sources: used, videos: vids, images: pick(withMedia.images, withMedia.videos.length), support: supportLink(message, who.techStack ?? null), nps,
