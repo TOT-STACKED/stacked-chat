@@ -6,7 +6,7 @@ import { pickProfiles, supportLink, takeNpsTag, vendorAnswerToRatingQuestion, ve
 import { checkNps, type NpsMirror, type NpsStore } from './nps.js';
 import { buildSystemPrompt } from './prompt.js';
 import type { ChatModel, ChatTurn } from './model.js';
-import { imagesBehind, pickMedia, retrievePassages, visibleTo } from './retrieve.js';
+import { imagesBehind, pickMedia, retrievePassages, visibleTo, wantsVideo } from './retrieve.js';
 import type { ConversationStore, StoredMessage } from './store.js';
 import { detectSensitive, TOPIC_IDS, withConfirmLine, type TopicId, type TopicMode } from '../sensitive/topics.js';
 
@@ -75,7 +75,7 @@ export function createChat(deps: ChatDeps) {
     return Array.isArray(c.messages) ? c.messages : [];
   }
 
-  async function ask(who: Who, input: { message: string; conversation_id?: number }): Promise<Answer> {
+  async function ask(who: Who, input: { message: string; conversation_id?: number; shown_media?: string[] }): Promise<Answer> {
     const message = input.message.trim();
     if (!message) throw badRequest('Type a question first');
     if (message.length > MAX_MESSAGE) throw badRequest(`That message is too long (the limit is ${MAX_MESSAGE} characters)`);
@@ -102,9 +102,16 @@ export function createChat(deps: ChatDeps) {
     // a short follow-up ("and on Sundays?") makes sense only with the previous question, so search with both
     const lastQuestion = [...stored].reverse().find((m) => m.role === 'user')?.content ?? '';
     const passages = retrievePassages(visible.filter((i) => i.kind === 'document' || i.kind === 'image'), `${message} ${message.split(/\s+/).length < 6 ? lastQuestion : ''}`);
+    // Pictures and videos are shown when asked for, or once when this question is about them. Not again on every follow-up:
+    // the page tells us what it has already shown in this chat, and asking for one again always works.
+    const shown = new Set(input.shown_media ?? []);
     const picked = pickMedia(visible, message);
-    const behind = imagesBehind(visible, passages).filter((i) => !picked.images.some((p) => p.id === i.id));
-    const media = { videos: picked.videos, images: [...picked.images, ...behind].slice(0, 1) };
+    const ownPassages = retrievePassages(visible.filter((i) => i.kind === 'document' || i.kind === 'image'), message); // this message only, not the one before it
+    const behind = imagesBehind(visible, ownPassages).filter((i) => !shown.has(i.id) && !picked.images.some((p) => p.id === i.id));
+    const media = {
+      videos: wantsVideo(message) ? picked.videos : picked.videos.filter((v) => !shown.has(v.id)),
+      images: [...picked.images, ...behind].slice(0, 1),
+    };
 
     const system = buildSystemPrompt({
       botName: who.botName || 'Stacked Chat', orgName: who.orgName, siteName: who.siteName, personName: who.name,

@@ -94,7 +94,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     preHandler: app.authenticate,
     schema: {
       tags: ['chat'], summary: 'Ask a question. Answers come only from knowledge you are allowed to see.', security: SECURITY,
-      body: z.object({ site_id: Id, message: z.string().min(1).max(MAX_MESSAGE + 500), conversation_id: z.number().int().positive().optional() }),
+      body: z.object({ site_id: Id, message: z.string().min(1).max(MAX_MESSAGE + 500), conversation_id: z.number().int().positive().optional(), shown_media: z.array(z.string().max(64)).max(60).optional() }),
       response: {
         200: z.object({ reply: z.string(), conversation_id: z.number(), unanswered: z.boolean(), sources: z.array(z.object({ id: Id, title: z.string() })), videos: z.array(Media.extend({ type: z.string() })), images: z.array(Media), support: z.object({ vendor: z.string(), url: z.string() }).nullable(), nps: z.object({ vendor: z.string(), forced: z.boolean() }).nullable(), sensitive: z.object({ topic: z.string(), label: z.string(), mode: z.enum(['confirm', 'manager']) }).nullable() }),
         400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody, 503: ErrorBody,
@@ -105,7 +105,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     const rl = limiter.hit(p.userId);
     if (!rl.allowed) { reply.header('Retry-After', String(rl.retryAfterSeconds)); throw new ApiHttpError(429, 'rate_limited', 'You are asking very quickly. Give it a few seconds.'); }
     const who = await whoAsks(p, req.body.site_id);
-    return chat().ask(who, { message: req.body.message, conversation_id: req.body.conversation_id });
+    return chat().ask(who, { message: req.body.message, conversation_id: req.body.conversation_id, shown_media: req.body.shown_media });
   });
 
   r.post('/api/v1/chat/nps', {

@@ -179,6 +179,18 @@ describe('the chat service', () => {
     expect(r.sources.map((x) => x.title)).toEqual(['Espresso martini']);
     expect(model.calls.at(-1)!.system).toContain('25ml coffee liqueur');
   });
+  it('shows a picture once, not again on every follow-up, but always when asked for it', async () => {
+    await kb().createImage(ORG, { title: 'Margarita serve', url: 'https://cdn.x/m.jpg', description: 'Margarita: rub a lime wedge round the glass, dip the rim in salt. Shake tequila, Cointreau and lime juice, strain.', site_id: null, status: 'published', by: 'a@b.co' });
+    chat = make(async (urls) => urls);
+    model.reply = 'Shake tequila, Cointreau and lime.\nSource: Margarita serve';
+    const first = await chat.ask(me(), { message: 'how do I make a margarita?' });
+    expect(first.images).toHaveLength(1);
+    const shown = first.images.map((i) => i.id);
+    const again = await chat.ask(me(), { message: 'how much lime juice in the margarita?', shown_media: shown });
+    expect(again.images).toEqual([]);
+    const asked = await chat.ask(me(), { message: 'have you got a picture of the margarita serve', shown_media: shown });
+    expect(asked.images).toHaveLength(1);
+  });
   it('shows only the sources the answer cites, not everything that was searched', async () => {
     await publish('Fire safety', 'Meet at the car park when the fire alarm sounds.');
     await publish('Handbook', 'Breaks are twenty minutes. Fire alarm tests are on Fridays.');

@@ -69,8 +69,8 @@ export function retrievePassages(items: ItemRow[], question: string, limit = 5):
   return out;
 }
 
-const wantsVideo = (q: string) => /\b(video|watch|tutorial|walkthrough|demo|show me how)\b/i.test(q);
-const wantsPhoto = (q: string) => /\b(photo|photos|picture|pictures|image|images|pic|pics|looks?\s+like)\b/i.test(q);
+export const wantsVideo = (q: string) => /\b(video|watch|tutorial|walkthrough|demo|show me how)\b/i.test(q);
+export const wantsPhoto = (q: string) => /\b(photo|photos|picture|pictures|image|images|pic|pics|looks?\s+like)\b/i.test(q);
 
 /** Pictures whose own description supplied the best passages: show them with the answer, even if nobody said "photo". */
 export function imagesBehind(items: ItemRow[], passages: Passage[], max = 1): ItemRow[] {

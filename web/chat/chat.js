@@ -5,7 +5,7 @@ import { parseBlocks, readableOn, youtubeThumb } from './render.js';
 
 const root = document.getElementById('app');
 let cfg; let auth; let api;
-const st = { ctx: null, site: null, conversationId: null, messages: [], sending: false, error: null, npsShown: false };
+const st = { ctx: null, site: null, conversationId: null, messages: [], sending: false, error: null, npsShown: false, shown: new Set() };
 const SITE_KEY = 'stacked_chat_site';
 // Ratings already given or skipped are remembered for 30 days, so a vendor is not asked about again and again.
 const RATED_KEY = 'stacked_chat_rated'; const RATED_DAYS = 30;
@@ -83,7 +83,7 @@ function showNoAccess() {
     h('button', { class: 'btn', onclick: signOut }, 'Sign out')));
 }
 function signOut() { auth.signOut(); st.ctx = null; showSignIn(); }
-function resetChat() { st.conversationId = null; st.messages = []; st.error = null; st.npsShown = false; }
+function resetChat() { st.conversationId = null; st.messages = []; st.error = null; st.npsShown = false; st.shown = new Set(); }
 
 const ownLogo = () => isHttps(st.site.branding.logo_url);
 /** The assistant's picture: the Stacked mark, or the first letter in the venue's colour when they use their own logo. */
@@ -253,8 +253,9 @@ async function send(text) {
   if (st.sending) return;
   st.error = null; st.messages.push({ role: 'user', content: text }); st.sending = true; drawThread(); if (sendBtn) sendBtn.disabled = true;
   try {
-    const r = await api.post('/api/v1/chat', { site_id: st.site.site_id, message: text, ...(st.conversationId ? { conversation_id: st.conversationId } : {}) });
+    const r = await api.post('/api/v1/chat', { site_id: st.site.site_id, message: text, ...(st.conversationId ? { conversation_id: st.conversationId } : {}), ...(st.shown.size ? { shown_media: [...st.shown] } : {}) });
     st.conversationId = r.conversation_id;
+    for (const x of [...(r.videos || []), ...(r.images || [])]) st.shown.add(x.id); // so it is not offered again on every follow-up
     st.messages.push({ role: 'assistant', content: r.reply, unanswered: r.unanswered, sources: r.sources, videos: r.videos, images: r.images, support: r.support, sensitive: r.sensitive || null });
     // a rating card: always when they asked to rate; otherwise once, after a couple of questions about a vendor
     const userTurns = st.messages.filter((m) => m.role === 'user').length;
