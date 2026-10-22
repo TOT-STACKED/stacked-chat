@@ -174,3 +174,11 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 - **The job** (`operations/reminders.ts`) runs every 5 minutes inside the server (`src/index.ts`; `DISABLE_REMINDERS=1` switches it off) and on `POST /api/v1/internal/operations/remind` with `x-cron-secret` (an optional external scheduler). From the due time until 3 hours after it, for every venue where the run is not finished, it emails that venue's active site managers, or the company's owner/HQ admins if the venue has none.
 - **Once only:** the first server to insert a `checklist_reminders` row for (checklist, venue, day) sends; everyone else skips. A failed email is logged and not retried that day.
 - Needs email (`RESEND_API_KEY`) to be configured; otherwise it does nothing. Manage's board marks a list "Overdue" using the same rule.
+
+## Communicate: updates
+
+- **Tables (migration 015):** `announcements` (title, body, `site_id`/`team_id` audience, `requires_ack`) and `announcement_reads` (one row per person per update: `read_at`, `acked_at`). A team update carries the team's venue.
+- **Managers:** `GET/POST /api/v1/orgs/:orgId/announcements`, `PATCH/DELETE …/:id`, `GET …/:id/readers`. Same write rule as knowledge and checklists: company admins for everyone, site managers for their own venue and its teams. The audience cannot change after sending.
+- **Staff:** `GET /api/v1/chat/updates?site_id=` (the feed plus an unread count) and `POST …/:id/read` (opening it, or `ack: true` to confirm). Visibility is the knowledge rule: the whole company, their venue, or their team. Staff see the last 60 days.
+- **Recipients** (for read counts and email): active people at the venue (or at every venue for a company update), or the team's members. Company-level admins are the senders and are not counted unless they are in the team.
+- **Email** is optional per update ("also email it"), up to 500 people, via the same mailer as the rest. No push notifications: the chat header shows a megaphone with an unread count.

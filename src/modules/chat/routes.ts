@@ -13,11 +13,13 @@ import type { TechStackStore } from '../vendors/store.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import type { Help } from './help.js';
 import type { Ops } from '../operations/service.js';
+import type { Comms } from '../communicate/service.js';
+import { FeedOut } from '../communicate/routes.js';
 import { RunOut, ChecklistOut } from '../operations/routes.js';
 import { MAX_MESSAGE, type Chat, type Who } from './service.js';
 
 interface Ctx {
-  chat: Chat | null; repo?: Repo; branding: BrandingStore | null; insights: InsightsStore | null; techStack?: TechStackStore | null; help?: Help | null; ops?: Ops | null;
+  chat: Chat | null; repo?: Repo; branding: BrandingStore | null; insights: InsightsStore | null; techStack?: TechStackStore | null; help?: Help | null; ops?: Ops | null; comms?: Comms | null;
   perMinute?: number; now?: () => number;
 }
 
@@ -167,6 +169,27 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
       response: { 200: Today, 400: ErrorBody, 403: ErrorBody, 404: ErrorBody },
     },
   }, async (req) => todayOut(await opsSvc().complete(await siteAccess(userOnly(req), req.body.site_id), req.params.id, req.body.note ?? null)));
+
+  // ---- updates from managers --------------------------------------------------------------------------------
+  const commsSvc = () => { if (!ctx.comms) throw notFound('Updates are not available'); return ctx.comms; };
+  r.get('/api/v1/chat/updates', {
+    preHandler: app.authenticate,
+    schema: { tags: ['chat'], summary: 'Updates sent to you and your venue, newest first', security: SECURITY, querystring: z.object({ site_id: Id }), response: { 200: z.object({ data: z.array(FeedOut), unread: z.number() }), 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => {
+    const who = await whoAsks(userOnly(req), req.query.site_id);
+    const data = await commsSvc().feed({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds });
+    return { data, unread: data.filter((d) => !d.read_at || (d.requires_ack && !d.acked_at)).length };
+  });
+
+  r.post('/api/v1/chat/updates/:id/read', {
+    preHandler: app.authenticate,
+    schema: { tags: ['chat'], summary: 'Note that you opened an update, or confirm you have read it', security: SECURITY, params: z.object({ id: Id }), body: z.object({ site_id: Id, ack: z.boolean().optional() }),
+      response: { 200: z.object({ ok: z.literal(true) }), 400: ErrorBody, 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => {
+    const who = await whoAsks(userOnly(req), req.body.site_id);
+    await commsSvc().markRead({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds }, req.params.id, req.body.ack === true);
+    return { ok: true as const };
+  });
 
   r.post('/api/v1/chat/help', {
     preHandler: app.authenticate,

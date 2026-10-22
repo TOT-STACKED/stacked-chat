@@ -151,3 +151,12 @@ button,input,select,textarea{font:inherit;color:inherit}
 .iconbtn[hidden],.chkdot[hidden]{display:none}
 .chk .btn.small,.chknote .btn.small{height:40px;padding:0 16px;font-size:14px}
 .chknote .row{display:flex;align-items:center;gap:14px}
+
+/* updates */
+.upd{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.upd.new{border-color:var(--brand)}
+.upd .uphead{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.upd small{color:var(--faint);font-size:12.5px}
+.upd p{margin:2px 0 4px;white-space:pre-wrap;line-height:1.5;font-size:15px}
+.upnew{font-size:11px;font-weight:700;background:var(--brand);color:var(--brand-ink);border-radius:999px;padding:2px 9px}
+.upd .btn.small{height:40px;padding:0 16px;font-size:14px;align-self:flex-start}

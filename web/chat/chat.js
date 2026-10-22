@@ -19,7 +19,7 @@ const svg = (d, size = 20, extra = {}) => {
   for (const p of [].concat(d)) { const e = document.createElementNS(ns, 'path'); e.setAttribute('d', p); s.append(e); }
   return s;
 };
-const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z', list: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 3h6v4H9z', 'M9 13l2 2 4-4'], tick: 'M5 12l5 5L20 7' };
+const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z', list: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 3h6v4H9z', 'M9 13l2 2 4-4'], tick: 'M5 12l5 5L20 7', mega: ['M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z', 'M15 9a4 4 0 0 1 0 6', 'M18 6.5a8 8 0 0 1 0 11'] };
 const logoSrc = '/manage/assets/logo-stacked.png';
 const markSrc = '/manage/assets/favicon-192.png'; // the Stacked mark: the chat wears it unless a venue brings its own logo
 const isHttps = (u) => /^https:\/\//i.test(String(u || ''));
@@ -133,7 +133,7 @@ function micButton() {
 }
 
 // ---- the chat screen ---------------------------------------------------------------------------------------
-let thread; let input; let sendBtn; let checkBtn;
+let thread; let input; let sendBtn; let checkBtn; let updatesBtn;
 function draw() {
   applyBrand(); clear(root);
   const b = st.site.branding; const sites = st.ctx.sites;
@@ -144,18 +144,19 @@ function draw() {
   sendBtn = h('button', { class: 'send', type: 'submit', 'aria-label': 'Send' }, svg(ICON.send));
   input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(160, input.scrollHeight) + 'px'; sendBtn.disabled = st.sending || !input.value.trim(); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
+  updatesBtn = h('button', { class: 'iconbtn chkbtn', hidden: true, 'aria-label': 'Updates', title: 'Updates from your managers', onclick: openUpdates }, svg(ICON.mega), h('i', { class: 'chkdot', hidden: true }));
   checkBtn = h('button', { class: 'iconbtn chkbtn', hidden: true, 'aria-label': 'Checklists', title: 'Checklists', onclick: openChecklists }, svg(ICON.list), h('i', { class: 'chkdot', hidden: true }));
   const form = h('form', { onsubmit: (e) => { e.preventDefault(); submit(); } }, input, micButton(), sendBtn);
   root.append(h('div', { class: 'app' },
     h('header', { class: 'bar' },
       h('button', { class: 'iconbtn', 'aria-label': 'Your conversations', onclick: openHistory }, svg(ICON.history)),
       h('div', { class: 'brand' }, ownLogo() ? h('img', { src: b.logo_url, alt: '' }) : h('img', { class: 'mark', src: markSrc, alt: '', width: 32, height: 32 }), h('b', { text: brandName() })),
-      venue, checkBtn, h('button', { class: 'iconbtn', 'aria-label': 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus)),
+      venue, updatesBtn, checkBtn, h('button', { class: 'iconbtn', 'aria-label': 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus)),
       h('button', { class: 'avatar', title: `Sign out ${auth.email()}`, 'aria-label': `Sign out ${auth.email()}`, style: 'border:0;cursor:pointer', onclick: signOut }, (auth.email()[0] || '?').toUpperCase())),
     thread,
     h('div', { class: 'composer' }, form, h('p', { class: 'fine', text: 'Answers come from your company’s knowledge. For anything safety-critical, such as allergens, check with your manager.' }))));
   sendBtn.disabled = true; drawThread(); input.focus();
-  refreshChecklists();
+  refreshChecklists(); refreshUpdates();
 }
 
 function hello() {
@@ -334,6 +335,46 @@ async function openChecklists() {
   }
   paint();
   await refreshChecklists(); paint();
+}
+
+// ---- updates: messages from managers to this venue, team or company ------------------------------------------
+st.updates = []; st.unread = 0;
+const upWhen = (iso) => new Date(iso).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+async function refreshUpdates() {
+  try { const r = await api.get(`/api/v1/chat/updates?site_id=${st.site.site_id}`); st.updates = r.data; st.unread = r.unread; } catch { st.updates = []; st.unread = 0; }
+  paintUpdatesBtn();
+}
+function paintUpdatesBtn() {
+  if (!updatesBtn || !updatesBtn.isConnected) return;
+  updatesBtn.hidden = st.updates.length === 0;
+  const dot = updatesBtn.querySelector('.chkdot'); if (dot) { dot.hidden = st.unread === 0; dot.textContent = st.unread ? String(st.unread) : ''; }
+}
+async function openUpdates() {
+  const scrim = h('div', { class: 'scrim' }); const body = h('div', { class: 'list chklist' });
+  const close = () => { scrim.remove(); drawer.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const drawer = h('aside', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Updates' },
+    h('header', null, h('h2', { text: 'Updates' }), h('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: close }, svg(ICON.close))), body);
+  scrim.addEventListener('click', close); document.addEventListener('keydown', onKey); document.body.append(scrim, drawer);
+  const post = (u, ack) => api.post(`/api/v1/chat/updates/${u.id}/read`, { site_id: st.site.site_id, ack: ack || undefined });
+  const recount = () => { st.unread = st.updates.filter((x) => !x.read_at || (x.requires_ack && !x.acked_at)).length; paintUpdatesBtn(); };
+  function paint() {
+    clear(body);
+    if (!st.updates.length) { body.append(h('p', { class: 'muted', style: 'padding:12px', text: 'No updates yet.' })); return; }
+    for (const u of st.updates) {
+      const fresh = u.isNew; const needs = u.requires_ack && !u.acked_at;
+      body.append(h('article', { class: `upd ${fresh || needs ? 'new' : ''}` },
+        h('div', { class: 'uphead' }, h('b', { text: u.title }), fresh ? h('span', { class: 'upnew', text: 'New' }) : null),
+        h('small', { text: `${upWhen(u.created_at)} · ${String(u.created_by || '').split('@')[0]}` }),
+        h('p', { text: u.body }),
+        u.err ? h('div', { class: 'err', role: 'alert', text: u.err }) : null,
+        needs ? h('button', { class: 'btn small', onclick: async () => { try { await post(u, true); u.acked_at = new Date().toISOString(); u.read_at = u.read_at || u.acked_at; recount(); paint(); } catch (e) { u.err = e.message; paint(); } } }, 'I’ve read this')
+          : u.requires_ack ? h('p', { class: 'chkdone', text: 'You confirmed you have read this.' }) : null));
+    }
+  }
+  // opening the list counts as reading: remember which were new so they stand out for now
+  for (const u of st.updates) { u.isNew = !u.read_at; if (!u.read_at) { post(u, false).then(() => { u.read_at = new Date().toISOString(); recount(); }).catch(() => {}); } }
+  paint();
 }
 
 // ---- history -------------------------------------------------------------------------------------------------

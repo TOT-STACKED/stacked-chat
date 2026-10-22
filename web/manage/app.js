@@ -7,6 +7,7 @@ import { renderHome } from './home.js';
 import { renderKnowledge } from './knowledge.js';
 import { renderInsights } from './insights.js';
 import { renderOperations } from './operations.js';
+import { renderCommunicate } from './communicate.js';
 import { ICONS, avatar, logo, pageHeader, tile } from './ui.js';
 import { ROLE_LABEL, atLeast, bestRole, isManagerAnywhere } from './lib.js';
 import { labelTables } from './responsive.js';
@@ -16,8 +17,10 @@ labelTables(root);
 let cfg; let auth; let api;
 const state = { memberships: [], orgs: [], orgId: null };
 
-const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['operations', 'Operations'], ['settings', 'Settings']];
-const SOON_NAV = [['communicate', 'Communicate'], ['training', 'Training']];
+const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['operations', 'Operations'], ['communicate', 'Communicate'], ['settings', 'Settings']];
+/** The phone's bottom bar is narrow: a few items use a shorter word there. */
+const SHORT = { communicate: 'Updates', operations: 'Ops' };
+const SOON_NAV = [['training', 'Training']];
 
 // ---- sign in -------------------------------------------------------------------------------
 function showSignIn(message) {
@@ -134,7 +137,7 @@ function drawShell() {
       h('a', { href: '#/home', 'aria-label': 'Stacked Manage home' }, logo()),
       orgBox,
       h('nav', { class: 'nav', 'aria-label': 'Main' }, h('span', { class: 'navlabel', text: 'Workspace' }),
-        NAV.map(([k, label]) => h('a', { href: '#/' + k, id: 'nav-' + k }, tile(k, 28), label))),
+        NAV.map(([k, label]) => h('a', { href: '#/' + k, id: 'nav-' + k }, tile(k, 28), SHORT[k] ? [h('span', { class: 'lg', text: label }), h('span', { class: 'sh', text: SHORT[k] })] : label))),
       h('nav', { class: 'nav soonwrap', 'aria-label': 'Coming next', style: 'margin-top:8px' }, h('span', { class: 'navlabel', text: 'Coming next' }),
         SOON_NAV.map(([k, label]) => h('span', { class: 'soonitem' }, tile(k, 28), label, h('span', { class: 'tag', text: 'Soon' })))),
       h('div', { class: 'grow' }),
@@ -149,7 +152,7 @@ function drawShell() {
 const SOON = {
   insights: ['Insights', 'What people ask most, what the AI could not answer, and usage by site and team.', 'What your teams ask, and what the AI could not answer.'],
 };
-const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', operations: 'Operations', settings: 'Settings' };
+const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', operations: 'Operations', communicate: 'Communicate', settings: 'Settings' };
 
 function route() {
   if (!main) return;
@@ -185,6 +188,11 @@ function route() {
   if (view === 'insights') {
     if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Insights', 'insights', 'What your teams ask.', 'This area is for managers'); return; }
     renderInsights(main, { api, memberships: state.memberships, orgId: state.orgId });
+    return;
+  }
+  if (view === 'communicate') {
+    if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Communicate', 'communicate', 'Updates to your team.', 'This area is for managers'); return; }
+    renderCommunicate(main, { api, memberships: state.memberships, orgId: state.orgId });
     return;
   }
   if (view === 'operations') {
