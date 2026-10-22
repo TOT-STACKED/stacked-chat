@@ -66,21 +66,23 @@ export function welcomeEmail(o: { to: string; name?: string | null; orgName: str
   const text = `${line}\n\n${how}\n\n${o.url}\n\nGetting started\n${steps.map(([n, t, d]) => `${n}. ${t}: ${d}`).join('\n')}\n\nIf you didn't ask for this, you can ignore this email and nothing will happen.\n\nStacked`;
   const logo = `${siteOrigin(o.url)}/manage/assets/logo-stacked.png`;
   const font = "font-family:'DM Sans',Arial,Helvetica,sans-serif";
-  const row = ([n, t, d, c]: [string, string, string, string]) => `<tr><td style="padding:0 0 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F0E9;border-radius:20px"><tr>
-<td width="64" valign="top" style="padding:18px 0 18px 18px"><div style="width:40px;height:40px;line-height:40px;border-radius:999px;background:${c};color:#38278F;text-align:center;font-weight:800;font-size:18px;${font}">${n}</div></td>
-<td valign="top" style="padding:18px 20px 18px 8px;${font};color:#38278F"><div style="font-size:17px;font-weight:800;line-height:1.3">${esc(t)}</div><div style="font-size:15px;line-height:1.5;color:#4A453C;padding-top:4px">${esc(d)}</div></td></tr></table></td></tr>`;
-  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#F1F0E9">
+  // Email apps strip the `background` shorthand. Every fill is set three ways (bgcolor attribute, background-color property) on a table cell, and text never relies on a fill it might lose.
+  const fill = (hex: string) => `bgcolor="${hex}" style="background-color:${hex}`;
+  const row = ([n, t, d, c]: [string, string, string, string]) => `<tr><td style="padding:0 0 14px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td ${fill('#F1F0E9')};border-radius:20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+<td width="64" valign="top" style="padding:18px 0 18px 18px"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td ${fill(c)};border-radius:20px;width:40px;height:40px;text-align:center;vertical-align:middle;color:#38278F;font-weight:800;font-size:18px;${font}" width="40" height="40" align="center" valign="middle">${n}</td></tr></table></td>
+<td valign="top" style="padding:18px 20px 18px 8px;${font};color:#38278F"><div style="font-size:17px;font-weight:800;line-height:1.3;color:#38278F">${esc(t)}</div><div style="font-size:15px;line-height:1.5;color:#4A453C;padding-top:4px">${esc(d)}</div></td></tr></table></td></tr></table></td></tr>`;
+  const html = `<!doctype html><html><body ${fill('#F1F0E9')};margin:0;padding:0">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">Your 30-day free trial for ${esc(o.orgName)} has started. No card needed.</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F1F0E9"><tr><td align="center" style="padding:28px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" ${fill('#F1F0E9')};padding:28px 12px">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px">
 <tr><td style="padding:0 8px 18px"><img src="${esc(logo)}" width="130" alt="Stacked" style="display:block;border:0;height:auto"></td></tr>
-<tr><td style="background:#FF5014;border-radius:28px 28px 0 0;padding:32px 32px 28px;${font}">
-<div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:30px;line-height:1.05;text-transform:uppercase;color:#FFF3EC;font-weight:900">Welcome to Stacked Chat</div>
-<div style="font-size:16px;line-height:1.5;color:#FFF3EC;padding-top:12px">Your 30-day free trial has started.</div></td></tr>
-<tr><td style="background:#FFFFFF;border-radius:0 0 28px 28px;padding:30px 32px 32px;${font};color:#38278F">
-<p style="font-size:16px;line-height:1.55;margin:0 0 14px">${esc(line)}</p>
+<tr><td ${fill('#FF5014')};border-radius:28px 28px 0 0;padding:32px 32px 28px;${font}">
+<div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:30px;line-height:1.05;text-transform:uppercase;color:#FFFFFF;font-weight:900">Welcome to Stacked Chat</div>
+<div style="font-size:16px;line-height:1.5;color:#FFFFFF;padding-top:12px">Your 30-day free trial has started.</div></td></tr>
+<tr><td ${fill('#FFFFFF')};border-radius:0 0 28px 28px;padding:30px 32px 32px;${font};color:#38278F">
+<p style="font-size:16px;line-height:1.55;margin:0 0 14px;color:#38278F">${esc(line)}</p>
 <p style="font-size:15px;line-height:1.55;margin:0 0 24px;color:#4A453C">${esc(how)}</p>
-<p style="margin:0 0 30px"><a href="${esc(o.url)}" style="background:#FF5014;color:#FFFFFF;text-decoration:none;font-weight:800;font-size:16px;padding:15px 28px;border-radius:999px;border-bottom:4px solid #C34014;display:inline-block;${font}">Open Stacked Chat</a></p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 30px"><tr><td ${fill('#FF5014')};border-radius:999px;border-bottom:4px solid #C34014" align="center"><a href="${esc(o.url)}" style="${font};display:block;padding:15px 30px;color:#FFFFFF;text-decoration:none;font-weight:800;font-size:16px;background-color:#FF5014;border-radius:999px"><span style="color:#FFFFFF">Open Stacked Chat</span></a></td></tr></table>
 <div style="font-size:12px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#C34014;padding:0 0 12px">Getting started</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${steps.map(row).join('')}</table>
 <p style="font-size:13px;line-height:1.5;color:#6B675F;margin:14px 0 0">If you didn't ask for this, you can ignore this email and nothing will happen.</p></td></tr>
