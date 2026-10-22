@@ -51,6 +51,9 @@ import { createSupabaseTechStackStore, type TechStackStore } from './modules/ven
 import { createSupabaseBrandingStore, type BrandingStore } from './modules/branding/store.js';
 import { createSensitiveSettings, createSupabaseSensitiveStore, type SensitiveStore } from './modules/sensitive/store.js';
 import { sensitiveRoutes } from './modules/sensitive/routes.js';
+import { createOps, type Ops } from './modules/operations/service.js';
+import { createSupabaseOpsStore, type OpsStore } from './modules/operations/store.js';
+import { operationsRoutes } from './modules/operations/routes.js';
 import { createSignup } from './modules/signup/service.js';
 import { signupRoutes } from './modules/signup/routes.js';
 import { startAppRoutes } from './modules/signup/app-routes.js';
@@ -74,6 +77,7 @@ export interface Deps {
   insightsStore?: InsightsStore;
   brandingStore?: BrandingStore;
   sensitiveStore?: SensitiveStore;
+  opsStore?: OpsStore;
   /** tests: tighter or looser sign-up limits */
   signupLimits?: { perIpPerHour?: number; perEmailPerHour?: number; allPerHour?: number };
   conversationStore?: ConversationStore;
@@ -145,6 +149,8 @@ export async function buildApp(
   const brandingStore = overrides.brandingStore ?? (db ? createSupabaseBrandingStore(db) : null);
   const sensitiveStore = overrides.sensitiveStore ?? (db ? createSupabaseSensitiveStore(db) : null);
   const sensitiveSettings = sensitiveStore ? createSensitiveSettings(sensitiveStore, { now: overrides.now ? () => overrides.now!().getTime() : undefined }) : null;
+  const opsStore = overrides.opsStore ?? (db ? createSupabaseOpsStore(db) : null);
+  const ops: Ops | null = opsStore ? createOps({ store: opsStore, now: overrides.now }) : null;
   const conversationStore = overrides.conversationStore ?? (db ? createSupabaseConversationStore(db) : null);
   const chatModel = overrides.chatModel !== undefined ? overrides.chatModel : (config.ANTHROPIC_API_KEY ? createAnthropicChatModel({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null);
   const adopted = new Map<string, number>(); // organisations whose older content we brought into the catalogue recently
@@ -240,7 +246,8 @@ export async function buildApp(
   await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate, files: overrides.storage ?? null, reader: pictureReader }));
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
   await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
-  await app.register(async (instance) => chatRoutes(instance, { chat, repo, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
+  await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate }));
+  await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
   const customers = repo ? createCustomers({ repo, mailer, publicUrl: config.PUBLIC_URL, billing, notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) }) : null;

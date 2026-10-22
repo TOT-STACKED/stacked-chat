@@ -1,0 +1,110 @@
+import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from 'fastify-type-provider-zod';
+import { z } from 'zod';
+import { forbidden, notFound } from '../../lib/errors.js';
+import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
+import type { Repo } from '../../lib/repo.js';
+import { assertOrgAccess, userOnly } from '../access.js';
+import { ErrorBody, Id, SECURITY } from '../schemas.js';
+import { KINDS, MAX_ITEM_CHARS, MAX_ITEMS, type Ops } from './service.js';
+import type { ChecklistRow } from './store.js';
+
+interface Ctx { ops: Ops | null; repo?: Repo; gate: (orgId: string) => Promise<void> }
+
+export const ChecklistOut = z.object({
+  id: Id, org_id: Id, site_id: Id.nullable(), title: z.string(), kind: z.enum(['opening', 'closing', 'custom']),
+  items: z.array(z.object({ id: z.string(), text: z.string() })), active: z.boolean(), created_at: z.string(), updated_at: z.string(),
+});
+export const RunOut = z.object({
+  done: z.number(), total: z.number(), started: z.boolean(), ticks: z.record(z.string(), z.object({ by: z.string(), at: z.string() })),
+  completed_at: z.string().nullable(), completed_by: z.string().nullable(), note: z.string().nullable(),
+});
+const Title = z.string().trim().min(1).max(120);
+const Items = z.array(z.string().max(MAX_ITEM_CHARS + 50)).min(1).max(MAX_ITEMS);
+const Kind = z.enum(KINDS as [string, ...string[]]);
+const view = (l: ChecklistRow) => ({ id: l.id, org_id: l.org_id, site_id: l.site_id, title: l.title, kind: l.kind, items: l.items, active: l.active, created_at: l.created_at, updated_at: l.updated_at });
+
+export async function operationsRoutes(app: FastifyInstance, ctx: Ctx) {
+  const r = app.withTypeProvider<ZodTypeProvider>();
+  const ops = (): Ops => { if (!ctx.ops) throw notFound('Operations is not available'); return ctx.ops; };
+  const canWrite = (p: Principal, orgId: string, siteId: string | null) => p.kind === 'user' && canManageMembers(p, orgId, siteId);
+  /** Who can SEE a list: managers of its audience. A company-wide list is visible to any manager in the company. */
+  const canSee = (p: Principal, orgId: string, siteId: string | null) => {
+    if (p.kind !== 'user') return false;
+    return siteId === null ? p.memberships.some((m) => m.orgId === orgId && atLeast(m.role, 'site_manager')) : atLeast(bestRole(p, orgId, siteId), 'site_manager');
+  };
+  const managed = async (p: Principal, orgId: string) => (await ctx.repo!.listSites(orgId)).filter((s) => p.kind === 'user' && atLeast(bestRole(p, orgId, s.id), 'site_manager'));
+
+  r.get('/api/v1/orgs/:orgId/checklists', {
+    preHandler: app.authenticate,
+    schema: { tags: ['operations'], summary: 'Checklists you can manage', security: SECURITY, params: z.object({ orgId: Id }), response: { 200: z.object({ data: z.array(ChecklistOut) }), 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => {
+    const { orgId } = req.params; const p = userOnly(req); assertOrgAccess(req, orgId);
+    return { data: (await ops().list(orgId)).filter((l) => canSee(p, orgId, l.site_id)).map(view) };
+  });
+
+  r.post('/api/v1/orgs/:orgId/checklists', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['operations'], summary: 'Write a checklist for the whole company or one venue', security: SECURITY, params: z.object({ orgId: Id }),
+      body: z.object({ title: Title, kind: Kind.default('custom'), site_id: Id.nullable().optional(), items: Items }),
+      response: { 201: ChecklistOut, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody },
+    },
+  }, async (req, reply) => {
+    const { orgId } = req.params; const p = userOnly(req); assertOrgAccess(req, orgId); await ctx.gate(orgId);
+    const siteId = req.body.site_id ?? null;
+    if (!canWrite(p, orgId, siteId)) throw forbidden(siteId ? 'You cannot add checklists for this venue' : 'Only company admins can add checklists for the whole company');
+    const l = await ops().create(orgId, { title: req.body.title, kind: req.body.kind as 'opening' | 'closing' | 'custom', site_id: siteId, items: req.body.items, by: p.email });
+    reply.status(201); return view(l);
+  });
+
+  r.patch('/api/v1/orgs/:orgId/checklists/:id', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['operations'], summary: 'Change a checklist: wording, items, venue or switch it on or off', security: SECURITY, params: z.object({ orgId: Id, id: Id }),
+      body: z.object({ title: Title.optional(), kind: Kind.optional(), site_id: Id.nullable().optional(), items: Items.optional(), active: z.boolean().optional() }),
+      response: { 200: ChecklistOut, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody },
+    },
+  }, async (req) => {
+    const { orgId, id } = req.params; const p = userOnly(req); assertOrgAccess(req, orgId); await ctx.gate(orgId);
+    const cur = await ops().get(orgId, id);
+    if (!cur || !canSee(p, orgId, cur.site_id)) throw notFound('Checklist not found');
+    if (!canWrite(p, orgId, cur.site_id) || (req.body.site_id !== undefined && !canWrite(p, orgId, req.body.site_id))) throw forbidden('You cannot change this checklist');
+    return view(await ops().update(orgId, id, { ...req.body, kind: req.body.kind as 'opening' | 'closing' | 'custom' | undefined }));
+  });
+
+  r.delete('/api/v1/orgs/:orgId/checklists/:id', {
+    preHandler: app.authenticate,
+    schema: { tags: ['operations'], summary: 'Delete a checklist and its history', security: SECURITY, params: z.object({ orgId: Id, id: Id }), response: { 200: z.object({ ok: z.literal(true) }), 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => {
+    const { orgId, id } = req.params; const p = userOnly(req); assertOrgAccess(req, orgId);
+    const cur = await ops().get(orgId, id);
+    if (!cur || !canSee(p, orgId, cur.site_id)) throw notFound('Checklist not found');
+    if (!canWrite(p, orgId, cur.site_id)) throw forbidden('You cannot delete this checklist');
+    await ops().remove(orgId, id);
+    return { ok: true as const };
+  });
+
+  r.get('/api/v1/orgs/:orgId/checklists/board', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['operations'], summary: 'Today at each venue you run, and the last few days', security: SECURITY, params: z.object({ orgId: Id }), querystring: z.object({ days: z.coerce.number().int().min(1).max(31).default(7) }),
+      response: { 200: z.object({
+        sites: z.array(z.object({ id: Id, name: z.string() })),
+        today: z.array(z.object({ checklist: ChecklistOut, site_id: Id, run: RunOut })),
+        recent: z.array(z.object({ date: z.string(), site_id: Id, checklist: ChecklistOut, run: RunOut })),
+      }), 403: ErrorBody, 404: ErrorBody },
+    },
+  }, async (req) => {
+    const { orgId } = req.params; const p = userOnly(req); assertOrgAccess(req, orgId);
+    const sites = await managed(p, orgId); const ids = sites.map((s) => s.id);
+    const lists = (await ops().list(orgId)).filter((l) => canSee(p, orgId, l.site_id));
+    const today = await ops().board(orgId, ids, lists);
+    const recent = (await ops().recent(orgId, ids, req.query.days)).filter((x) => lists.some((l) => l.id === x.checklist.id));
+    return {
+      sites: sites.map((s) => ({ id: s.id, name: s.name })),
+      today: today.map((t) => ({ ...t, checklist: view(t.checklist) })),
+      recent: recent.map((t) => ({ ...t, checklist: view(t.checklist) })),
+    };
+  });
+}

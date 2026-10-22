@@ -159,3 +159,11 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 - **Details:** an image's `description` (up to 4000 chars) is searched like a document passage (`retrievePassages`), so staff can ask "how much coffee liqueur in an espresso martini?". The picture behind the top passages is shown with the answer (`imagesBehind`), or on request ("photo of…", `pickMedia`).
 - **Read the text from a picture:** `POST …/knowledge/:id/read-picture` fetches the stored picture, asks the model (`vision.ts`, image block, 5 MB cap) to copy out the writing, and returns it. Nothing is saved: the manager checks it, edits the description, then publishes.
 - **Previews:** the detail endpoint returns a short-lived signed `preview_url`; Manage's CSP allows images from the Supabase origin for this.
+
+## Operations: checklists
+
+- **Tables (migration 013):** `checklists` (title, kind opening/closing/custom, items `[{id,text}]`, `site_id` null = every venue, active) and `checklist_runs` (one shared run per checklist, per venue, per UK day; `ticks` = `{itemId: {by, at}}`, `completed_by/at`, `note`).
+- **Managers:** `GET/POST /api/v1/orgs/:orgId/checklists`, `PATCH/DELETE …/:id`, `GET …/board?days=7` (today per venue they run, plus recent). Same write rule as people and knowledge (`canManageMembers`): admins for the whole company, site managers for their own venue.
+- **Staff:** `GET /api/v1/chat/checklists?site_id=`, `POST …/:id/tick`, `POST …/:id/complete` (in the chat routes, any member of the venue). Finishing with items unticked needs a note. A finished run is locked for the day.
+- **Manage:** Operations screen (today board, checklists, last 7 days). **Chat:** a clipboard button in the header (only shown when the venue has lists), with a count of lists not finished.
+- Items keep their id when a list is edited, so earlier ticks survive. Ticks for removed items are ignored.

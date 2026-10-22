@@ -6,6 +6,7 @@ import { renderSettings } from './settings.js';
 import { renderHome } from './home.js';
 import { renderKnowledge } from './knowledge.js';
 import { renderInsights } from './insights.js';
+import { renderOperations } from './operations.js';
 import { ICONS, avatar, logo, pageHeader, tile } from './ui.js';
 import { ROLE_LABEL, atLeast, bestRole, isManagerAnywhere } from './lib.js';
 import { labelTables } from './responsive.js';
@@ -15,8 +16,8 @@ labelTables(root);
 let cfg; let auth; let api;
 const state = { memberships: [], orgs: [], orgId: null };
 
-const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['settings', 'Settings']];
-const SOON_NAV = [['communicate', 'Communicate'], ['training', 'Training'], ['operations', 'Operations']];
+const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['operations', 'Operations'], ['settings', 'Settings']];
+const SOON_NAV = [['communicate', 'Communicate'], ['training', 'Training']];
 
 // ---- sign in -------------------------------------------------------------------------------
 function showSignIn(message) {
@@ -148,7 +149,7 @@ function drawShell() {
 const SOON = {
   insights: ['Insights', 'What people ask most, what the AI could not answer, and usage by site and team.', 'What your teams ask, and what the AI could not answer.'],
 };
-const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', settings: 'Settings' };
+const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', operations: 'Operations', settings: 'Settings' };
 
 function route() {
   if (!main) return;
@@ -184,6 +185,11 @@ function route() {
   if (view === 'insights') {
     if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Insights', 'insights', 'What your teams ask.', 'This area is for managers'); return; }
     renderInsights(main, { api, memberships: state.memberships, orgId: state.orgId });
+    return;
+  }
+  if (view === 'operations') {
+    if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Operations', 'operations', 'Checklists and who has done them.', 'This area is for managers'); return; }
+    renderOperations(main, { api, memberships: state.memberships, orgId: state.orgId });
     return;
   }
   const [title, , lead] = SOON[view];

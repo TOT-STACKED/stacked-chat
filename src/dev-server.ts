@@ -12,6 +12,8 @@ import { FakeKnowledgeStore } from './testing/knowledge-fakes.js';
 import { FakeInsightsStore } from './testing/insights-fakes.js';
 import { FakeBrandingStore } from './testing/branding-fakes.js';
 import { FakeSensitiveStore } from './testing/sensitive-fakes.js';
+import { FakeOpsStore } from './testing/ops-fakes.js';
+import { createOps } from './modules/operations/service.js';
 import { FakeConsoleStore } from './testing/console-fakes.js';
 import { FakeConversationStore, previewChatModel } from './testing/chat-fakes.js';
 
@@ -67,6 +69,12 @@ async function main() {
   const kb = (await import('./modules/knowledge/service.js')).createKnowledge({ store: kstore });
   await kb.createDocument(org.id, { title: 'Opening checklist', body: 'Unlock, lights, fridge temperatures, till float, specials board.', site_id: a.id, status: 'published', by: 'alex@example.com' });
   await kb.createDocument(org.id, { title: 'New staff meal policy (draft)', body: 'Staff meals are £3.50 per shift. Still to confirm with finance.', site_id: null, status: 'draft', by: 'hq@example.com' });
+  const opsStore = new FakeOpsStore();
+  for (const x of repo.sites) opsStore.addSite(org.id, x.id);
+  const opsSample = createOps({ store: opsStore });
+  const opening = await opsSample.create(org.id, { title: 'Opening checklist', kind: 'opening', site_id: null, items: ['Unlock the front door and turn off the alarm', 'Switch on the ovens and extraction', 'Check fridge and freezer temperatures', 'Count the till float', 'Set the specials board'], by: 'owner@example.com' });
+  await opsSample.create(org.id, { title: 'Closing checklist', kind: 'closing', site_id: a.id, items: ['Clean down the kitchen', 'Cash up', 'Lock the cellar', 'Set the alarm'], by: 'alex@example.com' });
+  for (const it of opening.items.slice(0, 2)) await opsSample.tick({ orgId: org.id, siteId: a.id, email: 'jordan@example.com' }, opening.id, it.id, true);
   const istore = new FakeInsightsStore();
   for (const x of repo.sites) istore.siteList.push({ id: x.id, org_id: org.id, name: x.name });
   istore.members.push({ org_id: org.id, email: 'alex@example.com', teams: ['Kitchen'] }, { org_id: org.id, email: 'jordan@example.com', teams: ['Front of house'] }, { org_id: org.id, email: 'sam@example.com', teams: ['Bar'] });
@@ -109,7 +117,7 @@ async function main() {
   await store.saveAccount(OB, { stripe_customer_id: 'cus_b', stripe_subscription_id: 'sub_b', status: 'active', interval: 'month', has_payment_method: true });
   await store.saveAccount(OH, { stripe_customer_id: 'cus_h', stripe_subscription_id: 'sub_h', status: 'trialing', interval: 'year', has_payment_method: false, trial_ends_at: new Date(Date.now() + 3 * day).toISOString() });
   const drafter = { draft: async (q: string) => `Staff are paid for training days at [CONFIRM: rate]. Training is rostered like a normal shift. (Draft for: ${q})` };
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), sensitiveStore: new FakeSensitiveStore(), conversationStore: new FakeConversationStore(), consoleStore: cstore, chatModel: previewChatModel, mirrorNps: null,
+  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), sensitiveStore: new FakeSensitiveStore(), opsStore, conversationStore: new FakeConversationStore(), consoleStore: cstore, chatModel: previewChatModel, mirrorNps: null,
     npsStore: { save: async (r) => { console.log('[preview] rating saved', JSON.stringify(r)); } },
     techStackStore: (() => { const stacks = new Map<string, Record<string, string>>([[a.id, { epos: 'Lightspeed', payments: 'Dojo' }]]); return { get: async (id: string) => stacks.get(id) ?? {}, list: async () => repo.sites.map((x) => ({ id: x.id, name: x.name, stack: stacks.get(x.id) ?? {} })), set: async (id: string, st: Record<string, string>) => { stacks.set(id, st); return st; } }; })(), drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);

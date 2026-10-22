@@ -323,3 +323,14 @@ input.switch:disabled{opacity:.6;cursor:wait}
 code.keycode{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:3px 8px}
 code.keybox{display:block;word-break:break-all;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:#fff;border:1px solid var(--line-strong);border-radius:12px;padding:14px}
 .toolbar>.sechead{flex:1 1 320px}
+
+/* Operations */
+.secthead{font-size:15px;font-weight:700;margin:22px 0 10px;letter-spacing:-.01em}
+.opgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.opcard{padding:18px;display:flex;flex-direction:column;gap:10px}
+.opcard .optop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.opcard.done{background:#F4FBF0;border-color:#CFE8C3}
+.opcard.done .bar>div{background:#2DA85A}
+.opnote{margin:0;font-size:13.5px;color:var(--ink2);background:var(--bg);border-radius:10px;padding:8px 10px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:700px){.cols2{grid-template-columns:1fr}}

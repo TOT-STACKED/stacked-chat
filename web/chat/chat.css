@@ -127,3 +127,27 @@ button,input,select,textarea{font:inherit;color:inherit}
 .mic.on{background:#D92D20;border-color:#D92D20;color:#fff;animation:listen 1.4s ease-in-out infinite}
 @keyframes listen{0%,100%{box-shadow:0 0 0 0 rgba(217,45,32,.45)}50%{box-shadow:0 0 0 8px rgba(217,45,32,0)}}
 @media (prefers-reduced-motion:reduce){.mic.on{animation:none}}
+
+/* checklists */
+.chkbtn{position:relative}
+.chkdot{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;border-radius:999px;background:var(--brand);color:var(--brand-ink);font-weight:700;font-size:11px;line-height:18px;font-style:normal;text-align:center;padding:0 5px;box-sizing:border-box}
+.chklist{padding:10px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.chk{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.chk>header{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 4px 6px}
+.chk.done{background:#F4FBF0;border-color:#CFE8C3}
+.chkcount{font-size:13px;color:var(--muted)}
+.chkitem{display:flex;align-items:center;gap:12px;text-align:left;border:1px solid var(--line2);background:var(--bg);border-radius:12px;padding:12px;cursor:pointer;min-height:48px}
+.chkitem.on{background:#fff;border-color:var(--line-strong)}
+.chkitem.on .ctext{color:var(--muted);text-decoration:line-through}
+.chkitem[disabled]{cursor:default;opacity:.85}
+.chkitem .cbox{flex:none;width:24px;height:24px;border-radius:8px;border:2px solid var(--line-strong);background:#fff;display:flex;align-items:center;justify-content:center;color:#fff}
+.chkitem.on .cbox{background:#2DA85A;border-color:#2DA85A}
+.chkitem .ctext{flex:1;font-size:15px;line-height:1.35}
+.chkitem small{color:var(--faint);font-size:12px;white-space:nowrap}
+.chkfinish{align-self:stretch;margin-top:4px}
+.chknote{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.chknote textarea{border:1px solid var(--line-strong);border-radius:10px;padding:8px 10px;resize:vertical;background:#fff;font-size:14px}
+.chkdone{margin:4px 4px 2px;font-size:13.5px;color:#1E6B3C}
+.iconbtn[hidden],.chkdot[hidden]{display:none}
+.chk .btn.small,.chknote .btn.small{height:40px;padding:0 16px;font-size:14px}
+.chknote .row{display:flex;align-items:center;gap:14px}

@@ -19,7 +19,7 @@ const svg = (d, size = 20, extra = {}) => {
   for (const p of [].concat(d)) { const e = document.createElementNS(ns, 'path'); e.setAttribute('d', p); s.append(e); }
   return s;
 };
-const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z' };
+const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z', list: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 3h6v4H9z', 'M9 13l2 2 4-4'], tick: 'M5 12l5 5L20 7' };
 const logoSrc = '/manage/assets/logo-stacked.png';
 const markSrc = '/manage/assets/favicon-192.png'; // the Stacked mark: the chat wears it unless a venue brings its own logo
 const isHttps = (u) => /^https:\/\//i.test(String(u || ''));
@@ -133,7 +133,7 @@ function micButton() {
 }
 
 // ---- the chat screen ---------------------------------------------------------------------------------------
-let thread; let input; let sendBtn;
+let thread; let input; let sendBtn; let checkBtn;
 function draw() {
   applyBrand(); clear(root);
   const b = st.site.branding; const sites = st.ctx.sites;
@@ -144,16 +144,18 @@ function draw() {
   sendBtn = h('button', { class: 'send', type: 'submit', 'aria-label': 'Send' }, svg(ICON.send));
   input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(160, input.scrollHeight) + 'px'; sendBtn.disabled = st.sending || !input.value.trim(); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
+  checkBtn = h('button', { class: 'iconbtn chkbtn', hidden: true, 'aria-label': 'Checklists', title: 'Checklists', onclick: openChecklists }, svg(ICON.list), h('i', { class: 'chkdot', hidden: true }));
   const form = h('form', { onsubmit: (e) => { e.preventDefault(); submit(); } }, input, micButton(), sendBtn);
   root.append(h('div', { class: 'app' },
     h('header', { class: 'bar' },
       h('button', { class: 'iconbtn', 'aria-label': 'Your conversations', onclick: openHistory }, svg(ICON.history)),
       h('div', { class: 'brand' }, ownLogo() ? h('img', { src: b.logo_url, alt: '' }) : h('img', { class: 'mark', src: markSrc, alt: '', width: 32, height: 32 }), h('b', { text: brandName() })),
-      venue, h('button', { class: 'iconbtn', 'aria-label': 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus)),
+      venue, checkBtn, h('button', { class: 'iconbtn', 'aria-label': 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus)),
       h('button', { class: 'avatar', title: `Sign out ${auth.email()}`, 'aria-label': `Sign out ${auth.email()}`, style: 'border:0;cursor:pointer', onclick: signOut }, (auth.email()[0] || '?').toUpperCase())),
     thread,
     h('div', { class: 'composer' }, form, h('p', { class: 'fine', text: 'Answers come from your company’s knowledge. For anything safety-critical, such as allergens, check with your manager.' }))));
   sendBtn.disabled = true; drawThread(); input.focus();
+  refreshChecklists();
 }
 
 function hello() {
@@ -270,6 +272,68 @@ async function send(text) {
     if (input && !input.value) input.value = text;
   }
   st.sending = false; drawThread(); if (sendBtn) sendBtn.disabled = !input.value.trim(); if (input) input.focus();
+}
+
+// ---- checklists: today's opening / closing lists for this venue --------------------------------------------------
+st.lists = [];
+const clTime = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+const clWho = (email) => String(email || '').split('@')[0];
+/** Fetch quietly: a venue with no checklists (or no checklist tables yet) simply never shows the button. */
+async function refreshChecklists() {
+  try { st.lists = (await api.get(`/api/v1/chat/checklists?site_id=${st.site.site_id}`)).data; } catch { st.lists = []; }
+  paintCheckBtn();
+}
+function paintCheckBtn() {
+  if (!checkBtn || !checkBtn.isConnected) return;
+  checkBtn.hidden = st.lists.length === 0;
+  const open = st.lists.filter((l) => !l.run.completed_at).length;
+  const dot = checkBtn.querySelector('.chkdot'); if (dot) { dot.hidden = open === 0; dot.textContent = open ? String(open) : ''; }
+}
+async function openChecklists() {
+  const scrim = h('div', { class: 'scrim' }); const body = h('div', { class: 'list chklist' });
+  const close = () => { scrim.remove(); drawer.remove(); document.removeEventListener('keydown', onKey); paintCheckBtn(); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const drawer = h('aside', { class: 'drawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Checklists' },
+    h('header', null, h('h2', { text: 'Checklists for today' }), h('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: close }, svg(ICON.close))), body);
+  scrim.addEventListener('click', close); document.addEventListener('keydown', onKey); document.body.append(scrim, drawer);
+  const replace = (t) => { const i = st.lists.findIndex((x) => x.checklist.id === t.checklist.id); if (i >= 0) st.lists[i] = { ...t, askNote: false, err: null }; };
+  const toggle = async (l, item) => {
+    const on = !l.run.ticks[item.id]; const before = { ...l.run.ticks };
+    if (on) l.run.ticks[item.id] = { by: 'you', at: new Date().toISOString() }; else delete l.run.ticks[item.id];
+    l.run.done = Object.keys(l.run.ticks).length; l.err = null; paint();
+    try { replace(await api.post(`/api/v1/chat/checklists/${l.checklist.id}/tick`, { site_id: st.site.site_id, item_id: item.id, done: on })); }
+    catch (e) { l.run.ticks = before; l.run.done = Object.keys(before).length; l.err = e.message; }
+    paint();
+  };
+  const finish = async (l, note) => {
+    l.err = null;
+    try { replace(await api.post(`/api/v1/chat/checklists/${l.checklist.id}/complete`, { site_id: st.site.site_id, note: note || null })); }
+    catch (e) { l.err = e.message; }
+    paint();
+  };
+  function paint() {
+    clear(body);
+    if (!st.lists.length) { body.append(h('p', { class: 'muted', style: 'padding:12px', text: 'No checklists for your venue today.' })); return; }
+    for (const l of st.lists) {
+      const done = !!l.run.completed_at; const all = l.run.done >= l.run.total;
+      const note = h('textarea', { rows: 2, maxlength: 600, placeholder: 'Why were some items skipped?', 'aria-label': 'Note' });
+      body.append(h('section', { class: `chk ${done ? 'done' : ''}` },
+        h('header', null, h('b', { text: l.checklist.title }), h('span', { class: 'chkcount', text: `${l.run.done} of ${l.run.total}` })),
+        ...l.checklist.items.map((it) => {
+          const t = l.run.ticks[it.id];
+          return h('button', { class: `chkitem ${t ? 'on' : ''}`, role: 'checkbox', 'aria-checked': String(!!t), disabled: done, onclick: () => toggle(l, it) },
+            h('span', { class: 'cbox' }, t ? svg(ICON.tick, 14, { 'stroke-width': 3 }) : null), h('span', { class: 'ctext', text: it.text }),
+            t && t.by !== 'you' ? h('small', { text: `${clWho(t.by)} ${clTime(t.at)}` }) : null);
+        }),
+        l.err ? h('div', { class: 'err', role: 'alert', text: l.err }) : null,
+        done ? h('p', { class: 'chkdone', text: `Done by ${clWho(l.run.completed_by)} at ${clTime(l.run.completed_at)}${l.run.note ? `. Note: ${l.run.note}` : ''}` })
+          : l.askNote ? h('div', { class: 'chknote' }, note, h('div', { class: 'row' }, h('button', { class: 'btn small', onclick: () => finish(l, note.value.trim()) }, 'Finish with this note'), h('button', { class: 'lnk', onclick: () => { l.askNote = false; paint(); } }, 'Cancel')))
+          : h('button', { class: 'btn small chkfinish', onclick: () => { if (all) finish(l, null); else { l.askNote = true; paint(); } } }, 'Mark as done')));
+    }
+    paintCheckBtn();
+  }
+  paint();
+  await refreshChecklists(); paint();
 }
 
 // ---- history -------------------------------------------------------------------------------------------------

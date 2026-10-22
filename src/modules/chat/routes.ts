@@ -12,10 +12,12 @@ import type { InsightsStore } from '../insights/store.js';
 import type { TechStackStore } from '../vendors/store.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import type { Help } from './help.js';
+import type { Ops } from '../operations/service.js';
+import { RunOut, ChecklistOut } from '../operations/routes.js';
 import { MAX_MESSAGE, type Chat, type Who } from './service.js';
 
 interface Ctx {
-  chat: Chat | null; repo?: Repo; branding: BrandingStore | null; insights: InsightsStore | null; techStack?: TechStackStore | null; help?: Help | null;
+  chat: Chat | null; repo?: Repo; branding: BrandingStore | null; insights: InsightsStore | null; techStack?: TechStackStore | null; help?: Help | null; ops?: Ops | null;
   perMinute?: number; now?: () => number;
 }
 
@@ -123,6 +125,48 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     await chat().rate(who, { vendor: req.body.vendor, score: req.body.score, comment: req.body.comment ?? null });
     return { ok: true as const };
   });
+
+  // ---- checklists: what staff tick off at their venue today ---------------------------------------------------
+  const opsSvc = () => { if (!ctx.ops) throw notFound('Checklists are not available'); return ctx.ops; };
+  const tickLimiter = new RateLimiter(120, 60_000, ctx.now);
+  async function siteAccess(p: UserPrincipal, siteId: string) {
+    const site = await repo().getSite(siteId);
+    if (!site || bestRole(p, site.org_id, siteId) === null) throw forbidden('You do not have access to that venue');
+    return { orgId: site.org_id, siteId, email: p.email };
+  }
+  const Today = z.object({ checklist: ChecklistOut, run: RunOut });
+  const todayOut = (t: z.infer<typeof Today>) => ({ checklist: t.checklist, run: t.run });
+
+  r.get('/api/v1/chat/checklists', {
+    preHandler: app.authenticate,
+    schema: { tags: ['chat'], summary: "Today's checklists for a venue, with what has been ticked", security: SECURITY, querystring: z.object({ site_id: Id }), response: { 200: z.object({ data: z.array(Today) }), 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => {
+    const who = await siteAccess(userOnly(req), req.query.site_id);
+    return { data: (await opsSvc().today(who.orgId, who.siteId)).map(todayOut) };
+  });
+
+  r.post('/api/v1/chat/checklists/:id/tick', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['chat'], summary: 'Tick or untick one item on a checklist for today', security: SECURITY, params: z.object({ id: Id }),
+      body: z.object({ site_id: Id, item_id: z.string().min(1).max(40), done: z.boolean() }),
+      response: { 200: Today, 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody },
+    },
+  }, async (req, reply) => {
+    const p = userOnly(req);
+    const rl = tickLimiter.hit('tick:' + p.userId);
+    if (!rl.allowed) { reply.header('Retry-After', String(rl.retryAfterSeconds)); throw new ApiHttpError(429, 'rate_limited', 'Slow down a moment.'); }
+    return todayOut(await opsSvc().tick(await siteAccess(p, req.body.site_id), req.params.id, req.body.item_id, req.body.done));
+  });
+
+  r.post('/api/v1/chat/checklists/:id/complete', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['chat'], summary: 'Mark a checklist done for today (add a note if some items were skipped)', security: SECURITY, params: z.object({ id: Id }),
+      body: z.object({ site_id: Id, note: z.string().max(600).nullable().optional() }),
+      response: { 200: Today, 400: ErrorBody, 403: ErrorBody, 404: ErrorBody },
+    },
+  }, async (req) => todayOut(await opsSvc().complete(await siteAccess(userOnly(req), req.body.site_id), req.params.id, req.body.note ?? null)));
 
   r.post('/api/v1/chat/help', {
     preHandler: app.authenticate,
