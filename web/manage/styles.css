@@ -331,6 +331,10 @@ code.keybox{display:block;word-break:break-all;font-family:ui-monospace,SFMono-R
 .opcard .optop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
 .opcard.done{background:#F4FBF0;border-color:#CFE8C3}
 .opcard.done .bar>div{background:#2DA85A}
+.dot.late{background:#D92D20}
+.days{display:flex;flex-wrap:wrap;gap:6px}
+.days .pill{border:1px solid var(--line-strong);background:#fff;padding:6px 12px}
+.days .pill.on{background:var(--ink);border-color:var(--ink);color:#fff;font-weight:600;box-shadow:none}
 .opnote{margin:0;font-size:13.5px;color:var(--ink2);background:var(--bg);border-radius:10px;padding:8px 10px}
 .cols2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media (max-width:700px){.cols2{grid-template-columns:1fr}}

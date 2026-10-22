@@ -17,5 +17,8 @@ export class FakeOpsStore implements OpsStore {
     Object.assign(r, fields, { updated_at: new Date().toISOString() }); return r;
   }
   async listRuns(orgId: string, from: string, to: string) { return this.runs.filter((r) => r.org_id === orgId && r.run_date >= from && r.run_date <= to); }
+  claimed = new Set<string>();
+  async listDueChecklists() { return this.lists.filter((l) => l.active && l.due_time); }
+  async claimReminder(checklistId: string, siteId: string, date: string) { const k = `${checklistId}|${siteId}|${date}`; if (this.claimed.has(k)) return false; this.claimed.add(k); return true; }
   async siteIds(orgId: string) { return this.sites.get(orgId) ?? []; }
 }

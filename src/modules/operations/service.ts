@@ -5,6 +5,19 @@ import type { ChecklistItem, ChecklistKind, ChecklistRow, OpsStore, RunRow, Tick
 export const MAX_ITEMS = 60;
 export const MAX_ITEM_CHARS = 200;
 export const KINDS: ChecklistKind[] = ['opening', 'closing', 'custom'];
+export const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const DUE = /^([01]\d|2[0-3]):[0-5]\d$/;
+function dueTime(v: unknown): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v !== 'string' || !DUE.test(v)) throw badRequest('Choose a time like 09:30');
+  return v;
+}
+function days(v: unknown): number[] {
+  if (v === undefined) return ALL_DAYS;
+  const d = [...new Set((v as unknown[]).map(Number))].filter((n) => Number.isInteger(n) && n >= 0 && n <= 6).sort();
+  if (!d.length) throw badRequest('Choose at least one day for the reminder');
+  return d;
+}
 
 /** The venue's day: UK time, so a closing checklist done at 1am still belongs to the evening before only if the venue says so (it does not: it is the calendar date in the UK). */
 export function ukDate(d: Date): string { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d); }
@@ -49,11 +62,11 @@ export function createOps(deps: { store: OpsStore; now?: () => Date }) {
   }
   const kind = (k: unknown): ChecklistKind => { if (!KINDS.includes(k as ChecklistKind)) throw badRequest('Choose opening, closing or custom'); return k as ChecklistKind; };
 
-  async function create(orgId: string, o: { title: string; kind: ChecklistKind; site_id: string | null; items: string[]; by: string }): Promise<ChecklistRow> {
+  async function create(orgId: string, o: { title: string; kind: ChecklistKind; site_id: string | null; items: string[]; due_time?: string | null; remind_days?: number[]; by: string }): Promise<ChecklistRow> {
     await assertSite(orgId, o.site_id);
-    return store.insertChecklist({ org_id: orgId, site_id: o.site_id, title: title(o.title), kind: kind(o.kind), items: cleanItems(o.items), active: true, created_by: o.by });
+    return store.insertChecklist({ org_id: orgId, site_id: o.site_id, title: title(o.title), kind: kind(o.kind), items: cleanItems(o.items), active: true, due_time: dueTime(o.due_time), remind_days: days(o.remind_days), created_by: o.by });
   }
-  async function update(orgId: string, id: string, p: { title?: string; kind?: ChecklistKind; site_id?: string | null; items?: string[]; active?: boolean }): Promise<ChecklistRow> {
+  async function update(orgId: string, id: string, p: { title?: string; kind?: ChecklistKind; site_id?: string | null; items?: string[]; active?: boolean; due_time?: string | null; remind_days?: number[] }): Promise<ChecklistRow> {
     const cur = await store.getChecklist(orgId, id);
     if (!cur) throw notFound('Checklist not found');
     if (p.site_id !== undefined) await assertSite(orgId, p.site_id);
@@ -61,6 +74,7 @@ export function createOps(deps: { store: OpsStore; now?: () => Date }) {
       ...(p.title !== undefined ? { title: title(p.title) } : {}), ...(p.kind !== undefined ? { kind: kind(p.kind) } : {}),
       ...(p.site_id !== undefined ? { site_id: p.site_id } : {}), ...(p.items !== undefined ? { items: cleanItems(p.items, cur.items) } : {}),
       ...(p.active !== undefined ? { active: p.active } : {}),
+      ...(p.due_time !== undefined ? { due_time: dueTime(p.due_time) } : {}), ...(p.remind_days !== undefined ? { remind_days: days(p.remind_days) } : {}),
     });
   }
   async function remove(orgId: string, id: string): Promise<void> {

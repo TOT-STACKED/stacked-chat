@@ -16,6 +16,11 @@ export function createModernHandler(opts: { config: Partial<Config> & Record<str
     : null;
   const appPromise = buildApp(config, { storage }).then(async (app) => {
     await app.ready();
+    // Checklist reminders: look every 5 minutes. Safe with several servers or restarts (each reminder is claimed in the database first).
+    if (app.opsReminders && !process.env.DISABLE_REMINDERS && !process.env.VITEST) {
+      const tick = () => { void app.opsReminders!().catch((e: Error) => app.log.warn({ err: e.message }, 'checklist reminders failed')); };
+      setTimeout(tick, 60_000).unref(); setInterval(tick, 5 * 60_000).unref();
+    }
     return app;
   });
 

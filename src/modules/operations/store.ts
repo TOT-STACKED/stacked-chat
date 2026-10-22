@@ -4,6 +4,7 @@ export type ChecklistKind = 'opening' | 'closing' | 'custom';
 export interface ChecklistItem { id: string; text: string }
 export interface ChecklistRow {
   id: string; org_id: string; site_id: string | null; title: string; kind: ChecklistKind; items: ChecklistItem[]; active: boolean;
+  /** "HH:MM" UK time by which it should be done; null = no reminder */ due_time: string | null; /** 0 = Sunday ... 6 = Saturday */ remind_days: number[];
   created_by: string | null; created_at: string; updated_at: string;
 }
 export interface Tick { by: string; at: string }
@@ -18,18 +19,22 @@ export interface OpsStore {
   listChecklists(orgId: string): Promise<ChecklistRow[]>;
   getChecklist(orgId: string, id: string): Promise<ChecklistRow | null>;
   insertChecklist(row: NewChecklist): Promise<ChecklistRow>;
-  updateChecklist(id: string, patch: Partial<Pick<ChecklistRow, 'title' | 'kind' | 'items' | 'active' | 'site_id'>>): Promise<ChecklistRow>;
+  updateChecklist(id: string, patch: Partial<Pick<ChecklistRow, 'title' | 'kind' | 'items' | 'active' | 'site_id' | 'due_time' | 'remind_days'>>): Promise<ChecklistRow>;
   deleteChecklist(id: string): Promise<void>;
   getRun(checklistId: string, siteId: string, date: string): Promise<RunRow | null>;
   /** create the run if it does not exist, or change the given fields */
   saveRun(key: RunKey, fields: Partial<Pick<RunRow, 'ticks' | 'completed_by' | 'completed_at' | 'note'>>): Promise<RunRow>;
   listRuns(orgId: string, fromDate: string, toDate: string): Promise<RunRow[]>;
+  /** active checklists, in any company, that have a due time (what the reminder job looks at) */
+  listDueChecklists(): Promise<ChecklistRow[]>;
+  /** true if this call is the one that gets to send today's reminder for this checklist at this venue */
+  claimReminder(checklistId: string, siteId: string, date: string): Promise<boolean>;
   /** the venues of an organisation (to check an audience) */
   siteIds(orgId: string): Promise<string[]>;
 }
 
 const enc = encodeURIComponent;
-const CL = 'id,org_id,site_id,title,kind,items,active,created_by,created_at,updated_at';
+const CL = 'id,org_id,site_id,title,kind,items,active,due_time,remind_days,created_by,created_at,updated_at';
 const RUN = 'id,checklist_id,org_id,site_id,run_date,ticks,completed_by,completed_at,note,created_at,updated_at';
 
 export function createSupabaseOpsStore(db: Db): OpsStore {
@@ -51,6 +56,12 @@ export function createSupabaseOpsStore(db: Db): OpsStore {
     },
     async listRuns(orgId, from, to) {
       return ok(await db.rest<RunRow[]>(`/checklist_runs?org_id=eq.${enc(orgId)}&run_date=gte.${enc(from)}&run_date=lte.${enc(to)}&select=${RUN}&order=run_date.desc&limit=5000`), 'list runs') ?? [];
+    },
+    async listDueChecklists() { return ok(await db.rest<ChecklistRow[]>(`/checklists?active=eq.true&due_time=not.is.null&select=${CL}&limit=5000`), 'list due') ?? []; },
+    async claimReminder(checklistId, siteId, date) {
+      const r = await db.rest<Array<{ checklist_id: string }>>('/checklist_reminders?on_conflict=checklist_id,site_id,run_date&select=checklist_id', { method: 'POST', headers: { Prefer: 'return=representation,resolution=ignore-duplicates' }, body: { checklist_id: checklistId, site_id: siteId, run_date: date } });
+      if (r.status >= 300) throw new Error(`operations store: claim reminder failed (${r.status})`);
+      return (r.data ?? []).length > 0; // ignored duplicates return no row: someone already sent it
     },
     async siteIds(orgId) { return (ok(await db.rest<Array<{ id: string }>>(`/venues?org_id=eq.${enc(orgId)}&select=id&limit=1000`), 'sites') ?? []).map((s) => s.id); },
   };

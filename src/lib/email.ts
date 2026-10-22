@@ -90,3 +90,22 @@ export function welcomeEmail(o: { to: string; name?: string | null; orgName: str
 </table></td></tr></table></body></html>`;
   return { to: o.to, subject, text, html };
 }
+
+/** Sent to a venue's managers when a checklist has not been finished by its due time. Fills are set the way email apps keep them (bgcolor + background-color). */
+export function checklistReminderEmail(o: { to: string; checklist: string; venue: string; due: string; done: number; total: number; url: string }): Mail {
+  const state = o.done === 0 ? 'has not been started' : `is only ${o.done} of ${o.total} ticked`;
+  const subject = `${o.checklist} not finished at ${o.venue}`;
+  const line = `The ${o.checklist.toLowerCase().endsWith('checklist') ? o.checklist : `${o.checklist} checklist`} at ${o.venue} ${state}, and it was due by ${o.due}.`;
+  const text = `${line}\n\nSee today's checklists: ${o.url}\n\nYou get this reminder once a day, only if a checklist is not done by its due time. You can change or switch it off under Operations in Stacked Chat.`;
+  const font = "font-family:'DM Sans',Arial,Helvetica,sans-serif";
+  const html = `<!doctype html><html><body bgcolor="#F1F0E9" style="background-color:#F1F0E9;margin:0;padding:0">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="#F1F0E9" style="background-color:#F1F0E9;padding:24px 12px">
+<table role="presentation" width="520" cellpadding="0" cellspacing="0" style="width:100%;max-width:520px">
+<tr><td bgcolor="#FF5014" style="background-color:#FF5014;border-radius:24px 24px 0 0;padding:24px 28px;${font}"><div style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:22px;line-height:1.1;text-transform:uppercase;color:#FFFFFF;font-weight:900">${esc(o.checklist)} not finished</div><div style="font-size:15px;color:#FFFFFF;padding-top:8px">${esc(o.venue)} · due by ${esc(o.due)}</div></td></tr>
+<tr><td bgcolor="#FFFFFF" style="background-color:#FFFFFF;border-radius:0 0 24px 24px;padding:26px 28px 28px;${font};color:#38278F">
+<p style="font-size:16px;line-height:1.55;margin:0 0 22px;color:#38278F">${esc(line)}</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 22px"><tr><td bgcolor="#FF5014" style="background-color:#FF5014;border-radius:999px;border-bottom:4px solid #C34014" align="center"><a href="${esc(o.url)}" style="${font};display:block;padding:14px 28px;color:#FFFFFF;text-decoration:none;font-weight:800;font-size:16px;background-color:#FF5014;border-radius:999px"><span style="color:#FFFFFF">See today's checklists</span></a></td></tr></table>
+<p style="font-size:13px;line-height:1.5;color:#6B675F;margin:0">You get this once a day, only if a checklist is not done by its due time. Change or switch it off under Operations.</p></td></tr>
+</table></td></tr></table></body></html>`;
+  return { to: o.to, subject, text, html };
+}

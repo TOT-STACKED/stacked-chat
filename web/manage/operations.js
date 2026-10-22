@@ -5,6 +5,15 @@ import { pageHeader, tile } from './ui.js';
 const KIND_LABEL = { opening: 'Opening', closing: 'Closing', custom: 'Other' };
 const dayText = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 const timeText = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
+const DAYS = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
+const DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+/** Is a list past its due time right now (UK time, on a day it is checked)? Same rule the reminder email uses. */
+function pastDue(l, now = new Date()) {
+  if (!l.due_time) return false;
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+  const get = (t) => (p.find((x) => x.type === t) || {}).value || '0';
+  return (l.remind_days || []).includes(DOW[get('weekday')]) && Number(get('hour')) * 60 + Number(get('minute')) >= Number(l.due_time.slice(0, 2)) * 60 + Number(l.due_time.slice(3, 5));
+}
 const who = (email) => String(email || '').split('@')[0];
 
 /** Operations: checklists a manager writes, what each venue has ticked off today, and the last few days. */
@@ -27,10 +36,11 @@ export async function renderOperations(main, ctx) {
     st.loading = false; draw();
   }
 
-  function status(run) {
+  function status(run, list) {
     if (run.completed_at) return h('span', { class: 'status' }, h('span', { class: 'dot active' }), `Done ${timeText(run.completed_at)} by ${who(run.completed_by)}`);
-    if (run.started) return h('span', { class: 'status' }, h('span', { class: 'dot invited' }), `${run.done} of ${run.total} ticked`);
-    return h('span', { class: 'status' }, h('span', { class: 'dot' }), 'Not started');
+    const late = list && pastDue(list);
+    if (run.started) return h('span', { class: 'status' }, h('span', { class: `dot ${late ? 'late' : 'invited'}` }), `${run.done} of ${run.total} ticked${late ? `, was due by ${list.due_time}` : ''}`);
+    return h('span', { class: 'status' }, h('span', { class: `dot ${late ? 'late' : ''}` }), late ? `Overdue, was due by ${list.due_time}` : 'Not started');
   }
 
   function draw() {
@@ -57,7 +67,7 @@ export async function renderOperations(main, ctx) {
         h('div', { class: 'optop' }, h('b', { text: t.checklist.title }), h('span', { class: 'badge role-staff', text: KIND_LABEL[t.checklist.kind] })),
         multi() ? h('span', { class: 'muted', style: 'font-size:13.5px', text: siteName(t.site_id) }) : null,
         h('div', { class: 'bar', role: 'progressbar', 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' }, h('div', { style: `width:${pct}%` })),
-        status(t.run), t.run.note ? h('p', { class: 'opnote', text: `Note: ${t.run.note}` }) : null);
+        status(t.run, t.checklist), t.run.note ? h('p', { class: 'opnote', text: `Note: ${t.run.note}` }) : null);
     }));
   }
 
@@ -66,7 +76,7 @@ export async function renderOperations(main, ctx) {
     return h('div', { class: 'card scroll' }, h('table', null,
       h('thead', null, h('tr', null, ['Checklist', 'Type', 'Where', 'Items', 'Status', ''].map((x) => h('th', { text: x })))),
       h('tbody', null, rows.map((l) => h('tr', null,
-        h('td', null, h('b', { text: l.title })), h('td', null, h('span', { class: 'badge role-staff', text: KIND_LABEL[l.kind] })),
+        h('td', null, h('b', { text: l.title }), l.due_time ? h('div', { class: 'muted', style: 'font-size:13px', text: `Reminder if not done by ${l.due_time}` }) : null), h('td', null, h('span', { class: 'badge role-staff', text: KIND_LABEL[l.kind] })),
         h('td', { text: audienceName(l) }), h('td', { text: String(l.items.length) }),
         h('td', null, h('span', { class: 'status' }, h('span', { class: `dot ${l.active ? 'active' : ''}` }), l.active ? 'On' : 'Off')),
         h('td', { class: 'act' }, (l.site_id === null ? orgAdmin : canManage(memberships, orgId, l.site_id)) ? h('button', { class: 'lnk', onclick: () => openForm(l) }, 'Edit') : null))))));
@@ -93,6 +103,9 @@ export async function renderOperations(main, ctx) {
       const where = h('select', { id: 'c-where' }, options.map((s) => h('option', { value: s.id, selected: s.id === startSite }, s.name)));
       const items = h('textarea', { id: 'c-items', rows: 10, style: 'min-height:200px', placeholder: 'One item per line, for example:\nUnlock the front door\nSwitch on the ovens and extraction\nCheck the fridge temperatures\nCount the float' });
       items.value = (existing.items || []).map((i) => i.text).join('\n');
+      const due = h('input', { type: 'time', id: 'c-due', value: existing.due_time || '' });
+      const picked = new Set(existing.remind_days || [0, 1, 2, 3, 4, 5, 6]);
+      const dayBtns = DAYS.map(([n, label]) => { const b = h('button', { type: 'button', class: `pill ${picked.has(n) ? 'on' : ''}`, 'aria-pressed': String(picked.has(n)), onclick: () => { if (picked.has(n)) picked.delete(n); else picked.add(n); b.classList.toggle('on', picked.has(n)); b.setAttribute('aria-pressed', String(picked.has(n))); } }, label); return b; });
       const active = h('input', { type: 'checkbox', id: 'c-active', checked: existing.active !== false });
       const save = h('button', { class: 'btn cta', onclick: submit }, editing ? 'Save' : 'Save checklist');
       async function submit() {
@@ -100,7 +113,8 @@ export async function renderOperations(main, ctx) {
         const lines = items.value.split('\n').map((x) => x.trim()).filter(Boolean);
         if (!title.value.trim()) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Give the checklist a title.' })); return; }
         if (!lines.length) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Add at least one item, one per line.' })); return; }
-        const payload = { title: title.value.trim(), kind: kind.value, site_id: where.value || null, items: lines };
+        if (due.value && !picked.size) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Choose at least one day for the reminder.' })); return; }
+        const payload = { title: title.value.trim(), kind: kind.value, site_id: where.value || null, items: lines, due_time: due.value || null, remind_days: picked.size ? DAYS.map(([n]) => n).filter((n) => picked.has(n)) : [0, 1, 2, 3, 4, 5, 6] };
         if (editing) payload.active = active.checked;
         save.disabled = true; save.textContent = 'Saving…';
         try {
@@ -112,6 +126,9 @@ export async function renderOperations(main, ctx) {
         h('div', { class: 'field' }, h('label', { for: 'c-title', text: 'Title' }), title),
         h('div', { class: 'cols2' }, h('div', { class: 'field' }, h('label', { for: 'c-kind', text: 'Type' }), kind), h('div', { class: 'field' }, h('label', { for: 'c-where', text: 'Who is it for?' }), where)),
         h('div', { class: 'field' }, h('label', { for: 'c-items', text: 'Items' }), items, h('span', { class: 'hint', text: 'One item per line. Your team ticks them off in order, on their phone.' })),
+        h('div', { class: 'field' }, h('label', { for: 'c-due', text: 'Remind managers if it is not done by' }), due,
+          h('span', { class: 'hint', text: 'Optional. Leave empty for no reminder. The venue’s managers get one email a day, only if it is not finished by this time (UK time), on the days you pick.' }),
+          h('div', { class: 'days', role: 'group', 'aria-label': 'Days to check' }, dayBtns)),
         editing ? h('div', { class: 'field' }, h('label', { class: 'radio' }, active, h('span', null, h('b', { text: 'Show to staff' }), h('span', { class: 'hint', text: ' Switch off to hide it without losing its history.' })))) : null,
         err,
         h('div', { class: 'row' }, editing ? h('button', { class: 'lnk', style: 'margin-right:auto;color:#9C2F1B', onclick: () => confirmDelete(existing, close) }, 'Delete') : null,

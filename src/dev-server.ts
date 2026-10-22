@@ -72,7 +72,7 @@ async function main() {
   const opsStore = new FakeOpsStore();
   for (const x of repo.sites) opsStore.addSite(org.id, x.id);
   const opsSample = createOps({ store: opsStore });
-  const opening = await opsSample.create(org.id, { title: 'Opening checklist', kind: 'opening', site_id: null, items: ['Unlock the front door and turn off the alarm', 'Switch on the ovens and extraction', 'Check fridge and freezer temperatures', 'Count the till float', 'Set the specials board'], by: 'owner@example.com' });
+  const opening = await opsSample.create(org.id, { title: 'Opening checklist', kind: 'opening', site_id: null, due_time: '08:00', items: ['Unlock the front door and turn off the alarm', 'Switch on the ovens and extraction', 'Check fridge and freezer temperatures', 'Count the till float', 'Set the specials board'], by: 'owner@example.com' });
   await opsSample.create(org.id, { title: 'Closing checklist', kind: 'closing', site_id: a.id, items: ['Clean down the kitchen', 'Cash up', 'Lock the cellar', 'Set the alarm'], by: 'alex@example.com' });
   for (const it of opening.items.slice(0, 2)) await opsSample.tick({ orgId: org.id, siteId: a.id, email: 'jordan@example.com' }, opening.id, it.id, true);
   const istore = new FakeInsightsStore();

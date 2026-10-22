@@ -54,6 +54,7 @@ import { sensitiveRoutes } from './modules/sensitive/routes.js';
 import { createOps, type Ops } from './modules/operations/service.js';
 import { createSupabaseOpsStore, type OpsStore } from './modules/operations/store.js';
 import { operationsRoutes } from './modules/operations/routes.js';
+import { createReminders } from './modules/operations/reminders.js';
 import { createSignup } from './modules/signup/service.js';
 import { signupRoutes } from './modules/signup/routes.js';
 import { startAppRoutes } from './modules/signup/app-routes.js';
@@ -62,7 +63,7 @@ import { createSupabaseInsightsStore, type InsightsStore } from './modules/insig
 import { createAnthropicDrafter, type AnswerDrafter } from './modules/insights/drafter.js';
 
 declare module 'fastify' {
-  interface FastifyInstance { billing: Billing | null; knowledge: Knowledge | null }
+  interface FastifyInstance { billing: Billing | null; knowledge: Knowledge | null; /** one reminder pass (checklists not done by their due time); null when email or the database is off */ opsReminders: (() => Promise<{ checked: number; sent: number }>) | null }
 }
 
 export interface Deps {
@@ -151,6 +152,8 @@ export async function buildApp(
   const sensitiveSettings = sensitiveStore ? createSensitiveSettings(sensitiveStore, { now: overrides.now ? () => overrides.now!().getTime() : undefined }) : null;
   const opsStore = overrides.opsStore ?? (db ? createSupabaseOpsStore(db) : null);
   const ops: Ops | null = opsStore ? createOps({ store: opsStore, now: overrides.now }) : null;
+  const reminders = repo && opsStore && mailer ? createReminders({ store: opsStore, repo, mailer, publicUrl: config.PUBLIC_URL, now: overrides.now, log: app.log }) : null;
+  app.decorate('opsReminders', reminders ? () => reminders.run() : null);
   const conversationStore = overrides.conversationStore ?? (db ? createSupabaseConversationStore(db) : null);
   const chatModel = overrides.chatModel !== undefined ? overrides.chatModel : (config.ANTHROPIC_API_KEY ? createAnthropicChatModel({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null);
   const adopted = new Map<string, number>(); // organisations whose older content we brought into the catalogue recently
@@ -246,7 +249,7 @@ export async function buildApp(
   await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate, files: overrides.storage ?? null, reader: pictureReader }));
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
   await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
-  await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate }));
+  await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));

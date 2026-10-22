@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { forbidden, notFound } from '../../lib/errors.js';
+import { forbidden, notFound, unauthorized } from '../../lib/errors.js';
+import { safeEqualStr } from '../billing/util.js';
 import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
 import type { Repo } from '../../lib/repo.js';
 import { assertOrgAccess, userOnly } from '../access.js';
@@ -9,11 +10,11 @@ import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import { KINDS, MAX_ITEM_CHARS, MAX_ITEMS, type Ops } from './service.js';
 import type { ChecklistRow } from './store.js';
 
-interface Ctx { ops: Ops | null; repo?: Repo; gate: (orgId: string) => Promise<void> }
+interface Ctx { ops: Ops | null; repo?: Repo; gate: (orgId: string) => Promise<void>; reminders?: (() => Promise<{ checked: number; sent: number }>) | null; cronSecret?: string }
 
 export const ChecklistOut = z.object({
   id: Id, org_id: Id, site_id: Id.nullable(), title: z.string(), kind: z.enum(['opening', 'closing', 'custom']),
-  items: z.array(z.object({ id: z.string(), text: z.string() })), active: z.boolean(), created_at: z.string(), updated_at: z.string(),
+  items: z.array(z.object({ id: z.string(), text: z.string() })), active: z.boolean(), due_time: z.string().nullable(), remind_days: z.array(z.number()), created_at: z.string(), updated_at: z.string(),
 });
 export const RunOut = z.object({
   done: z.number(), total: z.number(), started: z.boolean(), ticks: z.record(z.string(), z.object({ by: z.string(), at: z.string() })),
@@ -22,7 +23,9 @@ export const RunOut = z.object({
 const Title = z.string().trim().min(1).max(120);
 const Items = z.array(z.string().max(MAX_ITEM_CHARS + 50)).min(1).max(MAX_ITEMS);
 const Kind = z.enum(KINDS as [string, ...string[]]);
-const view = (l: ChecklistRow) => ({ id: l.id, org_id: l.org_id, site_id: l.site_id, title: l.title, kind: l.kind, items: l.items, active: l.active, created_at: l.created_at, updated_at: l.updated_at });
+const DueTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Choose a time like 09:30').nullable();
+const Days = z.array(z.number().int().min(0).max(6)).min(1).max(7);
+const view = (l: ChecklistRow) => ({ id: l.id, org_id: l.org_id, site_id: l.site_id, title: l.title, kind: l.kind, items: l.items, active: l.active, due_time: l.due_time, remind_days: l.remind_days, created_at: l.created_at, updated_at: l.updated_at });
 
 export async function operationsRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -47,14 +50,14 @@ export async function operationsRoutes(app: FastifyInstance, ctx: Ctx) {
     preHandler: app.authenticate,
     schema: {
       tags: ['operations'], summary: 'Write a checklist for the whole company or one venue', security: SECURITY, params: z.object({ orgId: Id }),
-      body: z.object({ title: Title, kind: Kind.default('custom'), site_id: Id.nullable().optional(), items: Items }),
+      body: z.object({ title: Title, kind: Kind.default('custom'), site_id: Id.nullable().optional(), items: Items, due_time: DueTime.optional(), remind_days: Days.optional() }),
       response: { 201: ChecklistOut, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody },
     },
   }, async (req, reply) => {
     const { orgId } = req.params; const p = userOnly(req); assertOrgAccess(req, orgId); await ctx.gate(orgId);
     const siteId = req.body.site_id ?? null;
     if (!canWrite(p, orgId, siteId)) throw forbidden(siteId ? 'You cannot add checklists for this venue' : 'Only company admins can add checklists for the whole company');
-    const l = await ops().create(orgId, { title: req.body.title, kind: req.body.kind as 'opening' | 'closing' | 'custom', site_id: siteId, items: req.body.items, by: p.email });
+    const l = await ops().create(orgId, { title: req.body.title, kind: req.body.kind as 'opening' | 'closing' | 'custom', site_id: siteId, items: req.body.items, due_time: req.body.due_time, remind_days: req.body.remind_days, by: p.email });
     reply.status(201); return view(l);
   });
 
@@ -62,7 +65,7 @@ export async function operationsRoutes(app: FastifyInstance, ctx: Ctx) {
     preHandler: app.authenticate,
     schema: {
       tags: ['operations'], summary: 'Change a checklist: wording, items, venue or switch it on or off', security: SECURITY, params: z.object({ orgId: Id, id: Id }),
-      body: z.object({ title: Title.optional(), kind: Kind.optional(), site_id: Id.nullable().optional(), items: Items.optional(), active: z.boolean().optional() }),
+      body: z.object({ title: Title.optional(), kind: Kind.optional(), site_id: Id.nullable().optional(), items: Items.optional(), active: z.boolean().optional(), due_time: DueTime.optional(), remind_days: Days.optional() }),
       response: { 200: ChecklistOut, 400: ErrorBody, 402: ErrorBody, 403: ErrorBody, 404: ErrorBody },
     },
   }, async (req) => {
@@ -83,6 +86,14 @@ export async function operationsRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!canWrite(p, orgId, cur.site_id)) throw forbidden('You cannot delete this checklist');
     await ops().remove(orgId, id);
     return { ok: true as const };
+  });
+
+  // Called by a scheduler with the shared CRON_SECRET (the server also runs this itself every few minutes).
+  r.post('/api/v1/internal/operations/remind', { schema: { hide: true } }, async (req) => {
+    const given = req.headers['x-cron-secret'];
+    if (!ctx.cronSecret || typeof given !== 'string' || !safeEqualStr(given, ctx.cronSecret)) throw unauthorized('Bad cron secret');
+    if (!ctx.reminders) throw notFound('Reminders are not switched on');
+    return ctx.reminders();
   });
 
   r.get('/api/v1/orgs/:orgId/checklists/board', {

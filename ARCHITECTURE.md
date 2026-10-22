@@ -167,3 +167,10 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 - **Staff:** `GET /api/v1/chat/checklists?site_id=`, `POST …/:id/tick`, `POST …/:id/complete` (in the chat routes, any member of the venue). Finishing with items unticked needs a note. A finished run is locked for the day.
 - **Manage:** Operations screen (today board, checklists, last 7 days). **Chat:** a clipboard button in the header (only shown when the venue has lists), with a count of lists not finished.
 - Items keep their id when a list is edited, so earlier ticks survive. Ticks for removed items are ignored.
+
+### Checklist reminders
+
+- **Set per checklist:** `due_time` ("HH:MM", UK time) and `remind_days` (0 = Sunday … 6 = Saturday). No due time = no reminder (migration 014).
+- **The job** (`operations/reminders.ts`) runs every 5 minutes inside the server (`src/index.ts`; `DISABLE_REMINDERS=1` switches it off) and on `POST /api/v1/internal/operations/remind` with `x-cron-secret` (an optional external scheduler). From the due time until 3 hours after it, for every venue where the run is not finished, it emails that venue's active site managers, or the company's owner/HQ admins if the venue has none.
+- **Once only:** the first server to insert a `checklist_reminders` row for (checklist, venue, day) sends; everyone else skips. A failed email is logged and not retried that day.
+- Needs email (`RESEND_API_KEY`) to be configured; otherwise it does nothing. Manage's board marks a list "Overdue" using the same rule.
