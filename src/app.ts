@@ -171,8 +171,6 @@ export async function buildApp(
     if (req.headers['x-forwarded-proto'] === 'https' && !reply.hasHeader('strict-transport-security')) reply.header('Strict-Transport-Security', 'max-age=31536000');
     if (req.url.startsWith('/api/') && !reply.hasHeader('cache-control')) reply.header('Cache-Control', 'no-store');
   });
-  // TEMPORARY: shows what the host's proxies put in X-Forwarded-For, to choose TRUST_PROXY_HOPS. Returns only the caller's own request details.
-  app.get('/api/v1/diag/ip', { schema: { hide: true } }, async (req) => ({ xff: req.headers['x-forwarded-for'] ?? null, ip: req.ip, ips: req.ips ?? null, socket: req.socket.remoteAddress ?? null, proto: req.headers['x-forwarded-proto'] ?? null, cf: !!req.headers['cf-connecting-ip'], trueClient: req.headers['true-client-ip'] ?? null }));
 
   // Billing (Stripe, test mode). Off, and failing closed, unless every Stripe setting is present.
   const billingCfg = loadBillingConfig(config);
