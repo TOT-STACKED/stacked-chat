@@ -203,6 +203,19 @@ describe('the chat service', () => {
     await chat.ask(me(), { message: 'where is the fire assembly point?' });
     expect(model.calls.at(-1)!.system).not.toContain('THIS PERSON\'S TRAINING');
   });
+  it('knows what the person has to do today when they ask, and only then', async () => {
+    chat = createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, work: async () => ['Checklist "Opening" (opening): 2 of 7 items ticked, due by 09:00', 'Update "New menu": not read yet', 'Training "Fire safety": not done yet'] });
+    for (const q of ['what do i need to do today?', 'have i got any updates?', 'is the opening checklist done', 'whats on my list']) {
+      await chat.ask(me(), { message: q });
+      const sys = model.calls.at(-1)!.system;
+      expect(sys, q).toContain('Checklist "Opening" (opening): 2 of 7 items ticked, due by 09:00'); expect(sys).toContain('Update "New menu": not read yet'); expect(sys).toContain('Training "Fire safety"'); expect(sys).toContain('four-square button');
+    }
+    await chat.ask(me(), { message: 'where is the fire assembly point?' });
+    expect(model.calls.at(-1)!.system).not.toContain("THIS PERSON'S WORK TODAY");
+    chat = createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, work: async () => { throw new Error('db down'); } });
+    await chat.ask(me(), { message: 'what do i need to do today?' }); // a failing lookup must not break the answer
+    expect(model.calls.at(-1)!.system).not.toContain("THIS PERSON'S WORK TODAY");
+  });
   it('lists every course when asked what training is available, and says so when there are none', async () => {
     const mk = (list: Array<{ title: string; status: 'todo' | 'done' | 'renew'; completed_at: string | null; expires_at: string | null }>) => createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, training: async () => list });
     await mk([{ title: 'Fire safety', status: 'todo', completed_at: null, expires_at: null }, { title: 'Food hygiene basics', status: 'todo', completed_at: null, expires_at: null }]).ask(me(), { message: 'what training is available?' });

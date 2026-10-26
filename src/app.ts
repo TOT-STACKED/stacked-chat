@@ -189,6 +189,20 @@ export async function buildApp(
     signUrls: overrides.storage ? async (urls) => overrides.storage!.signUrls(urls) as Promise<Array<string | null>> : undefined,
     onAnswered: (siteId) => { void billing?.recordQuestion(siteId); },
     training: training ? (who) => training.listFor({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds }) : undefined,
+    work: ops || comms || training ? async (who) => {
+      const lines: string[] = [];
+      for (const t of ops ? await ops.today(who.orgId, who.siteId).catch(() => []) : []) {
+        const r = t.run; const due = t.checklist.due_time ? `, due by ${t.checklist.due_time}` : '';
+        lines.push(`Checklist "${t.checklist.title}" (${t.checklist.kind}): ${r.completed_at ? 'done today' : r.started ? `${r.done} of ${r.total} items ticked${due}` : `not started${due}`}`);
+      }
+      for (const u of comms ? await comms.feed({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds }).catch(() => []) : []) {
+        if (!u.read_at || (u.requires_ack && !u.acked_at)) lines.push(`Update "${u.title}": ${u.requires_ack && u.read_at ? 'needs confirming' : u.requires_ack ? 'not read yet, needs confirming' : 'not read yet'}`);
+      }
+      for (const c of training ? await training.listFor({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds }).catch(() => []) : []) {
+        if (c.status !== 'done') lines.push(`Training "${c.title}": ${c.status === 'renew' ? 'due a refresher' : 'not done yet'}`);
+      }
+      return lines.length ? lines : ['Nothing is waiting for them: no checklists are set up for their venue, no unread updates and no training to take.'];
+    } : undefined,
     sensitive: sensitiveSettings ? (orgId) => sensitiveSettings.enabled(orgId) : undefined,
     nps: overrides.npsStore ?? (db ? createSupabaseNpsStore(db) : null),
     mirrorNps: overrides.mirrorNps !== undefined ? overrides.mirrorNps : (config.STACKCOLLECT_SUPABASE_URL && config.STACKCOLLECT_SUPABASE_KEY ? createPortalMirror({ url: config.STACKCOLLECT_SUPABASE_URL, key: config.STACKCOLLECT_SUPABASE_KEY }) : null),

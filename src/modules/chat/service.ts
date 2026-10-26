@@ -26,7 +26,12 @@ async function trainingNotesFor(load: (who: Who) => Promise<TrainingStatus[]>, w
   return list.length ? list.map(trainingLine) : ['No courses have been set up for them yet. Their manager can add some in Manage, under Training.'];
 }
 
+/** Questions about what the person has to do: today's checklists, updates to read, training to take. Only these get that list added to the prompt. */
+export const WORK_INTENT = /\b(to do|todo|to-do|tasks?|checklists?|check lists?|opening|closing|open up|close up|updates?|announcements?|news|outstanding|overdue|what (?:do|should|have|am|is|are)\b.{0,40}\b(?:today|now|first|next|left|on)|what'?s (?:on|left|next)|anything (?:for me|i need|i should|to do)|my (?:day|shift|jobs?|list))\b/i;
+
 export interface ChatDeps {
+  /** this person's work today: checklists at their venue and how far along they are, updates not yet read, for questions about what to do */
+  work?: (who: Who) => Promise<string[]>;
   /** this person's courses and sign-offs, for questions about their training */
   training?: (who: Who) => Promise<TrainingStatus[]>;
   /** all knowledge items for an organisation (the service filters what this person may see) */
@@ -131,6 +136,7 @@ export function createChat(deps: ChatDeps) {
     const system = buildSystemPrompt({
       botName: who.botName || 'Stacked Chat', orgName: who.orgName, siteName: who.siteName, personName: who.name,
       trainingNotes: deps.training && TRAINING_INTENT.test(message) ? await trainingNotesFor(deps.training, who) : undefined,
+      workNotes: deps.work && WORK_INTENT.test(message) ? await deps.work(who).catch(() => []) : undefined,
       passages, hasVideo: media.videos.length > 0, videoNotes: media.videos.map((v) => (v.description ? `${v.title}: ${v.description}` : v.title)), hasImage: media.images.length > 0,
       vendorNotes: pickProfiles(message, history.map((m) => ({ role: m.role, content: m.content })), who.techStack ?? null).map((k) => PROFILES[k]!),
       techStack: who.techStack ?? null, techCategories: TECH_CATEGORIES,
