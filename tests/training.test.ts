@@ -200,3 +200,11 @@ describe('ready-made courses', () => {
     expect(fire.lessons.some((l: { body: string }) => l.body.includes('[ADD:'))).toBe(true); expect(fire.note).toContain('[ADD');
   });
 });
+
+describe('the food hygiene course', () => {
+  it('has the venue blanks, a yearly refresher and a note for the manager', () => {
+    const food = COURSE_TEMPLATES.find((t: { id: string }) => t.id === 'food-hygiene')!;
+    expect(food.lessons.length).toBe(7); expect(food.quiz.length).toBe(8); expect(food.renew_months).toBe(12);
+    expect(food.lessons.some((l: { body: string }) => l.body.includes('[ADD:'))).toBe(true); expect(food.note).toContain('[ADD');
+  });
+});
