@@ -151,7 +151,7 @@ function draw() {
     h('header', { class: 'bar' },
       h('button', { class: 'iconbtn', 'aria-label': 'Your conversations', onclick: openHistory }, svg(ICON.history)),
       h('div', { class: 'brand' }, ownLogo() ? h('img', { src: b.logo_url, alt: '' }) : h('img', { class: 'mark', src: markSrc, alt: '', width: 32, height: 32 }), h('b', { text: brandName() })),
-      venue, hubBtn, h('button', { class: 'iconbtn', 'aria-label': 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus)),
+      venue, hubBtn, h('button', { class: 'iconbtn newbtn', 'aria-label': 'New chat', title: 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus), h('span', { class: 'lbl', text: 'New chat' })),
       h('button', { class: 'avatar', title: `Sign out ${auth.email()}`, 'aria-label': `Sign out ${auth.email()}`, style: 'border:0;cursor:pointer', onclick: signOut }, (auth.email()[0] || '?').toUpperCase())),
     thread,
     h('div', { class: 'composer' }, form, h('p', { class: 'fine', text: 'Answers come from your company’s knowledge. For anything safety-critical, such as allergens, check with your manager.' }))));
