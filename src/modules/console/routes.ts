@@ -9,7 +9,7 @@ import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import type { CustomersService } from './customers.js';
 import type { ConsoleService } from './service.js';
 
-interface Ctx { console: ConsoleService | null; staff: Set<string>; customers?: CustomersService | null; idempotency?: IdempotencyStore }
+interface Ctx { console: ConsoleService | null; staff: Set<string>; customers?: CustomersService | null; idempotency?: IdempotencyStore; connections?: { info(): Record<string, unknown>; test(to: string): Promise<Record<string, unknown>> } }
 
 /** Stacked staff are people whose verified email is on the STACKED_STAFF_EMAILS list. Empty list = Console off. */
 export const parseStaff = (raw: string | undefined) => new Set((raw ?? '').split(/[,\s;]+/).map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)));
@@ -40,6 +40,16 @@ export async function consoleRoutes(app: FastifyInstance, ctx: Ctx) {
   list('/api/v1/console/customers', 'Every customer with billing state, usage and flags', (q) => svc().customers(q.days));
   list('/api/v1/console/vendors', 'Vendor intelligence: mentions, problems and NPS per technology partner', (q) => svc().vendors(q.days));
   list('/api/v1/console/gaps', 'Questions the AI could not answer across all customers', (q) => svc().gaps(q.days));
+
+  // What is connected (never any secrets), and a button that tries each connection for real.
+  r.get('/api/v1/console/connections', {
+    preHandler: app.authenticate,
+    schema: { tags: ['console'], summary: 'Which outside services are connected (no secrets)', security: SECURITY, response: { 200: loose, 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => { staffOnly(req); if (!ctx.connections) throw notFound('Not available'); return ctx.connections.info(); });
+  r.post('/api/v1/console/connections/test', {
+    preHandler: app.authenticate,
+    schema: { tags: ['console'], summary: 'Send a test message to Slack and a test email to you, and say what came back', security: SECURITY, response: { 200: loose, 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => { const p = staffOnly(req); if (!ctx.connections) throw notFound('Not available'); return ctx.connections.test(p.email); });
 
   const Name = z.string().trim().min(2).max(80).refine((v) => !/[<>]/.test(v), 'Names cannot contain < or >');
   r.post('/api/v1/console/customers', {

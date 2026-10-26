@@ -62,3 +62,43 @@ describe('support requests', () => {
     expect(e.html).not.toContain('<script>'); expect(e.html).not.toContain('<b>Eve'); expect(e.replyTo).toBe('u@x.co');
   });
 });
+
+import { checkSlack, createSlackNotifier } from '../src/lib/slack.js';
+
+describe('support is honest about delivery', () => {
+  const U = { mgr: randomUUID() };
+  const setup = async (over: Record<string, unknown> = {}, cfg: Record<string, unknown> = {}) => {
+    const repo = new FakeRepo(); const org = repo.addOrg('Acme'); const n = repo.addSite(org, 'North'); repo.addMember(org, 'mgr@a.com', 'site_manager', n, U.mgr);
+    return buildApp({ ...testConfig, ...cfg }, { repo, ...over, verifyToken: fakeVerifier({ m: { userId: U.mgr, email: 'mgr@a.com' } }) });
+  };
+  const send = (app: FastifyInstance) => app.inject({ method: 'POST', url: '/api/v1/support', headers: { authorization: 'Bearer m' }, payload: { message: 'Is anyone there?' } });
+  it('does not say "sent" when nothing reached a person', async () => {
+    const none = await send(await setup({ notify: null, mailer: undefined }));
+    expect(none.statusCode).toBe(503); expect(none.json().error.message).toContain('could not pass your message on');
+    const refused = await send(await setup({ notify: async () => false, mailer: new FakeMailer() })); // Slack refuses, no support inbox set
+    expect(refused.statusCode).toBe(503);
+  });
+  it('is fine if Slack is refused but the support inbox got it, or the reverse', async () => {
+    const inbox = await send(await setup({ notify: async () => false, mailer: new FakeMailer() }, { SUPPORT_EMAIL: 'support@x.test' }));
+    expect(inbox.statusCode).toBe(200); expect(inbox.json()).toMatchObject({ slack: false, emailed: true });
+    const slack = await send(await setup({ notify: async () => true, mailer: undefined }));
+    expect(slack.json()).toMatchObject({ slack: true, emailed: false });
+  });
+  it('says what Slack answered, in plain words, without showing the link', async () => {
+    const reply = (status: number, body: string) => (async () => new Response(body, { status })) as unknown as typeof fetch;
+    expect(await createSlackNotifier('https://hooks/x', reply(200, 'ok'))('hi')).toBe(true);
+    expect(await createSlackNotifier('https://hooks/x', reply(404, 'no_service'))('hi')).toBe(false);
+    expect((await checkSlack(undefined, 'x')).configured).toBe(false);
+    const ok = await checkSlack('https://hooks/secret-link', 'x', reply(200, 'ok')); expect(ok).toMatchObject({ ok: true, status: 200 });
+    const gone = await checkSlack('https://hooks/secret-link', 'x', reply(404, 'no_service')); expect(gone.ok).toBe(false); expect(gone.detail).toContain('no_service'); expect(gone.detail).not.toContain('secret-link');
+  });
+  it('lets only Stacked staff see which connections are set and run the test', async () => {
+    const app = await setup({ mailer: new FakeMailer() }, { STACKED_STAFF_EMAILS: 'mgr@a.com', SUPPORT_EMAIL: 'support@x.test' });
+    const info = await app.inject({ method: 'GET', url: '/api/v1/console/connections', headers: { authorization: 'Bearer m' } });
+    expect(info.statusCode).toBe(200); expect(info.json()).toMatchObject({ slack_alerts: false, email: false, support_inbox: 'support@x.test' }); expect(JSON.stringify(info.json())).not.toContain('hooks.slack');
+    const test = await app.inject({ method: 'POST', url: '/api/v1/console/connections/test', headers: { authorization: 'Bearer m' } });
+    expect(test.json()).toMatchObject({ alerts: { configured: false, ok: false }, email: 'sent', email_to: 'mgr@a.com' });
+    const other = await setup({}, { STACKED_STAFF_EMAILS: 'someone@else.com' });
+    expect((await other.inject({ method: 'GET', url: '/api/v1/console/connections', headers: { authorization: 'Bearer m' } })).statusCode).toBe(403);
+  });
+});

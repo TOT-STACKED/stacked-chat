@@ -10,7 +10,7 @@ labelTables(root);
 let cfg; let auth; let api; let main; let crumb;
 const st = { days: 30, email: '' };
 
-const NAV = [['overview', 'Overview', 'insights'], ['customers', 'Customers', 'people'], ['vendors', 'Vendors', 'operations'], ['gaps', 'Gaps', 'knowledge']];
+const NAV = [['overview', 'Overview', 'insights'], ['customers', 'Customers', 'people'], ['vendors', 'Vendors', 'operations'], ['gaps', 'Gaps', 'knowledge'], ['connections', 'Connections', 'settings']];
 /** append to the page, skipping anything empty (null would print as the word "null") */
 const put = (...nodes) => main.append(...nodes.filter(Boolean));
 const STATUS = { trialing: 'Trial', active: 'Active', past_due: 'Past due', paused: 'Paused', canceled: 'Cancelled' };
@@ -94,6 +94,38 @@ async function overview() {
       h('section', { class: 'stack qcol' }, h('h2', { text: 'Needs attention' }), h('div', { class: 'card' }, d.attention.length ? d.attention.map((a) => h('div', { class: 'qrow' }, h('a', { class: 'lnk', href: `#/customers/${a.id}`, text: a.name }), flags(a.flags))) : h('p', { class: 'empty', text: 'Nothing needs attention.' }))),
       h('section', { class: 'stack qcol' }, h('h2', { text: 'Growth' }), h('div', { class: 'card pad miniBars' }, (() => { const max = Math.max(1, ...d.growth.map((g) => g.customers + g.venues)); return d.growth.map((g) => h('div', { class: 'barrow' }, h('span', { class: 'bl', style: 'width:70px', text: g.month }), h('div', { class: 'bar', role: 'img', 'aria-label': `${g.month}: ${g.customers} customers, ${g.venues} venues` }, h('div', { style: `width:${barPercent(g.customers + g.venues, max)}%` })), h('span', { class: 'muted br', style: 'width:130px', text: `${g.customers} new, ${g.venues} venues` }))); })()))),
     d.usage.truncated ? h('p', { class: 'muted', style: 'font-size:13px', text: 'Usage figures cover the most recent 5,000 conversations in this period.' }) : null);
+}
+
+// ---- connections: what is plugged in, and a test button ---------------------------------------------------------------
+async function connections() {
+  clear(main); put(pageHeader({ icon: 'settings', title: 'Connections', sub: 'Slack, email and the other services Stacked Chat relies on.' }), loading());
+  let d; try { d = await api.get('/api/v1/console/connections'); } catch (e) { clear(main); put(pageHeader({ icon: 'settings', title: 'Connections' }), failure(e, connections)); return; }
+  const row = (label, ok, text) => h('div', { class: 'qrow' }, h('span', { class: `statuschip ${ok ? 'active' : 'past_due'}`, text: ok ? 'Connected' : 'Not set' }), h('div', { style: 'flex:1' }, h('b', { text: label }), h('div', { class: 'muted', style: 'font-size:13.5px', text })));
+  const out = h('div', { class: 'stack' });
+  const go = h('button', { class: 'btn cta', onclick: async () => {
+    go.disabled = true; go.textContent = 'Testing…'; clear(out);
+    try {
+      const r = await api.post('/api/v1/console/connections/test', {});
+      const line = (label, ok, text) => h('div', { class: 'qrow' }, h('span', { class: `statuschip ${ok ? 'active' : 'past_due'}`, text: ok ? 'Worked' : 'Failed' }), h('div', { style: 'flex:1' }, h('b', { text: label }), h('div', { class: 'muted', style: 'font-size:13.5px', text })));
+      out.append(h('h2', { text: 'Test results' }), h('div', { class: 'card' },
+        line('Slack alerts', r.alerts.ok, r.alerts.detail),
+        r.support ? line('Slack support channel', r.support.ok, r.support.detail) : h('div', { class: 'qrow muted', text: 'Support requests use the alerts channel (no separate support link is set).' }),
+        r.email === 'not_set' ? line('Email', false, 'No email service is set (RESEND_API_KEY).') : line('Email', r.email === 'sent', r.email === 'sent' ? `A test email was sent to ${r.email_to}. Check your inbox (and spam).` : 'The email service refused it. Check the sending address in Resend.')));
+    } catch (e) { out.append(failure(e, () => go.click())); }
+    go.disabled = false; go.textContent = 'Send a test now';
+  } }, 'Send a test now');
+  clear(main);
+  put(pageHeader({ icon: 'settings', title: 'Connections', sub: 'Slack, email and the other services Stacked Chat relies on.', actions: [go] }),
+    h('div', { class: 'card' },
+      row('Slack alerts', d.slack_alerts, d.slack_alerts ? 'Sign-ups, billing flags and "Ask Stacked support" requests go to the channel this link belongs to.' : 'Set SLACK_WEBHOOK_URL on Render.'),
+      row('Slack support channel', d.slack_support || d.slack_support_falls_back, d.slack_support ? 'Get help messages go to their own channel.' : d.slack_support_falls_back ? 'Get help messages use the alerts channel. Set SUPPORT_SLACK_WEBHOOK_URL to give them their own.' : 'Set SUPPORT_SLACK_WEBHOOK_URL (or SLACK_WEBHOOK_URL).'),
+      row('Email', d.email, d.email ? `Sending as ${d.email_from || 'the default address'}.` : 'Set RESEND_API_KEY on Render.'),
+      row('Support inbox', !!d.support_inbox, d.support_inbox ? `Get help messages are also emailed to ${d.support_inbox}.` : 'Optional. Set SUPPORT_EMAIL to get them by email as well.'),
+      row('AI (answers, drafts, reading pictures)', d.ai, d.ai ? 'Anthropic key is set.' : 'Set ANTHROPIC_API_KEY.'),
+      row('Picture storage', d.pictures, d.pictures ? 'Pictures and files can be stored.' : 'Needs the Supabase service key.'),
+      row('Billing (Stripe)', d.billing, d.billing ? 'Billing is switched on.' : 'Stripe settings are not complete.'),
+      row('Nightly job secret', d.nightly_job_secret, d.nightly_job_secret ? 'The nightly billing job can call the app.' : 'Set CRON_SECRET.')),
+    out, h('p', { class: 'muted', style: 'font-size:13px', text: `Version ${String(d.version).slice(0, 7)}. Secrets are never shown here.` }));
 }
 
 let custFilter = { q: '', flagged: false };
@@ -199,7 +231,7 @@ function route() {
   document.querySelectorAll('.nav a').forEach((a) => { a.classList.toggle('on', a.id === 'nav-' + view); if (a.id === 'nav-' + view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   clear(crumb); crumb.append(h('span', { text: 'Console' }), h('span', { text: '/' }), h('b', { text: NAV.find(([k]) => k === view)[1] }));
   window.scrollTo(0, 0);
-  if (view === 'customers' && parts[1]) customerDetail(parts[1]); else ({ overview, customers, vendors, gaps })[view]();
+  if (view === 'customers' && parts[1]) customerDetail(parts[1]); else ({ overview, customers, vendors, gaps, connections })[view]();
 }
 
 async function boot() {

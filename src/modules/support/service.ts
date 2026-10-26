@@ -13,7 +13,7 @@ const KIND_LABEL: Record<SupportKind, string> = { problem: 'Something is not wor
 const ROLE_WORDS: Record<string, string> = { owner: 'Owner', hq_admin: 'HQ admin', site_manager: 'Site manager', staff: 'Staff', kiosk: 'Kiosk' };
 
 export interface SupportInput { message: string; kind?: SupportKind; org_id?: string | null; site_id?: string | null; page?: string | null; source?: 'manage' | 'chat'; device?: string | null }
-export interface SupportResult { sent: boolean; emailed: boolean; ticket: boolean }
+export interface SupportResult { sent: boolean; emailed: boolean; ticket: boolean; slack: boolean }
 
 /** A request to Stacked support: to Slack straight away, to the support inbox (so a reply goes to the customer), and an acknowledgement back to them. */
 export function supportEmail(o: { to: string; replyTo?: string; from: string; name: string; role: string; org: string; venue: string | null; kind: SupportKind; message: string; where: string; device: string | null }): Mail {
@@ -55,7 +55,7 @@ export function createSupport(deps: { repo: Repo; tickets?: TicketStore | null; 
     const device = input.device ? safeText(input.device, 200) || null : null;
 
     // 1. Slack, so someone sees it at once
-    await deps.notify?.(['🛟 *Support request, Stacked Chat*', `*From:* ${name} (${p.email}), ${role}`, `*Company:* ${org?.name ?? 'Unknown'}${site ? ` · *Venue:* ${site.name}` : ''}`, `*Type:* ${KIND_LABEL[kind]} · from ${where}`, `*Message:* ${message.slice(0, 600)}`, ...(device ? [`*Device:* ${device}`] : [])].join('\n'));
+    const slackOk = deps.notify ? (await deps.notify(['🛟 *Support request, Stacked Chat*', `*From:* ${name} (${p.email}), ${role}`, `*Company:* ${org?.name ?? 'Unknown'}${site ? ` · *Venue:* ${site.name}` : ''}`, `*Type:* ${KIND_LABEL[kind]} · from ${where}`, `*Message:* ${message.slice(0, 600)}`, ...(device ? [`*Device:* ${device}`] : [])].join('\n'))) !== false : false;
     // 2. the log, when we know a venue to file it under
     let ticket = false;
     const venueId = site?.id ?? (orgId ? (await deps.repo.listSites(orgId))[0]?.id : undefined);
@@ -66,7 +66,9 @@ export function createSupport(deps: { repo: Repo; tickets?: TicketStore | null; 
       if (deps.supportEmail) emailed = (await deps.mailer.send(supportEmail({ to: deps.supportEmail, replyTo: p.email, from: p.email, name, role, org: org?.name ?? 'Unknown', venue: site?.name ?? null, kind, message, where, device }))) === 'sent';
       await deps.mailer.send(supportReceipt({ to: p.email, name, message, support: deps.supportEmail }));
     }
-    return { sent: true, emailed, ticket };
+    // The person is told "sent" only if a human can actually see it. A ticket on its own is a record, not a notification.
+    if (!slackOk && !emailed) throw new ApiHttpError(503, 'support_unavailable', 'We could not pass your message on just now, so please try again in a few minutes. Nothing has been lost on your side.');
+    return { sent: true, emailed, ticket, slack: slackOk };
   }
   return { send };
 }

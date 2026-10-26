@@ -44,7 +44,7 @@ import { createAnthropicChatModel, type ChatModel } from './modules/chat/model.j
 import { createAnthropicPictureReader, type PictureReader } from './modules/knowledge/vision.js';
 import { createSupabaseConversationStore, type ConversationStore } from './modules/chat/store.js';
 import { createHelp, createSupabaseTicketStore, type Help, type TicketStore } from './modules/chat/help.js';
-import { createSlackNotifier, type Notify } from './lib/slack.js';
+import { checkSlack, createSlackNotifier, type Notify } from './lib/slack.js';
 import { createPortalMirror, createSupabaseNpsStore, type NpsMirror, type NpsStore } from './modules/chat/nps.js';
 import { techStackRoutes } from './modules/vendors/routes.js';
 import { createSupabaseTechStackStore, type TechStackStore } from './modules/vendors/store.js';
@@ -169,7 +169,8 @@ export async function buildApp(
   const comms: Comms | null = commsStore && repo ? createComms({ store: commsStore, repo, mailer, publicUrl: config.PUBLIC_URL, now: overrides.now }) : null;
   const trainingStore = overrides.trainingStore ?? (db ? createSupabaseTrainingStore(db) : null);
   const training: Training | null = trainingStore && repo ? createTraining({ store: trainingStore, repo, now: overrides.now }) : null;
-  const supportNotify = overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null);
+  const supportHook = config.SUPPORT_SLACK_WEBHOOK_URL ?? config.SLACK_WEBHOOK_URL;
+  const supportNotify = overrides.notify !== undefined ? overrides.notify : (supportHook ? createSlackNotifier(supportHook) : null);
   const support: Support | null = repo ? createSupport({ repo, tickets: overrides.ticketStore ?? (db ? createSupabaseTicketStore(db) : null), notify: supportNotify, mailer, supportEmail: config.SUPPORT_EMAIL, now: overrides.now ? () => overrides.now!().getTime() : undefined }) : null;
   const reminders = repo && opsStore && mailer ? createReminders({ store: opsStore, repo, mailer, publicUrl: config.PUBLIC_URL, now: overrides.now, log: app.log }) : null;
   app.decorate('opsReminders', reminders ? () => reminders.run() : null);
@@ -276,7 +277,20 @@ export async function buildApp(
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
   const customers = repo ? createCustomers({ repo, mailer, publicUrl: config.PUBLIC_URL, billing, notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) }) : null;
-  await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS), idempotency, customers }));
+  await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS), idempotency, customers, connections: {
+    info: () => ({
+      version: config.APP_VERSION,
+      slack_alerts: !!config.SLACK_WEBHOOK_URL, slack_support: !!config.SUPPORT_SLACK_WEBHOOK_URL, slack_support_falls_back: !config.SUPPORT_SLACK_WEBHOOK_URL && !!config.SLACK_WEBHOOK_URL,
+      email: !!config.RESEND_API_KEY, email_from: config.RESEND_FROM ?? null, support_inbox: config.SUPPORT_EMAIL ?? null,
+      ai: !!config.ANTHROPIC_API_KEY, pictures: !!overrides.storage, database_admin: !!config.SUPABASE_SERVICE_KEY, billing: !!billing, nightly_job_secret: !!config.CRON_SECRET,
+    }),
+    test: async (to) => {
+      const alerts = await checkSlack(config.SLACK_WEBHOOK_URL, '✅ *Stacked Chat test:* alerts (sign-ups, billing, help requests) are connected to this channel.');
+      const support = config.SUPPORT_SLACK_WEBHOOK_URL ? await checkSlack(config.SUPPORT_SLACK_WEBHOOK_URL, '✅ *Stacked Chat test:* support requests will appear in this channel.') : null;
+      const email = !mailer ? 'not_set' : (await mailer.send({ to, subject: 'Stacked Chat test email', text: 'This is a test from the Stacked Chat Console. If you can read this, email is connected.', html: '<p style="font-family:system-ui,sans-serif;font-size:15px">This is a test from the Stacked Chat Console. If you can read this, email is connected.</p>' })) === 'sent' ? 'sent' : 'failed';
+      return { alerts, support, support_uses_alerts: !config.SUPPORT_SLACK_WEBHOOK_URL, email, email_to: to };
+    },
+  } }));
   await app.register(async (instance) => signupRoutes(instance, { signup: repo && customers ? createSignup({ repo, customers }) : null, now: overrides.now ? () => overrides.now!().getTime() : undefined, ...overrides.signupLimits }));
   await app.register(async (instance) => startAppRoutes(instance));
   await app.register(async (instance) => consoleAppRoutes(instance, { config, devMode: overrides.devMode }));
