@@ -62,7 +62,7 @@ export async function renderKnowledge(main, ctx) {
     clear(tableBox);
     const rows = filterKnowledge(st.items, { kind: st.kind, audience: st.audience, q: st.q });
     if (!rows.length) { tableBox.append(h('p', { class: 'empty', text: 'Nothing matches. Try a different filter.' })); return; }
-    tableBox.append(h('table', null,
+    tableBox.append(h('table', { class: 'ktable' },
       h('thead', null, h('tr', null, ['Title', 'Audience', 'Status', 'Updated', ''].map((x) => h('th', { text: x })))),
       h('tbody', null, rows.map((i) => {
         const editable = canEditItem(i);

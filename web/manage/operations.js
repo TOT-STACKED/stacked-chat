@@ -65,7 +65,7 @@ export async function renderOperations(main, ctx) {
 
   function listTable() {
     const rows = st.lists;
-    return h('div', { class: 'card scroll' }, h('table', null,
+    return h('div', { class: 'card scroll' }, h('table', { class: 'otable' },
       h('thead', null, h('tr', null, ['Checklist', 'Type', 'Where', 'Items', 'Status', ''].map((x) => h('th', { text: x })))),
       h('tbody', null, rows.map((l) => h('tr', null,
         h('td', null, h('b', { text: l.title }), l.due_time ? h('div', { class: 'muted', style: 'font-size:13px', text: `Reminder if not done by ${l.due_time}` }) : null), h('td', null, h('span', { class: 'badge role-staff', text: KIND_LABEL[l.kind] })),
@@ -76,7 +76,7 @@ export async function renderOperations(main, ctx) {
 
   function recentTable() {
     if (!st.board.recent.length) return h('div', { class: 'card', style: 'padding:20px' }, h('p', { class: 'muted', style: 'margin:0', text: 'Nothing has been ticked off yet.' }));
-    return h('div', { class: 'card scroll' }, h('table', null,
+    return h('div', { class: 'card scroll' }, h('table', { class: 'rtable' },
       h('thead', null, h('tr', null, ['Day', 'Checklist', multi() ? 'Venue' : '', 'Result'].filter((x, i) => x || i !== 2).map((x) => h('th', { text: x })))),
       h('tbody', null, st.board.recent.map((r) => h('tr', null,
         h('td', { text: dayText(r.date) }), h('td', null, h('b', { text: r.checklist.title })), multi() ? h('td', { text: siteName(r.site_id) }) : null,

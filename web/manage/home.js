@@ -32,8 +32,10 @@ export async function renderHome(main, ctx) {
     // 1. what needs doing
     const items = homeAttention(data);
     main.append(section('h-attn', 'Needs your attention', items.length
-      ? h('ul', { class: 'attn' }, items.map((i) => h('li', { class: `card attnitem ${i.tone}` }, tile(i.icon, 40),
-        h('div', { class: 'sb' }, h('b', { text: i.title }), h('span', { class: 'muted', text: i.sub })), h('a', { class: 'btn line small', href: i.href, 'aria-label': `${i.cta}: ${i.title}`, text: i.cta }))))
+      ? h('div', null, h('ul', { class: 'attn', id: 'attn-list' }, items.map((i, n) => h('li', { class: `card attnitem ${i.tone} ${n >= 3 ? 'more' : ''}` }, tile(i.icon, 40),
+        h('div', { class: 'sb' }, h('b', { text: i.title }), h('span', { class: 'muted', text: i.sub })), h('a', { class: 'btn line small', href: i.href, 'aria-label': `${i.cta}: ${i.title}`, text: i.cta })))),
+        // on a phone only the first three show, so the page does not become a wall of cards
+        items.length > 3 ? h('button', { class: 'lnk showmore', 'aria-expanded': 'false', 'aria-controls': 'attn-list', onclick: (e) => { const l = document.getElementById('attn-list'); const open = l.classList.toggle('all'); e.target.setAttribute('aria-expanded', String(open)); e.target.textContent = open ? 'Show fewer' : `Show ${items.length - 3} more`; } }, `Show ${items.length - 3} more`) : null)
       : h('div', { class: 'card pad allclear' }, h('span', { class: 'check', 'aria-hidden': 'true', text: '✓' }), h('div', { class: 'sb' }, h('b', { text: 'All clear' }), h('span', { class: 'muted', text: 'Nothing needs you right now.' })))));
 
     // 2. the things managers do most

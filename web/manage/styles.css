@@ -380,7 +380,25 @@ code.keybox{display:block;word-break:break-all;font-family:ui-monospace,SFMono-R
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .skip{position:fixed;left:12px;top:-60px;z-index:50;background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600}
 .skip:focus{top:12px}
-@media (max-width:700px){.attnitem{flex-wrap:wrap}.attnitem .btn{width:100%;height:44px}}
+.showmore{display:none}
+@media (max-width:700px){
+  /* Home on a phone: short rows, a grid of shortcuts, a 2x2 of numbers */
+  .attn{gap:8px}
+  .attnitem{padding:12px 12px 12px 14px;gap:12px}
+  .attnitem .tile{width:34px!important;height:34px!important;flex:none}
+  .attnitem .sb b{font-size:15px;line-height:1.3}
+  .attnitem .sb .muted{font-size:13px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .attnitem .btn{flex:none;width:auto;min-width:64px;height:40px;padding:0 14px}
+  .attn:not(.all) .attnitem.more{display:none}
+  .showmore{display:inline-flex;align-items:center;min-height:44px;margin-top:2px}
+  .qa{grid-template-columns:1fr 1fr;gap:10px}
+  .qacard{min-height:0;padding:14px;gap:8px}
+  .qacard .muted{display:none}
+  .qacard .tile{width:34px!important;height:34px!important}
+  main .glance{grid-template-columns:1fr 1fr;gap:10px}
+  main .glance .stat{padding:14px;gap:8px}
+  main .glance .stat .sub2{display:none}
+}
 
 /* focus lands on the page when you move between screens; it needs no ring of its own */
 main:focus{outline:none}
@@ -411,4 +429,76 @@ main:focus{outline:none}
   .ptable td:first-child{flex:1 1 100%;padding:0}
   .ptable td:nth-child(3){display:none}
   .ptable td.act{margin-left:auto;display:flex;gap:16px}
+}
+
+/* Knowledge on a phone: four equal buttons in a grid, and one tidy card per item (title, then audience and status, then actions) */
+@media (max-width:700px){
+  main:has(.ktable) .ph .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .ktable tr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:12px 14px}
+  .ktable td{padding:0}
+  .ktable td::before{display:none}
+  .ktable td:first-child{flex:1 1 100%;padding:0}
+  .ktable td:nth-child(4){display:none}
+  .ktable td.act{margin-left:auto;display:flex;gap:16px}
+}
+
+/* Manage top bar on a phone: the mark instead of the wordmark, the whole company name, two square buttons */
+.logo .mk{display:none}
+@media (max-width:900px){
+  .side{gap:8px;padding:8px 12px;min-height:56px}
+  .logo .wm{display:none}
+  .logo .mk{display:block;width:34px;height:34px;border-radius:10px}
+  .org{padding:5px 10px;min-height:44px}
+  .org .meta b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .helpside,.mobsignout{width:44px;min-width:44px;height:44px;padding:0;justify-content:center;align-items:center}
+  .mobsignout .lbl{display:none}
+  .mobsignout::before{content:'';width:20px;height:20px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9'/%3E%3C/svg%3E") center/contain no-repeat}
+}
+
+/* Bottom bar on a phone: just the icons, all of them visible at once (no scrolling), each a comfortable thumb target */
+@media (max-width:900px){
+  .nav{overflow:hidden;gap:0;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  .nav a{flex:1 1 0;min-width:0;height:48px;padding:0;justify-content:center;align-items:center;font-size:0;gap:0}
+  .nav a .lg,.nav a .sh{display:none}
+  .nav .tile{width:32px!important;height:32px!important}
+}
+
+/* Settings sections on a phone: all visible and wrapped, not a strip you have to scroll */
+@media (max-width:900px){
+  .subnav{flex-wrap:wrap;overflow:visible;gap:6px}
+  .subnav a{min-height:40px;display:inline-flex;align-items:center}
+}
+
+/* text links (Edit, See who, Rename...) get a thumb-sized tap area on a phone */
+@media (max-width:900px){
+  .lnk{min-height:40px;display:inline-flex;align-items:center}
+}
+
+/* Operations lists on a phone: one short card per checklist, and one per day's result */
+@media (max-width:700px){
+  .otable tr,.rtable tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;padding:12px 14px}
+  .otable td,.rtable td{padding:0}
+  .otable td::before,.rtable td::before{display:none}
+  .otable td:first-child{flex:1 1 100%}
+  .otable td:nth-child(4){display:none}
+  .otable td.act{margin-left:auto;display:flex}
+  .rtable td:first-child{flex:1 1 100%;font-size:13px;color:var(--muted);font-weight:600}
+  .rtable td:nth-child(2){flex:1 1 100%}
+}
+
+/* Insights numbers on a phone: three small tiles across, number and label only */
+@media (max-width:700px){
+  main .grid3{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  main .grid3 .stat{padding:12px 10px;gap:4px}
+  main .grid3 .stat .tile,main .grid3 .stat .sub2{display:none}
+  main .grid3 .stat .lbl{font-size:12px;line-height:1.25}
+  main .grid3 .stat .big{font-size:22px}
+}
+
+/* Insights filters on a phone: the site picker and 7/30/90 days on one line */
+@media (max-width:700px){
+  main:has(select.filter) .ph .actions{flex-wrap:nowrap;gap:8px}
+  main:has(select.filter) .ph .actions select.filter{flex:none;max-width:124px;min-height:44px}
+  main:has(select.filter) .ph .actions .chips{flex:1 1 0;min-width:0;display:flex;justify-content:space-between;padding:3px}
+  main:has(select.filter) .ph .actions .chips .pill{flex:1 1 0;min-width:0;padding:0 6px;font-size:14px;text-align:center}
 }

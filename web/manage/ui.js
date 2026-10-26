@@ -12,7 +12,8 @@ export function tile(name, size = 40) {
     h('img', { src: `/manage/assets/icon-${ICONS[name] || name}.png`, alt: '', width: size, height: size }));
 }
 
-export const logo = () => h('span', { class: 'logo' }, h('img', { src: '/manage/assets/logo-stacked.png', alt: 'Stacked', height: 24 }));
+/** The wordmark; on a phone the small Stacked mark stands in for it, so the top bar has room for the company name. */
+export const logo = () => h('span', { class: 'logo' }, h('img', { class: 'wm', src: '/manage/assets/logo-stacked.png', alt: 'Stacked', height: 24 }), h('img', { class: 'mk', src: '/manage/assets/favicon-192.png', alt: '', width: 32, height: 32 }));
 
 const PALETTE = [['#FFF3CC', '#7A5900'], ['#DCCBF8', '#241660'], ['#D5F5B4', '#244106'], ['#FBC4DD', '#85003A'], ['#CFE7FA', '#0F4C8A'], ['#FFE0C9', '#9A3E0A']];
 /** Round initials in a colour that is the same for the same text every time. */
