@@ -185,6 +185,7 @@ export async function buildApp(
     conversations: conversationStore, model: chatModel,
     signUrls: overrides.storage ? async (urls) => overrides.storage!.signUrls(urls) as Promise<Array<string | null>> : undefined,
     onAnswered: (siteId) => { void billing?.recordQuestion(siteId); },
+    training: training ? (who) => training.listFor({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds }) : undefined,
     sensitive: sensitiveSettings ? (orgId) => sensitiveSettings.enabled(orgId) : undefined,
     nps: overrides.npsStore ?? (db ? createSupabaseNpsStore(db) : null),
     mirrorNps: overrides.mirrorNps !== undefined ? overrides.mirrorNps : (config.STACKCOLLECT_SUPABASE_URL && config.STACKCOLLECT_SUPABASE_KEY ? createPortalMirror({ url: config.STACKCOLLECT_SUPABASE_URL, key: config.STACKCOLLECT_SUPABASE_KEY }) : null),

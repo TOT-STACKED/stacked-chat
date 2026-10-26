@@ -13,7 +13,15 @@ import { detectSensitive, TOPIC_IDS, withConfirmLine, type TopicId, type TopicMo
 /** words that mean the person themselves is asking to rate or review something */
 const RATE_INTENT = /\b(rate|rating|rated|review|reviews|nps)\b/i;
 
+/** Questions about the person's own training. Only these get their course list added to the prompt. */
+export const TRAINING_INTENT = /\b(training|trainings|course|courses|quiz|quizzes|sign[- ]?off|signed off|refresher|certificate|e-?learning)\b/i;
+const dayText = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/London' });
+export interface TrainingStatus { title: string; status: 'todo' | 'done' | 'renew'; completed_at: string | null; expires_at: string | null }
+export const trainingLine = (c: TrainingStatus) => `${c.title}: ${c.status === 'done' ? `done on ${dayText(c.completed_at!)}${c.expires_at ? `, refresh by ${dayText(c.expires_at)}` : ''}` : c.status === 'renew' ? `time for a refresher (last done ${dayText(c.completed_at!)})` : 'not done yet'}`;
+
 export interface ChatDeps {
+  /** this person's courses and sign-offs, for questions about their training */
+  training?: (who: Who) => Promise<TrainingStatus[]>;
   /** all knowledge items for an organisation (the service filters what this person may see) */
   items: (orgId: string) => Promise<ItemRow[]>;
   conversations: ConversationStore;
@@ -115,6 +123,7 @@ export function createChat(deps: ChatDeps) {
 
     const system = buildSystemPrompt({
       botName: who.botName || 'Stacked Chat', orgName: who.orgName, siteName: who.siteName, personName: who.name,
+      trainingNotes: deps.training && TRAINING_INTENT.test(message) ? (await deps.training(who).catch(() => [])).map(trainingLine) : undefined,
       passages, hasVideo: media.videos.length > 0, videoNotes: media.videos.map((v) => (v.description ? `${v.title}: ${v.description}` : v.title)), hasImage: media.images.length > 0,
       vendorNotes: pickProfiles(message, history.map((m) => ({ role: m.role, content: m.content })), who.techStack ?? null).map((k) => PROFILES[k]!),
       techStack: who.techStack ?? null, techCategories: TECH_CATEGORIES,

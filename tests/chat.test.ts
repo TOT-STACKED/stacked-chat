@@ -191,6 +191,18 @@ describe('the chat service', () => {
     const asked = await chat.ask(me(), { message: 'have you got a picture of the margarita serve', shown_media: shown });
     expect(asked.images).toHaveLength(1);
   });
+  it('knows about the person\'s own training when they ask about it, and only then', async () => {
+    chat = createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, training: async () => [
+      { title: 'Fire safety', status: 'todo', completed_at: null, expires_at: null },
+      { title: 'Food hygiene basics', status: 'renew', completed_at: '2025-01-10T10:00:00.000Z', expires_at: '2026-01-10T10:00:00.000Z' },
+      { title: 'Allergens', status: 'done', completed_at: '2026-09-01T10:00:00.000Z', expires_at: null }] });
+    await chat.ask(me(), { message: 'i need to take my fire training?' });
+    const sys = model.calls.at(-1)!.system;
+    expect(sys).toContain('Fire safety: not done yet'); expect(sys).toContain('Food hygiene basics: time for a refresher (last done 10 Jan 2025)'); expect(sys).toMatch(/Allergens: done on 1 Sep(t)? 2026/);
+    expect(sys).toContain('four-square button');
+    await chat.ask(me(), { message: 'where is the fire assembly point?' });
+    expect(model.calls.at(-1)!.system).not.toContain('THIS PERSON\'S TRAINING');
+  });
   it('shows only the sources the answer cites, not everything that was searched', async () => {
     await publish('Fire safety', 'Meet at the car park when the fire alarm sounds.');
     await publish('Handbook', 'Breaks are twenty minutes. Fire alarm tests are on Fridays.');

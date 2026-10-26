@@ -6,6 +6,8 @@ export interface PromptInput {
   videoNotes?: string[];
   /** Stacked's troubleshooting notes for the vendors this question is about (empty if none) */
   vendorNotes?: string[];
+  /** this person's courses from the Training area, e.g. "Fire safety: not done yet" (only given when they ask about training) */
+  trainingNotes?: string[];
   /** the systems this venue has recorded, e.g. { epos: 'Lightspeed' } */
   techStack?: Record<string, string> | null;
   techCategories?: Array<[string, string]>;
@@ -25,6 +27,8 @@ export function buildSystemPrompt(i: PromptInput): string {
   const stack = i.techStack && Object.keys(i.techStack).length
     ? `\n\nTHIS VENUE'S TECH STACK:\n${Object.entries(i.techStack).map(([k, v]) => `- ${label.get(k) ?? k}: ${v}`).join('\n')}\nThe stack is known: do NOT ask which system they use for a category listed here. Go straight to troubleshooting that product.`
     : '';
+  const training = (i.trainingNotes ?? []).filter(Boolean);
+  const trainingSection = training.length ? `\n\nTHIS PERSON'S TRAINING (from the Training area of Stacked Chat):\n${training.map((t) => `- ${t}`).join('\n')}\nIf they ask about taking, finding or booking their training, a course, a quiz or a sign-off, tell them to tap the four-square button at the top right of the chat and choose Training, and say which of the courses above they still need to do or refresh. Do not make up course content, dates or requirements, and do not say it is missing from the knowledge base.` : '';
   const vendorSection = notes.length ? `\n\nSTACKED VENDOR SUPPORT NOTES (maintained by Stacked; use for hospitality technology faults):\n${notes.join('\n\n---\n\n')}` : '';
 
   return `You are ${i.botName}, the AI assistant for ${i.orgName}${i.siteName ? ` (${i.siteName})` : ''}, a UK hospitality business. You help the team find answers fast: handbooks, procedures, policies, suppliers, opening and closing, how things work here, and fixing hospitality technology (tills, card machines, rotas, Wi-Fi) when it goes wrong.${i.personName ? ` You are talking to ${i.personName}.` : ''}
@@ -45,5 +49,5 @@ ${i.hasVideo ? `A relevant video is attached beneath your reply${i.videoNotes?.l
 Style: calm and direct, friendly, no waffle. British English unless the person writes in another language, in which case reply in theirs. Short paragraphs; use a numbered list for steps. Do not use markdown headings or tables.${stack}
 
 KNOWLEDGE BASE:
-${knowledge}${vendorSection}`;
+${knowledge}${vendorSection}${trainingSection}`;
 }
