@@ -128,3 +128,57 @@ describe('training', () => {
     expect((await call('o', 'POST', base(), course({ pass_percent: 20 }))).statusCode).toBe(400);
   });
 });
+
+import { parseDraft, type CourseDrafter, type DraftedCourse } from '../src/modules/training/drafter.js';
+import { FakeKnowledgeStore } from '../src/testing/knowledge-fakes.js';
+
+describe('draft a course from a document', () => {
+  const good = { title: 'Allergens', description: 'The 14 allergens and what to do.', lessons: [{ title: 'The 14', body: 'Know the 14 allergens.' }, { title: 'Ask first', body: 'Always ask guests.' }], quiz: [{ q: 'How many allergens?', options: ['10', '14', '20'], answer: 1 }] };
+  it('reads the model\'s JSON even when it is wrapped in a code fence, and drops anything malformed', () => {
+    const d = parseDraft('Here you go:\n```json\n' + JSON.stringify(good) + '\n```');
+    expect(d).toMatchObject({ title: 'Allergens', lessons: [{ title: 'The 14' }, { title: 'Ask first' }], quiz: [{ q: 'How many allergens?', answer: 1 }] });
+    const messy = parseDraft(JSON.stringify({ ...good, lessons: [...good.lessons, { title: '', body: 'no title' }], quiz: [...good.quiz, { q: 'bad', options: ['one'], answer: 0 }, { q: 'bad2', options: ['a', 'b'], answer: 7 }] }));
+    expect(messy!.lessons).toHaveLength(2); expect(messy!.quiz).toHaveLength(1);
+    expect(parseDraft('not json at all')).toBeNull(); expect(parseDraft('{"lessons": []}')).toBeNull(); expect(parseDraft('{"lessons": "x"}')).toBeNull();
+  });
+
+  let repo: FakeRepo; let app: FastifyInstance; let kstore: FakeKnowledgeStore; let asked: Array<{ title: string; text: string }>; let result: DraftedCourse | null;
+  const U = { owner: randomUUID(), mgr: randomUUID(), staff: randomUUID() };
+  let org: ReturnType<FakeRepo['addOrg']>; let n: ReturnType<FakeRepo['addSite']>; let s: ReturnType<FakeRepo['addSite']>;
+  const long = 'Always check the allergen matrix before service. '.repeat(10);
+  beforeEach(async () => {
+    repo = new FakeRepo(); kstore = new FakeKnowledgeStore(); asked = []; result = { title: 'Allergens', description: 'About allergens.', lessons: [{ title: 'One', body: 'Body.' }], quiz: [{ q: 'Q?', options: ['a', 'b'], answer: 0 }] };
+    org = repo.addOrg('Acme'); n = repo.addSite(org, 'North'); s = repo.addSite(org, 'South');
+    kstore.addOrg(org.id, 'acme', 'acme'); kstore.sites.push({ id: n.id, org_id: org.id }, { id: s.id, org_id: org.id });
+    repo.addMember(org, 'owner@a.com', 'owner', null, U.owner); repo.addMember(org, 'mgr@a.com', 'site_manager', n, U.mgr); repo.addMember(org, 'staff@a.com', 'staff', n, U.staff);
+    const drafter: CourseDrafter = { async draft(i) { asked.push(i); return result; } };
+    app = await buildApp(testConfig, { repo, knowledgeStore: kstore, trainingStore: new FakeTrainingStore(), courseDrafter: drafter, verifyToken: fakeVerifier({
+      o: { userId: U.owner, email: 'owner@a.com' }, m: { userId: U.mgr, email: 'mgr@a.com' }, s: { userId: U.staff, email: 'staff@a.com' } }) });
+  });
+  let docN = 0;
+  const doc = (body = long, site: string | null = null) => app.knowledge!.createDocument(org.id, { title: docN++ ? `Allergen policy ${docN}` : 'Allergen policy', body, site_id: site, status: 'published', by: 'owner@a.com' });
+  const draft = (tok: string, id: string) => app.inject({ method: 'POST', url: `/api/v1/orgs/${org.id}/training/draft`, headers: { authorization: 'Bearer ' + tok }, payload: { knowledge_id: id } });
+
+  it('drafts from a document a manager can see, sends the AI the document\'s own text, and saves nothing', async () => {
+    const d = await doc(); const r = await draft('o', d.id);
+    expect(r.statusCode).toBe(200); expect(r.json()).toMatchObject({ title: 'Allergens', lessons: [{ title: 'One' }], quiz: [{ answer: 0 }], source: { title: 'Allergen policy', truncated: false } });
+    expect(asked[0]).toMatchObject({ title: 'Allergen policy' }); expect(asked[0]!.text).toContain('allergen matrix');
+    expect((await app.inject({ method: 'GET', url: `/api/v1/orgs/${org.id}/training`, headers: { authorization: 'Bearer o' } })).json().data).toEqual([]);
+  });
+  it('keeps managers to documents for their own venue, and staff out', async () => {
+    const mine = await doc(long, n.id); const theirs = await doc(long, s.id);
+    expect((await draft('m', mine.id)).statusCode).toBe(200);
+    expect((await draft('m', theirs.id)).statusCode).toBe(404);
+    expect((await draft('s', mine.id)).statusCode).toBe(404);
+  });
+  it('says so when the document is too short, is not a document, or the AI cannot draft', async () => {
+    expect((await draft('o', (await doc('Too short.')).id)).statusCode).toBe(400);
+    expect((await draft('o', randomUUID())).statusCode).toBe(404);
+    result = null; expect((await draft('o', (await doc()).id)).statusCode).toBe(502);
+  });
+  it('is off without a drafter', async () => {
+    const bare = await buildApp(testConfig, { repo, knowledgeStore: kstore, trainingStore: new FakeTrainingStore(), courseDrafter: null, verifyToken: fakeVerifier({ o: { userId: U.owner, email: 'owner@a.com' } }) });
+    const d = await bare.knowledge!.createDocument(org.id, { title: 'P', body: long, site_id: null, status: 'published', by: 'owner@a.com' });
+    expect((await bare.inject({ method: 'POST', url: `/api/v1/orgs/${org.id}/training/draft`, headers: { authorization: 'Bearer o' }, payload: { knowledge_id: d.id } })).statusCode).toBe(503);
+  });
+});

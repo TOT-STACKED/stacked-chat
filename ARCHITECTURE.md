@@ -195,3 +195,7 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 
 - `POST /api/v1/support` (any signed-in person, never gated by billing): `{ message, kind: problem|question|idea, org_id?, site_id?, page?, source: manage|chat, device? }`. It posts to the support Slack channel at once (who, role, company, venue, where, device), files a `tickets` row when a venue is known, emails the support inbox if `SUPPORT_EMAIL` is set (reply-to is the customer, so replying answers them), and sends the customer a receipt. 6 messages an hour per person.
 - Manage: "Get help" in the top bar (a "?" on a phone). Chat: "Get help" in the work menu.
+
+### Draft a course from a document
+
+`POST /api/v1/orgs/:orgId/training/draft { knowledge_id }` reads one Knowledge document (managers who can see it; at least 200 characters; the first 24,000 are sent) and returns a draft: title, description, 3–6 lessons and 4–6 three-option questions, using only what the document says (`training/drafter.ts`, `ANTHROPIC_API_KEY`, `CHAT_MODEL`). **Nothing is saved**: Manage opens the editor pre-filled with a banner telling the manager to check every lesson and answer. 10 drafts an hour per person. The reply is parsed and validated (`parseDraft`), so malformed model output is dropped, never shown.

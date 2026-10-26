@@ -34,13 +34,13 @@ export async function renderTraining(main, ctx) {
     clear(main);
     const canAdd = scopes().length > 0;
     main.append(pageHeader({ icon: 'training', title: 'Training', sub: 'Short courses with a quiz, and a record of who has signed them off.',
-      actions: canAdd ? [h('button', { class: 'btn cta', onclick: () => openEditor() }, 'New course')] : null }));
+      actions: canAdd ? [h('button', { class: 'btn line', onclick: () => openDraft() }, 'Draft from a document'), h('button', { class: 'btn cta', onclick: () => openEditor() }, 'New course')] : null }));
     if (st.error) { main.append(h('div', { class: 'banner', role: 'alert' }, st.error + ' ', h('button', { class: 'lnk', onclick: load }, 'Try again'))); return; }
     if (st.loading) { main.append(h('p', { class: 'muted', text: 'Loading…' })); return; }
     if (!st.items.length) {
       main.append(h('div', { class: 'card empty-state' }, tile('training', 64), h('h2', { text: 'Write your first course' }),
         h('p', { text: 'Food safety, fire, allergens, how you do things here. Write a few short lessons and a quick quiz. Your team takes it on their phone, and you keep the record of who passed and when to refresh it.' }),
-        canAdd ? h('div', { class: 'actions', style: 'justify-content:center' }, h('button', { class: 'btn cta', onclick: () => openEditor() }, 'Write a course')) : null));
+        canAdd ? h('div', { class: 'actions', style: 'justify-content:center' }, h('button', { class: 'btn cta', onclick: () => openDraft() }, 'Draft one from a document'), h('button', { class: 'btn line', onclick: () => openEditor() }, 'Write a course')) : null));
       return;
     }
     main.append(h('div', { class: 'upgrid' }, st.items.map(card)));
@@ -75,15 +75,42 @@ export async function renderTraining(main, ctx) {
     });
   }
 
-  /** Write (no id) or change (existing). Who it is for cannot change afterwards. */
-  function openEditor(existing) {
+  /** Pick a document from Knowledge and have the AI draft lessons and a quiz from it. Nothing is saved until the manager has checked it. */
+  async function openDraft() {
+    modal('Draft a course from a document', (close) => {
+      const body = h('div', { class: 'stack' }, h('p', { class: 'muted', style: 'margin:0', text: 'Loading your documents…' }));
+      (async () => {
+        try {
+          const docs = (await api.get(`/api/v1/orgs/${orgId}/knowledge`)).data.filter((i) => i.kind === 'document' && (i.chars || 0) >= 200).sort((a, b) => a.title.localeCompare(b.title));
+          clear(body);
+          if (!docs.length) { body.append(h('p', { class: 'muted', style: 'margin:0', text: 'You need a document in Knowledge with a few paragraphs in it first. Upload your allergen policy, fire procedure or handbook there, then come back.' }), h('div', { class: 'row' }, h('a', { class: 'btn cta', href: '#/knowledge', onclick: close }, 'Go to Knowledge'))); return; }
+          const pick = h('select', { id: 'd-doc' }, docs.map((d) => h('option', { value: d.id }, `${d.title}${d.status === 'draft' ? ' (draft)' : ''}`)));
+          const err = h('div'); const go = h('button', { class: 'btn cta', onclick: run }, 'Draft the course');
+          async function run() {
+            clear(err); go.disabled = true; go.textContent = 'Reading the document…';
+            try {
+              const d = await api.post(`${base}/draft`, { knowledge_id: pick.value });
+              close(); toast('Draft ready. Check every lesson and answer before you save.');
+              openEditor(null, { ...d, note: `Drafted by AI from “${d.source.title}”.${d.source.truncated ? ' The document was long, so only the first part was used.' : ''} Check every lesson and answer before you save: the AI can get things wrong, especially on safety and allergens.` });
+            } catch (e) { go.disabled = false; go.textContent = 'Draft the course'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
+          }
+          body.append(h('div', { class: 'field' }, h('label', { for: 'd-doc', text: 'Which document?' }), pick, h('span', { class: 'hint', text: 'The AI reads it and proposes short lessons and a quiz, using only what the document says. It takes about half a minute. You check and change it before anything is saved.' })), err, h('div', { class: 'row' }, h('button', { class: 'btn line', onclick: close }, 'Cancel'), go));
+        } catch (e) { clear(body); body.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
+      })();
+      return body;
+    });
+  }
+
+  /** Write (no id), start from an AI draft (prefill), or change (existing). Who it is for cannot change afterwards. */
+  function openEditor(existing, prefill) {
     const editing = !!(existing && existing.id);
+    const seed = editing ? existing : prefill || null;
     modal(editing ? 'Edit course' : 'New course', (close) => {
       const err = h('div');
-      const lessons = (editing ? existing.lessons : [{ title: '', body: '', url: '' }]).map((l) => ({ id: l.id, title: l.title, body: l.body, url: l.url || '' }));
-      const quiz = (editing ? existing.quiz : []).map((q) => ({ id: q.id, q: q.q, options: [...q.options], answer: q.answer }));
-      const title = h('input', { type: 'text', id: 't-title', maxlength: 120, value: editing ? existing.title : '', placeholder: 'e.g. Fire safety' });
-      const desc = h('textarea', { id: 't-desc', rows: 2, maxlength: 500, placeholder: 'One line on what it covers and who it is for (optional)' }); desc.value = editing ? existing.description || '' : '';
+      const lessons = (seed ? seed.lessons : [{ title: '', body: '', url: '' }]).map((l) => ({ id: l.id, title: l.title, body: l.body, url: l.url || '' }));
+      const quiz = (seed ? seed.quiz : []).map((q) => ({ id: q.id, q: q.q, options: [...q.options], answer: q.answer }));
+      const title = h('input', { type: 'text', id: 't-title', maxlength: 120, value: seed ? seed.title : '', placeholder: 'e.g. Fire safety' });
+      const desc = h('textarea', { id: 't-desc', rows: 2, maxlength: 500, placeholder: 'One line on what it covers and who it is for (optional)' }); desc.value = seed ? seed.description || '' : '';
       const sc = scopes();
       const where = h('select', { id: 't-where', disabled: editing }, (editing ? [{ id: audienceValue(existing), name: audience(existing) }] : sc).map((s) => h('option', { value: s.id }, s.name)));
       const pass = h('select', { id: 't-pass' }, PASS.map((p) => h('option', { value: p, selected: (editing ? existing.pass_percent : 80) === p }, `${p}%`)));
@@ -139,6 +166,7 @@ export async function renderTraining(main, ctx) {
         } catch (e) { save.disabled = false; save.textContent = editing ? 'Save' : 'Save course'; fail(e.message); }
       }
       return h('div', { class: 'stack' },
+        prefill && prefill.note ? h('div', { class: 'banner info', role: 'status', text: prefill.note }) : null,
         h('div', { class: 'field' }, h('label', { for: 't-title', text: 'Title' }), title),
         h('div', { class: 'field' }, h('label', { for: 't-desc', text: 'About this course' }), desc),
         h('div', { class: 'field' }, h('label', { for: 't-where', text: 'Who is it for?' }), where, editing ? h('span', { class: 'hint', text: 'Who it is for cannot change. Switch it off and write a new one instead.' }) : null),

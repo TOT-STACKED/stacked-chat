@@ -60,6 +60,7 @@ import { communicateRoutes } from './modules/communicate/routes.js';
 import { createTraining, type Training } from './modules/training/service.js';
 import { createSupabaseTrainingStore, type TrainingStore } from './modules/training/store.js';
 import { trainingRoutes } from './modules/training/routes.js';
+import { createAnthropicCourseDrafter, type CourseDrafter } from './modules/training/drafter.js';
 import { createSupport, type Support } from './modules/support/service.js';
 import { supportRoutes } from './modules/support/routes.js';
 import { createReminders } from './modules/operations/reminders.js';
@@ -89,6 +90,8 @@ export interface Deps {
   opsStore?: OpsStore;
   commsStore?: CommsStore;
   trainingStore?: TrainingStore;
+  /** writes a first draft of a course from a document; null = switched off */
+  courseDrafter?: CourseDrafter | null;
   /** tests: tighter or looser sign-up limits */
   signupLimits?: { perIpPerHour?: number; perEmailPerHour?: number; allPerHour?: number };
   conversationStore?: ConversationStore;
@@ -266,7 +269,7 @@ export async function buildApp(
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
   await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
   await app.register(async (instance) => communicateRoutes(instance, { comms, gate }));
-  await app.register(async (instance) => trainingRoutes(instance, { training, gate }));
+  await app.register(async (instance) => trainingRoutes(instance, { training, gate, knowledge, drafter: overrides.courseDrafter !== undefined ? overrides.courseDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicCourseDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
   await app.register(async (instance) => supportRoutes(instance, { support }));
   await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, comms, training, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));

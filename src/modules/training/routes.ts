@@ -5,10 +5,14 @@ import { forbidden, notFound } from '../../lib/errors.js';
 import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
 import { assertOrgAccess, userOnly } from '../access.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
+import { ApiHttpError } from '../../lib/errors.js';
+import { RateLimiter } from '../../lib/rate-limit.js';
+import type { Knowledge } from '../knowledge/service.js';
+import { MAX_SOURCE_CHARS, tooShort, type CourseDrafter } from './drafter.js';
 import type { Training } from './service.js';
 import type { CourseRow } from './store.js';
 
-interface Ctx { training: Training | null; gate: (orgId: string) => Promise<void> }
+interface Ctx { training: Training | null; gate: (orgId: string) => Promise<void>; knowledge?: Knowledge | null; drafter?: CourseDrafter | null }
 
 const Stats = z.object({ recipients: z.number(), done: z.number(), renew: z.number(), todo: z.number() });
 const Lesson = z.object({ id: z.string(), title: z.string(), body: z.string(), url: z.string().nullable() });
@@ -86,6 +90,28 @@ export async function trainingRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!canWrite(p, orgId, cur.site_id)) throw forbidden('You cannot delete this course');
     await tr().remove(orgId, id);
     return { ok: true as const };
+  });
+
+  // Draft a course from one of the company's own documents. Nothing is saved: the manager reads it, changes it and saves it.
+  const draftLimiter = new RateLimiter(10, 3_600_000);
+  r.post('/api/v1/orgs/:orgId/training/draft', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['training'], summary: 'Draft a course from a document in Knowledge (lessons and a quiz). Nothing is saved.', security: SECURITY, params: z.object({ orgId: Id }), body: z.object({ knowledge_id: Id }),
+      response: { 200: z.object({ title: z.string(), description: z.string(), lessons: z.array(z.object({ title: z.string(), body: z.string() })), quiz: z.array(z.object({ q: z.string(), options: z.array(z.string()), answer: z.number() })), source: z.object({ title: z.string(), truncated: z.boolean() }) }), 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody, 502: ErrorBody, 503: ErrorBody },
+    },
+  }, async (req, reply) => {
+    const { orgId } = req.params; const p = userOnly(req); assertOrgAccess(req, orgId);
+    if (!ctx.drafter || !ctx.knowledge) throw new ApiHttpError(503, 'drafting_unavailable', 'Drafting a course is not switched on yet');
+    const rl = draftLimiter.hit(p.userId);
+    if (!rl.allowed) { reply.header('Retry-After', String(rl.retryAfterSeconds)); throw new ApiHttpError(429, 'rate_limited', 'You have drafted a few courses this hour. Try again shortly.'); }
+    const item = await ctx.knowledge.get(orgId, req.body.knowledge_id);
+    if (!item || item.kind !== 'document' || !canSee(p, orgId, item.site_id)) throw notFound('Document not found');
+    const text = (item.body ?? '').trim();
+    if (text.length < 200) throw tooShort();
+    const d = await ctx.drafter.draft({ title: item.title, text });
+    if (!d || !d.lessons.length) throw new ApiHttpError(502, 'draft_failed', 'We could not draft a course from that just now. Please try again.');
+    return { ...d, title: d.title || item.title, source: { title: item.title, truncated: text.length > MAX_SOURCE_CHARS } };
   });
 
   r.get('/api/v1/orgs/:orgId/training/:id/progress', {
