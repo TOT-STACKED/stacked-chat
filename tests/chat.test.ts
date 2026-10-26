@@ -203,6 +203,14 @@ describe('the chat service', () => {
     await chat.ask(me(), { message: 'where is the fire assembly point?' });
     expect(model.calls.at(-1)!.system).not.toContain('THIS PERSON\'S TRAINING');
   });
+  it('lists every course when asked what training is available, and says so when there are none', async () => {
+    const mk = (list: Array<{ title: string; status: 'todo' | 'done' | 'renew'; completed_at: string | null; expires_at: string | null }>) => createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, training: async () => list });
+    await mk([{ title: 'Fire safety', status: 'todo', completed_at: null, expires_at: null }, { title: 'Food hygiene basics', status: 'todo', completed_at: null, expires_at: null }]).ask(me(), { message: 'what training is available?' });
+    const sys = model.calls.at(-1)!.system;
+    expect(sys).toContain('list EVERY course above'); expect(sys).toContain('- Fire safety: not done yet'); expect(sys).toContain('- Food hygiene basics: not done yet');
+    await mk([]).ask(me(), { message: 'what training is available?' });
+    expect(model.calls.at(-1)!.system).toContain('No courses have been set up for them yet');
+  });
   it('shows only the sources the answer cites, not everything that was searched', async () => {
     await publish('Fire safety', 'Meet at the car park when the fire alarm sounds.');
     await publish('Handbook', 'Breaks are twenty minutes. Fire alarm tests are on Fridays.');

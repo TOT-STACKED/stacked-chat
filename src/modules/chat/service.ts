@@ -19,6 +19,13 @@ const dayText = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day
 export interface TrainingStatus { title: string; status: 'todo' | 'done' | 'renew'; completed_at: string | null; expires_at: string | null }
 export const trainingLine = (c: TrainingStatus) => `${c.title}: ${c.status === 'done' ? `done on ${dayText(c.completed_at!)}${c.expires_at ? `, refresh by ${dayText(c.expires_at)}` : ''}` : c.status === 'renew' ? `time for a refresher (last done ${dayText(c.completed_at!)})` : 'not done yet'}`;
 
+/** The lines for the prompt: each course with its status, or a plain statement that nothing is assigned yet. */
+async function trainingNotesFor(load: (who: Who) => Promise<TrainingStatus[]>, who: Who): Promise<string[]> {
+  const list = await load(who).catch(() => null);
+  if (list === null) return [];
+  return list.length ? list.map(trainingLine) : ['No courses have been set up for them yet. Their manager can add some in Manage, under Training.'];
+}
+
 export interface ChatDeps {
   /** this person's courses and sign-offs, for questions about their training */
   training?: (who: Who) => Promise<TrainingStatus[]>;
@@ -123,7 +130,7 @@ export function createChat(deps: ChatDeps) {
 
     const system = buildSystemPrompt({
       botName: who.botName || 'Stacked Chat', orgName: who.orgName, siteName: who.siteName, personName: who.name,
-      trainingNotes: deps.training && TRAINING_INTENT.test(message) ? (await deps.training(who).catch(() => [])).map(trainingLine) : undefined,
+      trainingNotes: deps.training && TRAINING_INTENT.test(message) ? await trainingNotesFor(deps.training, who) : undefined,
       passages, hasVideo: media.videos.length > 0, videoNotes: media.videos.map((v) => (v.description ? `${v.title}: ${v.description}` : v.title)), hasImage: media.images.length > 0,
       vendorNotes: pickProfiles(message, history.map((m) => ({ role: m.role, content: m.content })), who.techStack ?? null).map((k) => PROFILES[k]!),
       techStack: who.techStack ?? null, techCategories: TECH_CATEGORIES,
