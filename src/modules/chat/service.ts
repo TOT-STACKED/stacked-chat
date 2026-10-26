@@ -7,6 +7,7 @@ import { checkNps, type NpsMirror, type NpsStore } from './nps.js';
 import { buildSystemPrompt } from './prompt.js';
 import type { ChatModel, ChatTurn } from './model.js';
 import { asItem, type WorkContext } from './work.js';
+import { wantsTeam } from './team.js';
 import { imagesBehind, pickMedia, retrievePassages, visibleTo, wantsVideo } from './retrieve.js';
 import type { ConversationStore, StoredMessage } from './store.js';
 import { detectSensitive, TOPIC_IDS, withConfirmLine, type TopicId, type TopicMode } from '../sensitive/topics.js';
@@ -34,6 +35,8 @@ export const WORK_INTENT = /\b(to do|todo|to-do|tasks?|checklists?|check lists?|
 export interface ChatDeps {
   /** this person's work (checklists, updates, training) as short lines, plus pages the chat can search and quote */
   work?: (who: Who) => Promise<WorkContext>;
+  /** for managers: how their people are getting on with training, updates and checklists, as short lines */
+  team?: (who: { orgId: string; manages: NonNullable<Who['manages']> }) => Promise<string[]>;
   /** this person's courses and sign-offs, for questions about their training */
   training?: (who: Who) => Promise<TrainingStatus[]>;
   /** all knowledge items for an organisation (the service filters what this person may see) */
@@ -55,6 +58,8 @@ export interface Who {
   email: string; name: string | null; orgId: string; orgName: string; siteId: string; siteName: string; teamIds: string[]; botName: string | null;
   /** the systems this venue has recorded (EPOS, payments...), if any */
   techStack?: Record<string, string> | null;
+  /** the venues this person manages (set only for managers), so they can ask how their team is getting on */
+  manages?: { all: boolean; siteIds: string[] };
 }
 export interface Answer {
   reply: string; conversation_id: number; unanswered: boolean;
@@ -139,9 +144,12 @@ export function createChat(deps: ChatDeps) {
       images: [...picked.images, ...behind].slice(0, 1),
     };
 
+    // Managers asking about their people ("who has not done fire training?") get their team's progress, built only for that question.
+    const teamNotes = deps.team && who.manages && wantsTeam(message) ? await deps.team({ orgId: who.orgId, manages: who.manages }).catch(() => []) : undefined;
     const system = buildSystemPrompt({
       botName: who.botName || 'Stacked Chat', orgName: who.orgName, siteName: who.siteName, personName: who.name,
       trainingNotes: deps.training && TRAINING_INTENT.test(message) ? await trainingNotesFor(deps.training, who) : undefined,
+      teamNotes,
       workNotes: work ? (work.notes.length ? work.notes : WORK_INTENT.test(message) ? ['Nothing is waiting for them: no checklists are set up for their venue, no unread updates and no training to take.'] : []) : undefined,
       passages, hasVideo: media.videos.length > 0, videoNotes: media.videos.map((v) => (v.description ? `${v.title}: ${v.description}` : v.title)), hasImage: media.images.length > 0,
       vendorNotes: pickProfiles(message, history.map((m) => ({ role: m.role, content: m.content })), who.techStack ?? null).map((k) => PROFILES[k]!),

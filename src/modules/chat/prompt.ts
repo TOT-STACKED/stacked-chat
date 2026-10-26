@@ -10,6 +10,8 @@ export interface PromptInput {
   trainingNotes?: string[];
   /** what this person has to do today, from Operations, Communicate and Training (only given when they ask what they need to do) */
   workNotes?: string[];
+  /** for a manager: how the people at the venues they manage are getting on (only given when they ask about their team) */
+  teamNotes?: string[];
   /** the systems this venue has recorded, e.g. { epos: 'Lightspeed' } */
   techStack?: Record<string, string> | null;
   techCategories?: Array<[string, string]>;
@@ -33,6 +35,8 @@ export function buildSystemPrompt(i: PromptInput): string {
   const trainingSection = training.length ? `\n\nTHIS PERSON'S TRAINING (from the Training area of Stacked Chat):\n${training.map((t) => `- ${t}`).join('\n')}\nIf they ask what training is available, or about their courses, list EVERY course above, one per line, with where they are up to (not done yet, done, or due a refresher). If they ask about taking, finding or booking a particular course, quiz or sign-off, say where they are up to with it. Either way, finish by telling them to tap the four-square button at the top right of the chat and choose Training to take them. Do not make up course content, dates or requirements, and do not say it is missing from the knowledge base.` : '';
   const work = (i.workNotes ?? []).filter(Boolean);
   const workSection = work.length ? `\n\nTHIS PERSON'S WORK TODAY (from the Operations, Updates and Training areas of Stacked Chat):\n${work.map((t) => `- ${t}`).join('\n')}\nThis is always here, so use it ONLY when their question is about what they need to do, what is on today, or their checklists, updates or training; otherwise do not mention it. When it is, answer from this list: say what is done and what is still to do, one per line. Then tell them to tap the four-square button at the top right of the chat and choose Checklists, Updates or Training to do it. Do not invent tasks, shifts or rota details: this list is everything Stacked Chat knows, and their rota is somewhere else. Do not say any of it is missing from the knowledge base.` : '';
+  const team = (i.teamNotes ?? []).filter(Boolean);
+  const teamSection = team.length ? `\n\nHOW THIS MANAGER'S TEAM IS GETTING ON (from Training, Updates and Checklists; only the people and venues they manage):\n${team.map((t) => `- ${t}`).join('\n')}\nThey are a manager asking about their people. Answer from this list: name the people and say what is outstanding, and give the counts. If what they ask about is not in the list, say it is not set up or has no activity, and do not guess. Do not list people who are not named above. Then tell them they can see the full picture, and send reminders, in Manage under Training, Communicate or Operations. Do not say any of it is missing from the knowledge base.` : '';
   const vendorSection = notes.length ? `\n\nSTACKED VENDOR SUPPORT NOTES (maintained by Stacked; use for hospitality technology faults):\n${notes.join('\n\n---\n\n')}` : '';
 
   return `You are ${i.botName}, the AI assistant for ${i.orgName}${i.siteName ? ` (${i.siteName})` : ''}, a UK hospitality business. You help the team find answers fast: handbooks, procedures, policies, suppliers, opening and closing, how things work here, and fixing hospitality technology (tills, card machines, rotas, Wi-Fi) when it goes wrong.${i.personName ? ` You are talking to ${i.personName}.` : ''}
@@ -53,5 +57,5 @@ ${i.hasVideo ? `A relevant video is attached beneath your reply${i.videoNotes?.l
 Style: calm and direct, friendly, no waffle. British English unless the person writes in another language, in which case reply in theirs. Short paragraphs; use a numbered list for steps. Do not use markdown headings or tables.${stack}
 
 KNOWLEDGE BASE:
-${knowledge}${vendorSection}${trainingSection}${workSection}`;
+${knowledge}${vendorSection}${trainingSection}${workSection}${teamSection}`;
 }

@@ -55,6 +55,7 @@ import { createOps, type Ops } from './modules/operations/service.js';
 import { createSupabaseOpsStore, type OpsStore } from './modules/operations/store.js';
 import { operationsRoutes } from './modules/operations/routes.js';
 import { createWork } from './modules/chat/work.js';
+import { createTeam } from './modules/chat/team.js';
 import { createAnthropicChecklistDrafter, type ChecklistDrafter } from './modules/operations/drafter.js';
 import { createComms, type Comms } from './modules/communicate/service.js';
 import { createSupabaseCommsStore, type CommsStore } from './modules/communicate/store.js';
@@ -191,6 +192,7 @@ export async function buildApp(
     onAnswered: (siteId) => { void billing?.recordQuestion(siteId); },
     training: training ? (who) => training.listFor({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds }) : undefined,
     work: ops || comms || training ? createWork({ ops, comms, training }) : undefined,
+    team: repo && (ops || comms || training) ? createTeam({ repo, ops, comms, training }) : undefined,
     sensitive: sensitiveSettings ? (orgId) => sensitiveSettings.enabled(orgId) : undefined,
     nps: overrides.npsStore ?? (db ? createSupabaseNpsStore(db) : null),
     mirrorNps: overrides.mirrorNps !== undefined ? overrides.mirrorNps : (config.STACKCOLLECT_SUPABASE_URL && config.STACKCOLLECT_SUPABASE_KEY ? createPortalMirror({ url: config.STACKCOLLECT_SUPABASE_URL, key: config.STACKCOLLECT_SUPABASE_KEY }) : null),

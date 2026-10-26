@@ -203,7 +203,8 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 - **Notes** go into the prompt as "THIS PERSON'S WORK TODAY"; the prompt says to use them only when the question is about what to do, or their checklists, updates or training. When they ask and there is nothing, the chat says nothing is waiting (`WORK_INTENT`).
 - **Docs** are searched exactly like Knowledge (`asItem` wraps each as a published document): updates (title and text, last 60 days), checklist items (active lists for their venue), and course lessons (`training.outlinesFor`). Titles are prefixed `Update:`, `Checklist:`, `Training:` and are cited as sources. Quiz questions and answers are never included.
 - Visibility is applied before anything is wrapped: the same venue and team rules as the staff screens, so one venue's list never reaches another venue's chat.
-- Not covered yet: a manager asking about their team ("who has not done fire training?").
+- **Managers asking about their team** (`chat/team.ts`, `createTeam`): when a manager asks about people and training, updates or checklists ("who hasn't done fire training?", "has everyone read the menu update?", "has opening been done at North?"), `wantsTeam` matches and the prompt gets "HOW THIS MANAGER'S TEAM IS GETTING ON": per course who is not done or due a refresher, per recent update who has not read or confirmed, and today's and this week's checklist runs. Built only for those questions, never for every message.
+- **Scope:** `Who.manages` (set in `whoAsks` for site managers and above) lists the venues they look after; company admins see all. People are filtered to those with a member row at those venues, so a site manager never sees another venue's staff, and company-level admins appear only to company admins. Same people and numbers as the Manage screens. Staff never get this section.
 
 ## Get help (support)
 

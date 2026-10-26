@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ApiHttpError, forbidden, notFound } from '../../lib/errors.js';
-import { bestRole, type UserPrincipal } from '../../lib/permissions.js';
+import { atLeast, bestRole, type UserPrincipal } from '../../lib/permissions.js';
 import { RateLimiter } from '../../lib/rate-limit.js';
 import type { Repo } from '../../lib/repo.js';
 import { userOnly } from '../access.js';
@@ -55,7 +55,12 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     const [org, members, links, branding, techStack] = await Promise.all([repo().getOrg(site.org_id), repo().listMembers(site.org_id), repo().listMemberTeams(site.org_id), ctx.branding?.list(site.org_id).catch(() => []), ctx.techStack?.get(siteId).catch(() => null)]);
     const mine = members.filter((m) => m.email.toLowerCase() === p.email.toLowerCase() && m.status === 'active');
     const ids = new Set(mine.map((m) => m.id));
+    // managers: which venues they look after, so they can ask how their team is getting on
+    const orgWide = atLeast(bestRole(p, site.org_id, null), 'hq_admin');
+    const managed = orgWide || p.memberships.some((m) => m.orgId === site.org_id && atLeast(m.role, 'site_manager'))
+      ? (await repo().listSites(site.org_id)).filter((s) => orgWide || atLeast(bestRole(p, site.org_id, s.id), 'site_manager')).map((s) => s.id) : [];
     return {
+      ...(managed.length || orgWide ? { manages: { all: orgWide, siteIds: managed } } : {}),
       email: p.email, name: nameOf(p.email, mine.find((m) => m.display_name)?.display_name ?? null), orgId: site.org_id, orgName: org?.name ?? 'your company',
       siteId, siteName: site.name, teamIds: links.filter((l) => ids.has(l.member_id)).map((l) => l.team_id),
       botName: (branding ?? []).find((b) => b.id === siteId)?.bot_name ?? null, techStack: techStack ?? null,
