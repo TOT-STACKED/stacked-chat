@@ -156,9 +156,10 @@ function drawShell() {
     state.orgs.length > 1 ? chevron() : null,
     state.orgs.length > 1 ? h('select', { 'aria-label': 'Switch company', onchange: (e) => { state.orgId = e.target.value; localStorage.setItem('stacked_manage_org', state.orgId); drawShell(); route(); } },
       state.orgs.map((o) => h('option', { value: o.id, selected: o.id === state.orgId }, o.name))) : null);
-  main = h('main', { class: 'main', id: 'main' });
+  main = h('main', { class: 'main', id: 'main', tabindex: '-1' });
   crumb = h('span', { class: 'crumbs' });
   root.append(h('div', { class: 'shell' },
+    h('a', { class: 'skip', href: '#main', onclick: (e) => { e.preventDefault(); main.focus(); } }, 'Skip to main content'),
     h('aside', { class: 'side' },
       h('a', { href: '#/home', 'aria-label': 'Stacked Manage home' }, logo()),
       orgBox,
@@ -191,12 +192,15 @@ function route() {
   const org = state.orgs.find((o) => o.id === state.orgId);
   const orgRole = bestRole(state.memberships, state.orgId, null);
   clear(crumb); crumb.append(h('span', { text: org.name }), h('span', { text: '/' }), h('b', { text: TITLES[view] }));
+  document.title = `${TITLES[view]} · ${org.name} · Stacked Manage`;
   window.scrollTo(0, 0);
+  if (state.routed) main.focus({ preventScroll: true }); // keyboard and screen reader users start at the top of the new screen
+  state.routed = true;
 
   const restricted = (title, icon, lead, text) => main.append(pageHeader({ icon, title, sub: lead }),
     h('div', { class: 'card empty-state' }, tile('empty', 56), h('b', { text }), h('p', { text: 'If you should have access, ask your company admin to change your role.' })));
 
-  if (view === 'home') { renderHome(main, { api, memberships: state.memberships, orgId: state.orgId, orgName: org.name, isManager: isManagerAnywhere(state.memberships, state.orgId), isAdmin: atLeast(orgRole, 'hq_admin'), email: auth.email() }); return; }
+  if (view === 'home') { renderHome(main, { api, memberships: state.memberships, orgId: state.orgId, orgName: org.name, isManager: isManagerAnywhere(state.memberships, state.orgId), isAdmin: atLeast(orgRole, 'hq_admin'), email: auth.email(), onHelp: openHelp }); return; }
   if (view === 'people') {
     if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('People', 'people', 'Invite people and choose what they can do.', 'This area is for managers'); return; }
     renderPeople(main, { api, memberships: state.memberships, orgId: state.orgId, orgName: org.name });

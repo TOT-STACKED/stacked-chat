@@ -192,3 +192,46 @@ export function lastUsedText(iso, now = new Date()) {
   const days = Math.floor((now - new Date(iso)) / 86_400_000);
   return days <= 0 ? 'Today' : days === 1 ? 'Yesterday' : days < 30 ? `${days} days ago` : shortDate(iso);
 }
+
+const DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+/** Is a checklist past its due time right now (UK time, on a day it is checked)? The same rule the reminder email uses. */
+export function pastDue(l, now = new Date()) {
+  if (!l.due_time) return false;
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
+  const get = (t) => (p.find((x) => x.type === t) || {}).value || '0';
+  return (l.remind_days || []).includes(DOW[get('weekday')]) && Number(get('hour')) * 60 + Number(get('minute')) >= Number(l.due_time.slice(0, 2)) * 60 + Number(l.due_time.slice(3, 5));
+}
+
+/**
+ * What needs a manager's attention right now, most urgent first. Pure, so it can be tested.
+ * data: { billing, board (today rows), updates, courses, insights, knowledge, members }; anything may be missing.
+ */
+export function homeAttention(data, now = new Date()) {
+  const out = [];
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+  const b = data.billing;
+  if (b && b.account && b.state) {
+    if (b.state.mode === 'grace') out.push({ id: 'billing', tone: 'bad', icon: 'billing', title: 'Your payment is overdue', sub: 'Update your card to keep everything running.', href: '#/settings/billing', cta: 'Fix billing' });
+    else if (b.state.mode !== 'full') out.push({ id: 'billing', tone: 'bad', icon: 'billing', title: 'Billing needs your attention', sub: 'Some features are paused until this is sorted.', href: '#/settings/billing', cta: 'Open billing' });
+    else if (b.account.status === 'trialing' && b.state.trial_days_left <= 5) out.push({ id: 'trial', tone: 'warn', icon: 'billing', title: `Your free trial ends in ${plural(b.state.trial_days_left, 'day', 'days')}`, sub: 'Add a card so nothing stops.', href: '#/settings/billing', cta: 'Add a card' });
+  }
+  const late = (data.board || []).filter((t) => !t.run.completed_at && pastDue(t.checklist, now));
+  if (late.length) out.push({ id: 'late', tone: 'bad', icon: 'operations', title: `${plural(late.length, 'checklist is', 'checklists are')} overdue today`, sub: late.slice(0, 2).map((t) => `${t.checklist.title}${t.siteName ? ` at ${t.siteName}` : ''}`).join(', ') + (late.length > 2 ? ` and ${late.length - 2} more` : ''), href: '#/operations', cta: 'See checklists' });
+  for (const c of (data.courses || []).filter((x) => x.active && x.stats.recipients && (x.stats.todo || x.stats.renew)).sort((a, z) => z.stats.todo + z.stats.renew - (a.stats.todo + a.stats.renew)).slice(0, 2)) {
+    const bits = [c.stats.todo ? `${c.stats.todo} not done` : null, c.stats.renew ? `${c.stats.renew} due a refresher` : null].filter(Boolean).join(', ');
+    out.push({ id: `course-${c.id}`, tone: 'warn', icon: 'training', title: `${c.title}: ${bits}`, sub: `${c.stats.done} of ${c.stats.recipients} have signed it off.`, href: '#/training', cta: 'See who' });
+  }
+  const recent = now.getTime() - 14 * 86_400_000;
+  for (const u of (data.updates || []).filter((x) => x.stats.recipients && new Date(x.created_at).getTime() >= recent && (x.requires_ack ? x.stats.acked : x.stats.read) < x.stats.recipients).slice(0, 2)) {
+    const missing = u.stats.recipients - (u.requires_ack ? u.stats.acked : u.stats.read);
+    out.push({ id: `update-${u.id}`, tone: 'info', icon: 'communicate', title: `“${u.title}”: ${plural(missing, 'person has', 'people have')} not ${u.requires_ack ? 'confirmed' : 'read'} it`, sub: `${u.stats.read} of ${u.stats.recipients} have read it.`, href: '#/communicate', cta: 'See who' });
+  }
+  const unanswered = ((data.insights && data.insights.unanswered) || []).filter((q) => !q.draft_item_id).length;
+  if (unanswered) out.push({ id: 'unanswered', tone: 'warn', icon: 'insights', title: `${plural(unanswered, 'question', 'questions')} the AI could not answer`, sub: 'Turn them into answers your team can use.', href: '#/insights', cta: 'Review' });
+  const drafts = (data.knowledge || []).filter((k) => k.status === 'draft').length;
+  if (drafts) out.push({ id: 'drafts', tone: 'info', icon: 'knowledge', title: `${plural(drafts, 'draft', 'drafts')} waiting to be published`, sub: 'Your team cannot see these yet.', href: '#/knowledge', cta: 'Review' });
+  const invited = (data.members || []).filter((m) => m.status === 'invited').length;
+  if (invited) out.push({ id: 'invited', tone: 'info', icon: 'people', title: `${plural(invited, 'person has', 'people have')} not signed in yet`, sub: 'They were invited but have not used their code.', href: '#/people', cta: 'See people' });
+  const rank = { bad: 0, warn: 1, info: 2 };
+  return out.sort((a, z) => rank[a.tone] - rank[z.tone]).slice(0, 7);
+}

@@ -51,7 +51,7 @@ export async function renderCommunicate(main, ctx) {
       h('div', { class: 'uptop' }, h('b', { text: a.title }), h('span', { class: 'badge role-staff', text: audience(a) })),
       h('span', { class: 'muted', style: 'font-size:13px', text: `${when(a.created_at)} · ${who(a.created_by)}` }),
       h('p', { class: 'upbody', text: a.body }),
-      h('div', { class: 'bar', role: 'progressbar', 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' }, h('div', { style: `width:${pct}%` })),
+      h('div', { class: 'bar', role: 'progressbar', 'aria-label': `${a.title}: read by ${a.stats.read} of ${a.stats.recipients}`, 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' }, h('div', { style: `width:${pct}%` })),
       h('div', { class: 'upfoot' }, h('span', { class: 'muted', text: a.stats.recipients ? `Read by ${a.stats.read} of ${a.stats.recipients}${a.requires_ack ? ` · ${a.stats.acked} confirmed` : ''}` : 'Nobody to send this to yet' }),
         h('button', { class: 'lnk', onclick: () => openDetail(a) }, 'See who')));
   }

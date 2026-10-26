@@ -182,3 +182,32 @@ describe('manage lib: knowledge audience picker', () => {
     expect(audienceLabel({ team_id: 't1', site_id: 's1' }, [{ id: 's1', name: 'North' }], [{ id: 't1', name: 'Kitchen' }])).toBe('Team: Kitchen');
   });
 });
+
+import { homeAttention, pastDue } from '../web/manage/lib.js';
+describe('manage lib: what needs attention on Home', () => {
+  const now = new Date('2026-03-10T10:00:00Z'); // Tuesday 10:00 UK
+  const list = (over: Record<string, unknown> = {}) => ({ title: 'Opening checklist', due_time: '09:00', remind_days: [0, 1, 2, 3, 4, 5, 6], ...over });
+  const row = (over: Record<string, unknown> = {}, done = false) => ({ checklist: list(over), site_id: 's1', siteName: 'North', run: { completed_at: done ? 'x' : null } });
+  it('says all clear when nothing is wrong', () => { expect(homeAttention({}, now)).toEqual([]); });
+  it('knows when a checklist is past due', () => {
+    expect(pastDue(list(), now)).toBe(true); expect(pastDue(list({ due_time: '11:00' }), now)).toBe(false);
+    expect(pastDue(list({ remind_days: [0, 6] }), now)).toBe(false); expect(pastDue(list({ due_time: null }), now)).toBe(false);
+  });
+  it('puts money and overdue checklists first, then people to chase, then tidying', () => {
+    const items = homeAttention({
+      billing: { account: { status: 'trialing' }, state: { mode: 'full', trial_days_left: 3 } },
+      board: [row(), row({ title: 'Closing checklist', due_time: '23:00' }), row({ title: 'Done one' }, true)],
+      courses: [{ id: 'c1', title: 'Fire safety', active: true, stats: { recipients: 10, done: 6, todo: 3, renew: 1 } }, { id: 'c2', title: 'Off', active: false, stats: { recipients: 5, done: 0, todo: 5, renew: 0 } }],
+      updates: [{ id: 'u1', title: 'Fire drill', requires_ack: true, created_at: '2026-03-05T10:00:00Z', stats: { recipients: 10, read: 8, acked: 5 } }, { id: 'u2', title: 'Old', requires_ack: false, created_at: '2025-01-01T00:00:00Z', stats: { recipients: 10, read: 1, acked: 0 } }],
+      insights: { unanswered: [{ draft_item_id: null }, { draft_item_id: null }, { draft_item_id: 'd' }] },
+      knowledge: [{ status: 'draft' }, { status: 'published' }], members: [{ status: 'invited' }, { status: 'active' }],
+    }, now);
+    expect(items.map((i: { id: string }) => i.id)).toEqual(['late', 'trial', 'course-c1', 'unanswered', 'update-u1', 'drafts', 'invited']);
+    expect(items[0]!.title).toBe('1 checklist is overdue today'); expect(items[0]!.sub).toBe('Opening checklist at North');
+    expect(items[1]!.title).toBe('Your free trial ends in 3 days'); expect(items[2]!.title).toBe('Fire safety: 3 not done, 1 due a refresher');
+    expect(items[3]!.title).toBe('2 questions the AI could not answer'); expect(items[4]!.title).toBe('“Fire drill”: 5 people have not confirmed it');
+  });
+  it('flags a payment problem as urgent', () => {
+    expect(homeAttention({ billing: { account: { status: 'past_due' }, state: { mode: 'grace' } } }, now)[0]).toMatchObject({ tone: 'bad', title: 'Your payment is overdue' });
+  });
+});

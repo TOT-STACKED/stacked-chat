@@ -199,3 +199,9 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 ### Draft a course from a document
 
 `POST /api/v1/orgs/:orgId/training/draft { knowledge_id }` reads one Knowledge document (managers who can see it; at least 200 characters; the first 24,000 are sent) and returns a draft: title, description, 3–6 lessons and 4–6 three-option questions, using only what the document says (`training/drafter.ts`, `ANTHROPIC_API_KEY`, `CHAT_MODEL`). **Nothing is saved**: Manage opens the editor pre-filled with a banner telling the manager to check every lesson and answer. 10 drafts an hour per person. The reply is parsed and validated (`parseDraft`), so malformed model output is dropped, never shown.
+
+## Manage Home and accessibility
+
+- **Home** (`web/manage/home.js`) leads with "Needs your attention" (`homeAttention` in `lib.js`, pure and tested): payment or trial problems, overdue checklists, courses people have not done, updates people have not read or confirmed, questions the AI could not answer, drafts to publish, people not signed in. Then "Do something" (six quick actions, including Get help), "At a glance", and "Get set up" only until it is done. Staff who open Manage see a plain "Open Stacked Chat" page.
+- **Accessibility:** skip link, a page title per screen, focus moves to the new screen on navigation, labelled progress bars, `lang="en-GB"`, a 4.5:1 minimum for secondary text (`--faint`), 44px touch targets on a phone, reduced-motion respected.
+- **Icons:** Chat (and the sign-up page) keep the pink people tile, Manage is the orange dashboard tile, Console is the blue chart tile (`web/manage/assets/favicon-*-{32,192}.png`, `apple-touch-*.png`).

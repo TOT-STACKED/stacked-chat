@@ -1,7 +1,7 @@
 /* Stacked Manage: SaaS look on the Stacked brand.
    Cream canvas, white surfaces, ink text. Orange is for the main action only. */
 :root{
-  --bg:#F5F3EE;--surface:#fff;--ink:#1B1A17;--ink2:#4A473F;--muted:#6B675F;--faint:#8A867C;
+  --bg:#F5F3EE;--surface:#fff;--ink:#1B1A17;--ink2:#4A473F;--muted:#6B675F;--faint:#716D64;
   --line:#E6E2D8;--line2:#EFECE4;--line-strong:#D5D0C4;
   --orange:#E87830;--orange-press:#D4691F;--warn:#9C2F1B;--warn-bg:#FBEDE9;--ok:#1E7A3C;--ok-bg:#E7F6EC;--info:#1F5FA8;--info-bg:#E8F1FB;
   --radius:14px;--radius-sm:10px;
@@ -71,7 +71,7 @@ h3{font-size:16px;font-weight:700;margin:0}
 .btn.cta:hover{background:var(--orange-press)}
 .btn.line{background:var(--surface);border-color:var(--line-strong);color:var(--ink)}
 .btn.line:hover{background:var(--bg);border-color:var(--ink2)}
-.btn.small{height:32px;font-size:13px;padding:0 12px;border-radius:8px}
+.btn.small{height:36px;font-size:13.5px;padding:0 14px;border-radius:8px}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 .lnk{background:none;border:0;padding:0;cursor:pointer;font-weight:600;font-size:14px;color:var(--ink);text-decoration:underline;text-decoration-color:var(--line-strong);text-underline-offset:3px}
 .lnk:hover{text-decoration-color:var(--ink)}
@@ -364,3 +364,26 @@ code.keybox{display:block;word-break:break-all;font-family:ui-monospace,SFMono-R
 /* Get help in Manage */
 .helpside{display:none}
 @media (max-width:900px){.helpside{display:inline-flex;flex:none;min-width:40px;padding:0 12px;justify-content:center}.helpside .hl{display:none}.helpside::before{content:'?';font-weight:800;font-size:16px}}
+
+/* Home */
+.attn{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.attnitem{display:flex;align-items:center;gap:14px;padding:14px 16px;border-left-width:5px}
+.attnitem .sb{display:flex;flex-direction:column;flex:1;min-width:0}
+.attnitem.bad{border-left-color:#D92D20}.attnitem.warn{border-left-color:#E8A21A}.attnitem.info{border-left-color:#4E71F2}
+.allclear{display:flex;align-items:center;gap:14px;padding:16px}
+.allclear .check{width:32px;height:32px;border-radius:50%;background:#2DA85A;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.allclear .sb{display:flex;flex-direction:column}
+.qa{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.qacard{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:16px;text-decoration:none;text-align:left;font:inherit;color:inherit;cursor:pointer;min-height:112px}
+.qacard:hover{border-color:var(--ink2)}
+.qacard b{font-size:15px}.qacard .muted{font-size:13.5px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:fixed;left:12px;top:-60px;z-index:50;background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600}
+.skip:focus{top:12px}
+@media (max-width:700px){.attnitem{flex-wrap:wrap}.attnitem .btn{width:100%;height:44px}}
+
+/* focus lands on the page when you move between screens; it needs no ring of its own */
+main:focus{outline:none}
+@media (max-width:900px){.btn{min-height:44px}.btn.small{height:44px}.pill{min-height:40px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+.glance{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}

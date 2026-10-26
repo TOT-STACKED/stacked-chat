@@ -128,14 +128,16 @@ describe('the sign-up API and page', () => {
   });
 });
 
-describe('the site icon', () => {
-  it('every page declares it, the files exist, and /favicon.ico leads to one', async () => {
+describe('the site icons', () => {
+  const ICONS: Record<string, string> = { '/start/': 'favicon-32.png', '/chat/': 'favicon-32.png', '/manage/': 'favicon-manage-32.png', '/console/': 'favicon-console-32.png' };
+  it('Chat, Manage and Console each declare their own icon, the files exist, and /favicon.ico leads to one', async () => {
     const app = await buildApp(testConfig, {});
-    for (const page of ['/start/', '/chat/', '/manage/', '/console/']) {
+    for (const [page, icon] of Object.entries(ICONS)) {
       const html = (await app.inject({ method: 'GET', url: page })).body;
-      expect(html, page).toContain('rel="icon"'); expect(html, page).toContain('/manage/assets/favicon-32.png'); expect(html, page).toContain('rel="apple-touch-icon"');
+      expect(html, page).toContain('rel="icon"'); expect(html, page).toContain('/manage/assets/' + icon); expect(html, page).toContain('rel="apple-touch-icon"');
     }
-    for (const f of ['favicon-32.png', 'favicon-192.png', 'apple-touch-icon.png']) {
+    expect(new Set([ICONS['/chat/'], ICONS['/manage/'], ICONS['/console/']]).size).toBe(3);
+    for (const f of ['favicon-32.png', 'favicon-192.png', 'apple-touch-icon.png', 'favicon-manage-32.png', 'favicon-manage-192.png', 'apple-touch-manage.png', 'favicon-console-32.png', 'favicon-console-192.png', 'apple-touch-console.png']) {
       const r = await app.inject({ method: 'GET', url: '/manage/assets/' + f });
       expect([r.statusCode, r.headers['content-type']], f).toEqual([200, 'image/png']);
     }

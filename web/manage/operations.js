@@ -1,19 +1,11 @@
 import { clear, h, modal, toast } from './dom.js';
-import { atLeast, bestRole, canManage } from './lib.js';
+import { atLeast, bestRole, canManage, pastDue } from './lib.js';
 import { pageHeader, tile } from './ui.js';
 
 const KIND_LABEL = { opening: 'Opening', closing: 'Closing', custom: 'Other' };
 const dayText = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 const timeText = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
 const DAYS = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
-const DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
-/** Is a list past its due time right now (UK time, on a day it is checked)? Same rule the reminder email uses. */
-function pastDue(l, now = new Date()) {
-  if (!l.due_time) return false;
-  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
-  const get = (t) => (p.find((x) => x.type === t) || {}).value || '0';
-  return (l.remind_days || []).includes(DOW[get('weekday')]) && Number(get('hour')) * 60 + Number(get('minute')) >= Number(l.due_time.slice(0, 2)) * 60 + Number(l.due_time.slice(3, 5));
-}
 const who = (email) => String(email || '').split('@')[0];
 
 /** Operations: checklists a manager writes, what each venue has ticked off today, and the last few days. */
@@ -66,7 +58,7 @@ export async function renderOperations(main, ctx) {
       return h('div', { class: `card opcard ${t.run.completed_at ? 'done' : ''}` },
         h('div', { class: 'optop' }, h('b', { text: t.checklist.title }), h('span', { class: 'badge role-staff', text: KIND_LABEL[t.checklist.kind] })),
         multi() ? h('span', { class: 'muted', style: 'font-size:13.5px', text: siteName(t.site_id) }) : null,
-        h('div', { class: 'bar', role: 'progressbar', 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' }, h('div', { style: `width:${pct}%` })),
+        h('div', { class: 'bar', role: 'progressbar', 'aria-label': `${t.checklist.title} progress`, 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' }, h('div', { style: `width:${pct}%` })),
         status(t.run, t.checklist), t.run.note ? h('p', { class: 'opnote', text: `Note: ${t.run.note}` }) : null);
     }));
   }

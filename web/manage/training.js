@@ -53,7 +53,7 @@ export async function renderTraining(main, ctx) {
       h('div', { class: 'uptop' }, h('b', { text: c.title }), h('span', { style: 'display:flex;gap:6px' }, c.active ? null : h('span', { class: 'badge role-staff', text: 'Off' }), h('span', { class: 'badge role-staff', text: audience(c) }))),
       h('span', { class: 'muted', style: 'font-size:13.5px', text: bits.join(' · ') }),
       c.description ? h('p', { class: 'upbody', text: c.description }) : null,
-      h('div', { class: 'bar', role: 'progressbar', 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' }, h('div', { style: `width:${pct}%` })),
+      h('div', { class: 'bar', role: 'progressbar', 'aria-label': `${c.title}: ${s.done} of ${s.recipients} done`, 'aria-valuenow': String(pct), 'aria-valuemin': '0', 'aria-valuemax': '100' }, h('div', { style: `width:${pct}%` })),
       h('div', { class: 'upfoot' }, h('span', { class: 'muted', text: s.recipients ? `${s.done} of ${s.recipients} done${s.renew ? ` · ${s.renew} due a refresher` : ''}` : 'Nobody to take this yet' }),
         h('span', { style: 'display:flex;gap:16px' }, canEdit(c) ? h('button', { class: 'lnk', onclick: () => openEditor(c) }, 'Edit') : null, h('button', { class: 'lnk', onclick: () => openProgress(c) }, 'See who'))));
   }
