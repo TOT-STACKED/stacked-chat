@@ -134,7 +134,7 @@ function micButton() {
 }
 
 // ---- the chat screen ---------------------------------------------------------------------------------------
-let thread; let input; let sendBtn; let hubBtn;
+let thread; let input; let sendBtn; let hubBtn; let newBtn;
 function draw() {
   applyBrand(); clear(root);
   const b = st.site.branding; const sites = st.ctx.sites;
@@ -146,12 +146,14 @@ function draw() {
   input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(160, input.scrollHeight) + 'px'; sendBtn.disabled = st.sending || !input.value.trim(); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
   hubBtn = h('button', { class: 'iconbtn chkbtn', hidden: true, 'aria-label': 'Work: checklists, updates and training', 'aria-haspopup': 'true', onclick: toggleHub }, svg(ICON.hub), h('i', { class: 'chkdot', hidden: true }));
+  // only shown once there is a conversation to start over from
+  newBtn = h('button', { class: 'iconbtn newbtn', hidden: !st.messages.length && !st.sending, 'aria-label': 'New chat', title: 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus), h('span', { class: 'lbl' }, h('span', { class: 'long', text: 'New chat' }), h('span', { class: 'short', text: 'New' })));
   const form = h('form', { onsubmit: (e) => { e.preventDefault(); submit(); } }, input, micButton(), sendBtn);
   root.append(h('div', { class: 'app' },
     h('header', { class: 'bar' },
       h('button', { class: 'iconbtn', 'aria-label': 'Your conversations', onclick: openHistory }, svg(ICON.history)),
       h('div', { class: 'brand' }, ownLogo() ? h('img', { src: b.logo_url, alt: '' }) : h('img', { class: 'mark', src: markSrc, alt: '', width: 32, height: 32 }), h('b', { text: brandName() })),
-      venue, hubBtn, h('button', { class: 'iconbtn newbtn', 'aria-label': 'New chat', title: 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus), h('span', { class: 'lbl', text: 'New chat' })),
+      venue, hubBtn, newBtn,
       h('button', { class: 'avatar', title: `Sign out ${auth.email()}`, 'aria-label': `Sign out ${auth.email()}`, style: 'border:0;cursor:pointer', onclick: signOut }, (auth.email()[0] || '?').toUpperCase())),
     thread,
     h('div', { class: 'composer' }, form, h('p', { class: 'fine', text: 'Answers come from your company’s knowledge. For anything safety-critical, such as allergens, check with your manager.' }))));
@@ -240,7 +242,7 @@ function botBubble(m, last) {
 }
 
 function drawThread() {
-  clear(thread);
+  clear(thread); if (newBtn) newBtn.hidden = !st.messages.length && !st.sending;
   const col = h('div', { class: 'col' });
   if (!st.messages.length && !st.sending) col.append(hello());
   const lastBot = st.messages.map((m) => m.role).lastIndexOf('assistant');
