@@ -7,7 +7,7 @@ import type { Config } from '../../config.js';
  * Serves the Manage web app (plain HTML/CSS/JS in /web/manage, no build step) at /manage.
  * `/manage/config.json` hands the browser ONLY public values (project URL + anon key).
  */
-export async function manageRoutes(app: FastifyInstance, opts: { config: Config; devMode?: boolean }) {
+export async function manageRoutes(app: FastifyInstance, opts: { config: Config; devMode?: boolean; phoneSignin?: boolean }) {
   const root = path.resolve(__dirname, '../../../web/manage');
   const supabaseOrigin = new URL(opts.config.SUPABASE_URL).origin;
 
@@ -36,6 +36,8 @@ export async function manageRoutes(app: FastifyInstance, opts: { config: Config;
     supabaseUrl: opts.config.SUPABASE_URL,
     anonKey: opts.config.SUPABASE_KEY,
     dev: !!opts.devMode,
+    /** is sign-in by mobile number switched on? The sign-in form only offers it when it is. */
+    phone: !!opts.phoneSignin,
   }));
   await app.register(fastifyStatic, { root, prefix: '/manage/', index: ['index.html'], decorateReply: false });
 }

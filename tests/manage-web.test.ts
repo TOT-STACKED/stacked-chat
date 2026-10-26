@@ -106,7 +106,7 @@ describe('/manage is served safely', () => {
     const body = await (await fetch(base + '/manage/config.json')).text();
     expect(body).toContain('anon-test-key');
     expect(body).not.toContain('service-secret-value');
-    expect(Object.keys(JSON.parse(body)).sort()).toEqual(['anonKey', 'dev', 'supabaseUrl']);
+    expect(Object.keys(JSON.parse(body)).sort()).toEqual(['anonKey', 'dev', 'phone', 'supabaseUrl']);
   });
 });
 
@@ -227,6 +227,6 @@ describe('people who sign in with a mobile number', () => {
   });
   it('says texted, not emailed, when everyone was added by number', () => {
     expect(inviteResultText([{ ok: true, via: 'text', invite: 'sent' }, { ok: true, via: 'text', invite: 'sent' }])).toBe('2 invitations texted.');
-    expect(inviteResultText([{ ok: true, via: 'text', invite: 'skipped' }])).toContain('not texted');
+    expect(inviteResultText([{ ok: true, via: 'text', invite: 'failed' }])).toContain('the text did not go');
   });
 });

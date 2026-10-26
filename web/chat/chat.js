@@ -33,7 +33,7 @@ function showSignIn(note) {
   const box = h('div', { class: 'box' }); root.append(h('div', { class: 'signin' }, box));
   const devBox = () => h('div', { class: 'devbox' }, h('span', { text: 'Local preview: sign in as' }), h('div', null, [['staff', 'Staff'], ['mgr', 'Site manager'], ['owner', 'Owner']].map(([r, l]) => h('button', { onclick: async () => { auth.devSignIn(r); await enter(); } }, l))));
   signInForm({
-    auth, box, brand: h('img', { src: logoSrc, alt: 'Stacked' }), title: 'Ask anything about work', note, defaultMode: 'phone', btn: 'btn',
+    auth, box, brand: h('img', { src: logoSrc, alt: 'Stacked' }), title: 'Ask anything about work', note, defaultMode: 'phone', phone: !!cfg.phone, btn: 'btn',
     noteNode: (t) => h('div', { class: 'err', text: t }), errNode: (t) => h('div', { class: 'err', role: 'alert', text: t }),
     extras: () => [h('p', { class: 'muted', style: 'font-size:13.5px;margin:0' }, 'Own the business? ', h('a', { href: '/start/', text: 'Start a free trial' })), cfg.dev ? devBox() : null].filter(Boolean),
     done: () => enter(),

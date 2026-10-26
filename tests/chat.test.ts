@@ -330,7 +330,7 @@ describe('chat API', () => {
   });
   it('serves the chat page safely', async () => {
     const res = await app.inject({ method: 'GET', url: '/chat/config.json' });
-    expect(res.statusCode).toBe(200); expect(Object.keys(res.json()).sort()).toEqual(['anonKey', 'dev', 'supabaseUrl']);
+    expect(res.statusCode).toBe(200); expect(Object.keys(res.json()).sort()).toEqual(['anonKey', 'dev', 'phone', 'supabaseUrl']);
     expect(res.headers['content-security-policy']).toContain("script-src 'self'");
   });
 });

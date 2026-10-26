@@ -140,7 +140,7 @@ export async function renderPeople(main, ctx) {
   async function resend(m) {
     try {
       const r = await api.post(`/api/v1/orgs/${orgId}/members/${m.id}/resend-invite`);
-      toast(r.invite === 'sent' ? `Invitation ${m.phone ? 'texted' : 'sent'} again to ${contactOf(m)}` : `${m.phone ? 'Text messages' : 'Email sending'} are not set up yet, so nothing was sent`);
+      toast(r.invite === 'sent' ? `Invitation ${m.phone ? 'texted' : 'sent'} again to ${contactOf(m)}` : r.invite === 'failed' ? `The ${m.phone ? 'text' : 'email'} could not be sent just now. Try again in a minute, or tell Stacked support.` : `${m.phone ? 'Text messages' : 'Email sending'} are not set up yet, so nothing was sent`);
     } catch (e) { toast(e.message); }
   }
 

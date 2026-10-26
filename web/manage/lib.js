@@ -118,7 +118,7 @@ export function inviteResultText(results) {
   const texted = results.length > 0 && results.every((r) => r.via === 'text');
   const parts = [];
   if (sent) parts.push(`${sent} invitation${sent === 1 ? '' : 's'} ${texted ? 'texted' : 'emailed'}`);
-  if (saved) parts.push(`${saved} saved but not ${texted ? 'texted' : 'emailed'}, use Resend invite to try again`);
+  if (saved) parts.push(`${saved} saved but the ${texted ? 'text' : 'email'} did not go${saved === 1 ? '' : ' for each'}, use Resend invite to try again`);
   if (failed.length) parts.push(`${failed.length} could not be added (${failed.map((f) => (f.email || f.name) + ': ' + f.error).join('; ')})`);
   return parts.join('. ') + '.';
 }

@@ -7,16 +7,18 @@ const saveMode = (m) => { try { localStorage.setItem(MODE_KEY, m); } catch { /* 
 /**
  * The sign-in form shared by Chat and Manage. Staff use their mobile number and a texted code; managers can use that or email.
  * opts: auth, box (the element to draw in), brand (node), title, note, errNode(text), btn (button class), defaultMode ('phone' | 'email'),
- *       extras() (nodes under the form), done() (called once signed in).
+ *       extras() (nodes under the form), done() (called once signed in), phone (is sign-in by mobile number switched on? without it, email only).
  */
 export function signInForm(opts) {
   const { auth, box } = opts;
-  let mode = readMode() === 'email' || readMode() === 'phone' ? readMode() : opts.defaultMode;
+  const phoneOn = opts.phone !== false;
+  let mode = !phoneOn ? 'email' : readMode() === 'email' || readMode() === 'phone' ? readMode() : opts.defaultMode;
   let email = ''; let phone = '';
   const fail = (err, text) => { clear(err); err.append(opts.errNode(text)); };
 
   function tabs() {
     const tab = (m, label) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(mode === m), class: `signtab ${mode === m ? 'on' : ''}`, onclick: () => { mode = m; saveMode(m); start(); } }, label);
+    if (!phoneOn) return null; // email only until mobile sign-in is switched on for this server
     return h('div', { class: 'signtabs', role: 'tablist', 'aria-label': 'How do you want to sign in?' }, tab('phone', 'Mobile number'), tab('email', 'Email'));
   }
   const top = (heading, ...more) => [opts.brand, h('h1', { text: heading }), opts.note ? opts.noteNode(opts.note) : null, ...more].filter(Boolean);

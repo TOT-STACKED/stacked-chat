@@ -8,7 +8,7 @@ import type { Config } from '../../config.js';
  * Manage (sign-in, API client, helpers) so there is one copy of each. /chat/config.json hands the browser ONLY
  * public values. A venue link like /chat/boxpark opens the same app (the page then picks that venue by its slug).
  */
-export async function chatAppRoutes(app: FastifyInstance, opts: { config: Config; devMode?: boolean }) {
+export async function chatAppRoutes(app: FastifyInstance, opts: { config: Config; devMode?: boolean; phoneSignin?: boolean }) {
   const root = path.resolve(__dirname, '../../../web/chat');
   const supabaseOrigin = new URL(opts.config.SUPABASE_URL).origin;
   const csp = [
@@ -25,7 +25,7 @@ export async function chatAppRoutes(app: FastifyInstance, opts: { config: Config
   app.get('/chat', { schema: { hide: true } }, async (_req, reply) => reply.redirect('/chat/', 301));
 
   await app.register(async (inner) => {
-    inner.get('/config.json', { schema: { hide: true } }, async () => ({ supabaseUrl: opts.config.SUPABASE_URL, anonKey: opts.config.SUPABASE_KEY, dev: !!opts.devMode }));
+    inner.get('/config.json', { schema: { hide: true } }, async () => ({ supabaseUrl: opts.config.SUPABASE_URL, anonKey: opts.config.SUPABASE_KEY, dev: !!opts.devMode, phone: !!opts.phoneSignin }));
     await inner.register(fastifyStatic, { root, prefix: '/', index: ['index.html'] });
     // an address that is not a file (a venue link) opens the app; a missing file is a real 404
     inner.setNotFoundHandler((req, reply) => {

@@ -33,7 +33,7 @@ function showSignIn(message) {
     h('div', { class: 'chips' }, [['owner', 'Owner'], ['hq', 'HQ admin'], ['mgr', 'Site manager'], ['staff', 'Staff']].map(([r, label]) =>
       h('button', { class: 'pill', onclick: async () => { auth.devSignIn(r); await enter(); } }, label))));
   signInForm({
-    auth, box, brand: logo(), title: 'Sign in to Manage', note: message, defaultMode: 'email', btn: 'btn cta',
+    auth, box, brand: logo(), title: 'Sign in to Manage', note: message, defaultMode: 'email', phone: !!cfg.phone, btn: 'btn cta',
     noteNode: (t) => h('div', { class: 'result', text: t }), errNode: (t) => h('div', { class: 'banner', role: 'alert', text: t }),
     extras: () => [h('p', { class: 'muted', style: 'font-size:13.5px;margin:0' }, 'Run a hospitality business and new to Stacked Chat? ', h('a', { href: '/start/', text: 'Start your free trial' })), cfg.dev ? devBox() : null].filter(Boolean),
     done: () => enter(),

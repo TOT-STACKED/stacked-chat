@@ -287,7 +287,7 @@ export async function buildApp(
   await app.register(async (instance) => meRoutes(instance));
   await app.register(async (instance) => orgRoutes(instance, { repo, idempotency, mailer, sms, publicUrl: config.PUBLIC_URL, gate, onSiteAdded: (orgId) => { void billing?.syncQuietly(orgId); } }));
   await app.register(async (instance) => teamRoutes(instance, { repo, gate }));
-  await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode }));
+  await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode, phoneSignin: !!phoneAuth }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
   const pictureReader = overrides.pictureReader !== undefined ? overrides.pictureReader : (config.ANTHROPIC_API_KEY ? createAnthropicPictureReader({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null);
   await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate, files: overrides.storage ?? null, reader: pictureReader }));
@@ -300,7 +300,7 @@ export async function buildApp(
   await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET, knowledge, drafter: overrides.checklistDrafter !== undefined ? overrides.checklistDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicChecklistDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, comms, training, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
-  await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
+  await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode, phoneSignin: !!phoneAuth }));
   const customers = repo ? createCustomers({ repo, mailer, publicUrl: config.PUBLIC_URL, billing, notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) }) : null;
   await app.register(async (instance) => consoleRoutes(instance, { console: consoleSvc, staff: parseStaff(config.STACKED_STAFF_EMAILS), idempotency, customers, connections: {
     info: () => ({

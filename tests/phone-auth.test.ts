@@ -185,6 +185,11 @@ describe('phone sign-in and adding staff by number, through the app', () => {
     const r = await call('POST', '/api/v1/auth/phone/start', { phone: '07700 900555' });
     expect(r.statusCode).toBe(200); expect(r.json()).toEqual({ ok: true }); expect(sms.sent).toHaveLength(0);
   });
+  it('tells the sign-in pages whether mobile sign-in is on, so they only offer it when it works', async () => {
+    for (const url of ['/chat/config.json', '/manage/config.json']) expect((await call('GET', url)).json().phone).toBe(true);
+    const off = await buildApp(testConfig, { repo, sms: null, verifyToken: fakeVerifier({}) });
+    for (const url of ['/chat/config.json', '/manage/config.json']) expect((await off.inject({ method: 'GET', url })).json().phone).toBe(false);
+  });
   it('is off, saying so, when texts or the secret are not set up', async () => {
     const off = await buildApp(testConfig, { repo, sms: null, verifyToken: fakeVerifier({}) });
     expect((await off.inject({ method: 'POST', url: '/api/v1/auth/phone/start', payload: { phone: '07700 900123' } })).statusCode).toBe(503);
