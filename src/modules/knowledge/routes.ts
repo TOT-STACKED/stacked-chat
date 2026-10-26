@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { ApiHttpError, badRequest, forbidden, notFound } from '../../lib/errors.js';
 import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
 import { assertOrgAccess, userOnly } from '../access.js';
+import { UNITS, type AiBudget } from '../../lib/ai-budget.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import { MAX_UPLOAD_BYTES, extractText, titleFromFilename } from './extract.js';
 import { MAX_IMAGE_BYTES, imageFileName, imageTitle, sniffImage } from './image.js';
@@ -15,7 +16,7 @@ import type { ItemRow } from './store.js';
 
 /** Private file storage for pictures, and the model that reads writing off them. Either can be absent (the buttons then say so). */
 export interface FileStore { /** the path of a file in OUR storage, or null for any other address */ pathFromUrl?(url: unknown): string | null; signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>>; uploadObject?(path: string, data: Uint8Array, contentType: string): Promise<string> }
-interface Ctx { knowledge: Knowledge | null; gate: (orgId: string) => Promise<void>; files?: FileStore | null; reader?: PictureReader | null }
+interface Ctx { aiBudget?: AiBudget | null; knowledge: Knowledge | null; gate: (orgId: string) => Promise<void>; files?: FileStore | null; reader?: PictureReader | null }
 
 const Title = z.string().trim().min(1).max(120);
 const Status = z.enum(['draft', 'published']);
@@ -200,6 +201,7 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
       data = Buffer.concat(parts);
     } catch (e) { if (e instanceof ApiHttpError) throw e; throw new ApiHttpError(502, 'picture_unavailable', 'We could not open that picture. Please try again.'); }
     if (data.length > MAX_READABLE_BYTES) throw badRequest('That picture is too large to read. Upload a smaller version (under 5 MB).');
+    await ctx.aiBudget?.spend(orgId, UNITS.picture);
     const text = await ctx.reader.read({ data, mediaType: sniffImage(data) });
     if (!text) throw new ApiHttpError(502, 'reader_failed', 'We could not read that picture just now. You can type the details in instead.');
     return { text };

@@ -4,11 +4,12 @@ import { z } from 'zod';
 import { forbidden, notFound } from '../../lib/errors.js';
 import { atLeast, bestRole, canManageMembers, type UserPrincipal } from '../../lib/permissions.js';
 import { assertOrgAccess, userOnly } from '../access.js';
+import { UNITS, type AiBudget } from '../../lib/ai-budget.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import type { Insights } from './service.js';
 import type { InsightsStore } from './store.js';
 
-interface Ctx { insights: Insights | null; store: InsightsStore | null; gate: (orgId: string) => Promise<void> }
+interface Ctx { insights: Insights | null; store: InsightsStore | null; gate: (orgId: string) => Promise<void>; aiBudget?: AiBudget | null }
 
 const Days = z.coerce.number().int().default(30);
 
@@ -71,6 +72,7 @@ export async function insightsRoutes(app: FastifyInstance, ctx: Ctx) {
     assertOrgAccess(req, orgId);
     await ctx.gate(orgId);
     const siteIds = await visibleSites(actor, orgId);
+    await ctx.aiBudget?.spend(orgId, Math.min(req.body.keys.length, 10) * 2); // each question drafted is an AI call
     return svc().draftAnswers(orgId, { keys: req.body.keys, days: req.body.days, siteIds, by: actor.email, canWriteTo: (s) => canManageMembers(actor, orgId, s) });
   });
 }

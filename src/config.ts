@@ -35,6 +35,10 @@ export const schema = z.object({
   /** Fair use: a venue over either limit is flagged for review, never blocked. */
   FAIR_USE_AI_QUESTIONS: z.coerce.number().int().positive().default(2000),
   FAIR_USE_STAFF_PER_VENUE: z.coerce.number().int().positive().default(75),
+  /** Daily AI ceilings, in questions (a chat answer is 1, a drafted course 8). A company, a free trial, and everyone together. */
+  AI_DAILY_CAP_ORG: z.coerce.number().int().positive().default(3000),
+  AI_DAILY_CAP_TRIAL: z.coerce.number().int().positive().default(200),
+  AI_DAILY_CAP_ALL: z.coerce.number().int().positive().default(10000),
   CRON_SECRET: z.string().optional(),
   /** A Slack Incoming Webhook for the support channel. Optional: without it, support requests use SLACK_WEBHOOK_URL. */
   SUPPORT_SLACK_WEBHOOK_URL: z.string().url().optional(),

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { forbidden, notFound } from '../../lib/errors.js';
 import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
 import { assertOrgAccess, userOnly } from '../access.js';
+import { UNITS, type AiBudget } from '../../lib/ai-budget.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import { ApiHttpError } from '../../lib/errors.js';
 import { RateLimiter } from '../../lib/rate-limit.js';
@@ -12,7 +13,7 @@ import { MAX_SOURCE_CHARS, tooShort, type CourseDrafter } from './drafter.js';
 import type { Training } from './service.js';
 import type { CourseRow } from './store.js';
 
-interface Ctx { training: Training | null; gate: (orgId: string) => Promise<void>; knowledge?: Knowledge | null; drafter?: CourseDrafter | null }
+interface Ctx { aiBudget?: AiBudget | null; training: Training | null; gate: (orgId: string) => Promise<void>; knowledge?: Knowledge | null; drafter?: CourseDrafter | null }
 
 const Stats = z.object({ recipients: z.number(), done: z.number(), renew: z.number(), todo: z.number() });
 const Lesson = z.object({ id: z.string(), title: z.string(), body: z.string(), url: z.string().nullable() });
@@ -109,6 +110,7 @@ export async function trainingRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!item || item.kind !== 'document' || !canSee(p, orgId, item.site_id)) throw notFound('Document not found');
     const text = (item.body ?? '').trim();
     if (text.length < 200) throw tooShort();
+    await ctx.aiBudget?.spend(orgId, UNITS.draft);
     const d = await ctx.drafter.draft({ title: item.title, text });
     if (!d || !d.lessons.length) throw new ApiHttpError(502, 'draft_failed', 'We could not draft a course from that just now. Please try again.');
     return { ...d, title: d.title || item.title, source: { title: item.title, truncated: text.length > MAX_SOURCE_CHARS } };

@@ -33,6 +33,8 @@ async function trainingNotesFor(load: (who: Who) => Promise<TrainingStatus[]>, w
 export const WORK_INTENT = /\b(to do|todo|to-do|tasks?|checklists?|check lists?|opening|closing|open up|close up|updates?|announcements?|news|outstanding|overdue|what (?:do|should|have|am|is|are)\b.{0,40}\b(?:today|now|first|next|left|on)|what'?s (?:on|left|next)|anything (?:for me|i need|i should|to do)|my (?:day|shift|jobs?|list))\b/i;
 
 export interface ChatDeps {
+  /** counts one AI call against today's allowance, or refuses it (a 429 the person can read) */
+  budget?: (orgId: string, units: number) => Promise<void>;
   /** this person's work (checklists, updates, training) as short lines, plus pages the chat can search and quote */
   work?: (who: Who) => Promise<WorkContext>;
   /** for managers: how their people are getting on with training, updates and checklists, as short lines */
@@ -159,6 +161,7 @@ export function createChat(deps: ChatDeps) {
     // the API needs the conversation to start with the person
     while (turns.length > 1 && turns[0]!.role !== 'user') turns.shift();
 
+    await deps.budget?.(who.orgId, 1);
     const raw = await deps.model.complete({ system, messages: turns });
     if (!raw) throw new ApiHttpError(503, 'assistant_unavailable', 'The assistant could not answer just now. Please try again in a moment.');
     const tagged = takeNpsTag(raw);

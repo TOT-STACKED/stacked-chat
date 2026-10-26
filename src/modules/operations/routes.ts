@@ -6,6 +6,7 @@ import { safeEqualStr } from '../billing/util.js';
 import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
 import type { Repo } from '../../lib/repo.js';
 import { assertOrgAccess, userOnly } from '../access.js';
+import { UNITS, type AiBudget } from '../../lib/ai-budget.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import { RateLimiter } from '../../lib/rate-limit.js';
 import type { Knowledge } from '../knowledge/service.js';
@@ -13,7 +14,7 @@ import { MAX_SOURCE_CHARS, type ChecklistDrafter } from './drafter.js';
 import { KINDS, MAX_ITEM_CHARS, MAX_ITEMS, type Ops } from './service.js';
 import type { ChecklistRow } from './store.js';
 
-interface Ctx { ops: Ops | null; repo?: Repo; gate: (orgId: string) => Promise<void>; reminders?: (() => Promise<{ checked: number; sent: number }>) | null; cronSecret?: string; knowledge?: Knowledge | null; drafter?: ChecklistDrafter | null }
+interface Ctx { aiBudget?: AiBudget | null; ops: Ops | null; repo?: Repo; gate: (orgId: string) => Promise<void>; reminders?: (() => Promise<{ checked: number; sent: number }>) | null; cronSecret?: string; knowledge?: Knowledge | null; drafter?: ChecklistDrafter | null }
 
 export const ChecklistOut = z.object({
   id: Id, org_id: Id, site_id: Id.nullable(), title: z.string(), kind: z.enum(['opening', 'closing', 'custom']),
@@ -114,6 +115,7 @@ export async function operationsRoutes(app: FastifyInstance, ctx: Ctx) {
       if (text) source = { title: item.title, text };
     }
     const venue = req.body.site_id ? (await ctx.repo!.listSites(orgId)).find((s) => s.id === req.body.site_id)?.name ?? null : null;
+    await ctx.aiBudget?.spend(orgId, UNITS.draft);
     const d = await ctx.drafter.draft({ brief: req.body.brief, kind: req.body.kind as 'opening' | 'closing' | 'custom', venue, source });
     if (!d || !d.items.length) throw new ApiHttpError(502, 'draft_failed', 'We could not draft a checklist just now. Please try again.');
     return { title: d.title, items: d.items, source: source ? { title: source.title, truncated } : null };

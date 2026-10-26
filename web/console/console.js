@@ -123,7 +123,7 @@ async function connections() {
       row('Email', d.email, d.email ? `Sending as ${d.email_from || 'the default address'}.` : 'Set RESEND_API_KEY on Render.'),
       row('Support inbox', !!d.support_inbox, d.support_inbox ? `Get help messages are also emailed to ${d.support_inbox}.` : 'Optional. Set SUPPORT_EMAIL to get them by email as well.'),
       row('Text messages (sign-in codes, invitations)', d.sms && d.phone_signin, d.sms_last_error ? `The last text failed. Twilio said: ${d.sms_last_error.message}${d.sms_last_error.code ? ` (code ${d.sms_last_error.code})` : ''}.` : d.sms && d.phone_signin ? `Sending from ${d.sms_from || 'the default sender'}.` : d.sms ? 'Twilio is set, but AUTH_SECRET (32+ characters) is missing, so sign-in by number is off.' : 'Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM and AUTH_SECRET.'),
-      row('AI (answers, drafts, reading pictures)', d.ai, d.ai ? 'Anthropic key is set.' : 'Set ANTHROPIC_API_KEY.'),
+      row('AI (answers, drafts, reading pictures)', d.ai, d.ai ? `Anthropic key is set.${d.ai_today ? ` Today: ${d.ai_today.total} of ${d.ai_today.all} AI calls across ${d.ai_today.companies} compan${d.ai_today.companies === 1 ? 'y' : 'ies'}.` : ''}` : 'Set ANTHROPIC_API_KEY.'),
       row('Picture storage', d.pictures, d.pictures ? 'Pictures and files can be stored.' : 'Needs the Supabase service key.'),
       row('Billing (Stripe)', d.billing, d.billing ? 'Billing is switched on.' : 'Stripe settings are not complete.'),
       row('Nightly job secret', d.nightly_job_secret, d.nightly_job_secret ? 'The nightly billing job can call the app.' : 'Set CRON_SECRET.')),

@@ -59,6 +59,7 @@ import { createSupabasePhoneCodeStore, type PhoneCodeStore } from './modules/pho
 import { phoneAuthRoutes } from './modules/phone-auth/routes.js';
 import { createTwilioSender, type SmsSender } from './lib/sms.js';
 import { isPhoneKey } from './lib/phone.js';
+import { createAiBudget, UNITS, type AiBudget } from './lib/ai-budget.js';
 import { createWork } from './modules/chat/work.js';
 import { createTeam } from './modules/chat/team.js';
 import { createAnthropicChecklistDrafter, type ChecklistDrafter } from './modules/operations/drafter.js';
@@ -89,6 +90,8 @@ export interface Deps {
   repo?: Repo;
   verifyToken?: TokenVerifier;
   mailer?: Mailer;
+  /** daily AI allowance; null = unlimited (tests) */
+  aiBudget?: AiBudget | null;
   /** sends text messages; null = switched off */
   sms?: SmsSender | null;
   phoneCodeStore?: PhoneCodeStore;
@@ -208,6 +211,13 @@ export async function buildApp(
   const conversationStore = overrides.conversationStore ?? (db ? createSupabaseConversationStore(db) : null);
   const chatModel = overrides.chatModel !== undefined ? overrides.chatModel : (config.ANTHROPIC_API_KEY ? createAnthropicChatModel({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null);
   const adopted = new Map<string, number>(); // organisations whose older content we brought into the catalogue recently
+  // A daily allowance for AI that blocks (billing's fair-use numbers only flag). The first time a company or the whole service hits it each day, Stacked is told.
+  const alertNotify = overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null);
+  const aiBudget: AiBudget | null = overrides.aiBudget !== undefined ? overrides.aiBudget : createAiBudget({
+    perOrg: config.AI_DAILY_CAP_ORG, perTrial: config.AI_DAILY_CAP_TRIAL, all: config.AI_DAILY_CAP_ALL, now: overrides.now,
+    isTrial: billing ? async (orgId) => (await billing.stateFor(orgId)).banner === 'trial' : undefined,
+    orgName: async (id) => (await repo?.getOrg(id))?.name ?? null, notify: alertNotify,
+  });
   const chat: Chat | null = knowledge && conversationStore ? createChat({
     items: async (orgId) => {
       if (!adopted.has(orgId) || Date.now() - adopted.get(orgId)! > 300_000) { adopted.set(orgId, Date.now()); return knowledge.list(orgId); }
@@ -217,6 +227,7 @@ export async function buildApp(
     signUrls: overrides.storage ? async (urls) => overrides.storage!.signUrls(urls) as Promise<Array<string | null>> : undefined,
     onAnswered: (siteId) => { void billing?.recordQuestion(siteId); },
     training: training ? (who) => training.listFor({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds }) : undefined,
+    budget: aiBudget ? (orgId, units) => aiBudget.spend(orgId, units) : undefined,
     work: ops || comms || training ? createWork({ ops, comms, training }) : undefined,
     team: repo && (ops || comms || training) ? createTeam({ repo, ops, comms, training }) : undefined,
     sensitive: sensitiveSettings ? (orgId) => sensitiveSettings.enabled(orgId) : undefined,
@@ -300,14 +311,14 @@ export async function buildApp(
   await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode, phoneSignin: !!phoneAuth }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
   const pictureReader = overrides.pictureReader !== undefined ? overrides.pictureReader : (config.ANTHROPIC_API_KEY ? createAnthropicPictureReader({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null);
-  await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate, files: overrides.storage ?? null, reader: pictureReader }));
+  await app.register(async (instance) => knowledgeRoutes(instance, { knowledge, gate, aiBudget, files: overrides.storage ?? null, reader: pictureReader }));
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
   await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
   await app.register(async (instance) => communicateRoutes(instance, { comms, gate }));
-  await app.register(async (instance) => trainingRoutes(instance, { training, gate, knowledge, drafter: overrides.courseDrafter !== undefined ? overrides.courseDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicCourseDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
+  await app.register(async (instance) => trainingRoutes(instance, { training, gate, aiBudget, knowledge, drafter: overrides.courseDrafter !== undefined ? overrides.courseDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicCourseDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
   await app.register(async (instance) => phoneAuthRoutes(instance, { phoneAuth, now: overrides.now ? () => overrides.now!().getTime() : undefined }));
   await app.register(async (instance) => supportRoutes(instance, { support }));
-  await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET, knowledge, drafter: overrides.checklistDrafter !== undefined ? overrides.checklistDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicChecklistDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
+  await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, aiBudget, reminders: app.opsReminders, cronSecret: config.CRON_SECRET, knowledge, drafter: overrides.checklistDrafter !== undefined ? overrides.checklistDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicChecklistDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, comms, training, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode, phoneSignin: !!phoneAuth }));
@@ -318,7 +329,7 @@ export async function buildApp(
       slack_alerts: !!config.SLACK_WEBHOOK_URL, slack_support: !!config.SUPPORT_SLACK_WEBHOOK_URL, slack_support_falls_back: !config.SUPPORT_SLACK_WEBHOOK_URL && !!config.SLACK_WEBHOOK_URL,
       email: !!config.RESEND_API_KEY, email_from: config.RESEND_FROM ?? null, support_inbox: config.SUPPORT_EMAIL ?? null,
       sms: !!sms, sms_from: sms ? config.TWILIO_FROM ?? null : null, phone_signin: !!phoneAuth, sms_last_error: sms?.lastError?.() ?? null,
-      ai: !!config.ANTHROPIC_API_KEY, pictures: !!overrides.storage, database_admin: !!config.SUPABASE_SERVICE_KEY, billing: !!billing, nightly_job_secret: !!config.CRON_SECRET,
+      ai: !!config.ANTHROPIC_API_KEY, ai_today: aiBudget?.snapshot() ?? null, pictures: !!overrides.storage, database_admin: !!config.SUPABASE_SERVICE_KEY, billing: !!billing, nightly_job_secret: !!config.CRON_SECRET,
     }),
     test: async (to) => {
       const alerts = await checkSlack(config.SLACK_WEBHOOK_URL, '✅ *Stacked Chat test:* alerts (sign-ups, billing, help requests) are connected to this channel.');
@@ -331,7 +342,7 @@ export async function buildApp(
   await app.register(async (instance) => signupRoutes(instance, { signup: repo && customers ? createSignup({ repo, customers }) : null, now: overrides.now ? () => overrides.now!().getTime() : undefined, ...overrides.signupLimits }));
   await app.register(async (instance) => startAppRoutes(instance));
   await app.register(async (instance) => consoleAppRoutes(instance, { config, devMode: overrides.devMode }));
-  await app.register(async (instance) => insightsRoutes(instance, { insights, store: insightsStore ?? null, gate }));
+  await app.register(async (instance) => insightsRoutes(instance, { insights, store: insightsStore ?? null, gate, aiBudget }));
   const billingCtx = { billing, config: billingCfg.ok ? billingCfg.config : null, notConfiguredReason: billingReason };
   await app.register(async (instance) => billingRoutes(instance, billingCtx));
   await app.register(async (instance) => billingWebhookRoute(instance, billingCtx));
