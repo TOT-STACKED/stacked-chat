@@ -27,6 +27,8 @@ const schema = z.object({
   FAIR_USE_AI_QUESTIONS: z.coerce.number().int().positive().default(2000),
   FAIR_USE_STAFF_PER_VENUE: z.coerce.number().int().positive().default(75),
   CRON_SECRET: z.string().optional(),
+  /** Where "Get help" requests are also emailed (replying goes straight to the customer). Optional: Slack still gets them. */
+  SUPPORT_EMAIL: z.string().email().optional(),
   /** Who may open the Stacked staff Console: a comma-separated list of verified email addresses. Empty = Console off. */
   STACKED_STAFF_EMAILS: z.string().optional(),
   /** Insights: lets Stacked Chat write DRAFT answers for questions it could not answer. Optional: without it, drafts are blank templates. */

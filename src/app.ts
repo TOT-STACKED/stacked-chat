@@ -60,6 +60,8 @@ import { communicateRoutes } from './modules/communicate/routes.js';
 import { createTraining, type Training } from './modules/training/service.js';
 import { createSupabaseTrainingStore, type TrainingStore } from './modules/training/store.js';
 import { trainingRoutes } from './modules/training/routes.js';
+import { createSupport, type Support } from './modules/support/service.js';
+import { supportRoutes } from './modules/support/routes.js';
 import { createReminders } from './modules/operations/reminders.js';
 import { createSignup } from './modules/signup/service.js';
 import { signupRoutes } from './modules/signup/routes.js';
@@ -164,6 +166,8 @@ export async function buildApp(
   const comms: Comms | null = commsStore && repo ? createComms({ store: commsStore, repo, mailer, publicUrl: config.PUBLIC_URL, now: overrides.now }) : null;
   const trainingStore = overrides.trainingStore ?? (db ? createSupabaseTrainingStore(db) : null);
   const training: Training | null = trainingStore && repo ? createTraining({ store: trainingStore, repo, now: overrides.now }) : null;
+  const supportNotify = overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null);
+  const support: Support | null = repo ? createSupport({ repo, tickets: overrides.ticketStore ?? (db ? createSupabaseTicketStore(db) : null), notify: supportNotify, mailer, supportEmail: config.SUPPORT_EMAIL, now: overrides.now ? () => overrides.now!().getTime() : undefined }) : null;
   const reminders = repo && opsStore && mailer ? createReminders({ store: opsStore, repo, mailer, publicUrl: config.PUBLIC_URL, now: overrides.now, log: app.log }) : null;
   app.decorate('opsReminders', reminders ? () => reminders.run() : null);
   const conversationStore = overrides.conversationStore ?? (db ? createSupabaseConversationStore(db) : null);
@@ -263,6 +267,7 @@ export async function buildApp(
   await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
   await app.register(async (instance) => communicateRoutes(instance, { comms, gate }));
   await app.register(async (instance) => trainingRoutes(instance, { training, gate }));
+  await app.register(async (instance) => supportRoutes(instance, { support }));
   await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, comms, training, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));

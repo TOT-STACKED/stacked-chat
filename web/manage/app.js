@@ -1,4 +1,4 @@
-import { clear, h, toast } from './dom.js';
+import { clear, h, modal, toast } from './dom.js';
 import { createAuth } from './auth.js';
 import { createApi } from './api.js';
 import { renderPeople } from './people.js';
@@ -82,6 +82,31 @@ function showSignIn(message) {
   stepEmail(message);
 }
 
+// ---- Get help: a message to Stacked support, straight to the team's Slack, answered by email --------------------
+function openHelp() {
+  modal('Get help', (close) => {
+    let kind = 'question';
+    const kinds = [['problem', 'Something is not working'], ['question', 'A question'], ['idea', 'An idea']];
+    const chips = h('div', { class: 'days', role: 'radiogroup', 'aria-label': 'What is this about?' }, kinds.map(([k, label]) =>
+      h('button', { type: 'button', role: 'radio', class: `pill ${kind === k ? 'on' : ''}`, 'aria-checked': String(kind === k), onclick: (e) => { kind = k; chips.querySelectorAll('.pill').forEach((b) => { b.classList.toggle('on', b === e.currentTarget); b.setAttribute('aria-checked', String(b === e.currentTarget)); }); } }, label)));
+    const text = h('textarea', { id: 'help-msg', rows: 6, maxlength: 2000, placeholder: 'Tell us what you need. If something is not working, say what you were doing and what you saw.', style: 'min-height:140px' });
+    const err = h('div'); const send = h('button', { class: 'btn cta', onclick: submit }, 'Send to Stacked support');
+    const body = h('div', { class: 'stack' });
+    async function submit() {
+      clear(err);
+      if (text.value.trim().length < 3) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Tell us a little about what you need.' })); return; }
+      send.disabled = true; send.textContent = 'Sending…';
+      try {
+        await api.post('/api/v1/support', { message: text.value.trim(), kind, org_id: state.orgId, page: location.hash || '#/home', source: 'manage', device: `${navigator.platform || ''} · ${navigator.userAgent}`.slice(0, 300) });
+        clear(body); body.append(h('div', { class: 'empty-state', style: 'padding:24px 8px' }, h('b', { text: 'Sent. We have it.' }), h('p', { text: `Someone from Stacked will email you back at ${auth.email()}.` })), h('div', { class: 'row' }, h('button', { class: 'btn cta', onclick: close }, 'Done')));
+      } catch (e) { send.disabled = false; send.textContent = 'Send to Stacked support'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
+    }
+    body.append(h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'What is this about?' }), chips), h('div', { class: 'field' }, h('label', { for: 'help-msg', text: 'Your message' }), text),
+      h('span', { class: 'hint', text: `It goes straight to the Stacked team, who reply by email to ${auth.email()}.` }), err, h('div', { class: 'row' }, h('button', { class: 'btn line', onclick: close }, 'Cancel'), send));
+    return body;
+  });
+}
+
 // ---- after sign in ---------------------------------------------------------------------------
 async function enter() {
   try {
@@ -142,11 +167,12 @@ function drawShell() {
       SOON_NAV.length ? h('nav', { class: 'nav soonwrap', 'aria-label': 'Coming next', style: 'margin-top:8px' }, h('span', { class: 'navlabel', text: 'Coming next' }),
         SOON_NAV.map(([k, label]) => h('span', { class: 'soonitem' }, tile(k, 28), label, h('span', { class: 'tag', text: 'Soon' })))) : null,
       h('div', { class: 'grow' }),
+      h('button', { class: 'btn line small helpside', 'aria-label': 'Get help', title: 'Get help', onclick: openHelp }, h('span', { class: 'hl', text: 'Get help' })),
       h('button', { class: 'btn line small mobsignout', onclick: signOut }, 'Sign out')),
     h('div', { class: 'content' },
       h('header', { class: 'top' }, crumb,
         h('div', { class: 'userbox' }, h('div', { class: 'who' }, h('b', { text: auth.email() }), h('span', { text: org.name })),
-          avatar(auth.email() || '?'), h('button', { class: 'btn line small', onclick: signOut }, 'Sign out'))),
+          h('button', { class: 'btn line small', onclick: openHelp }, 'Get help'), avatar(auth.email() || '?'), h('button', { class: 'btn line small', onclick: signOut }, 'Sign out'))),
       main)));
 }
 

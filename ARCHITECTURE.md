@@ -190,3 +190,8 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 - **Staff:** `GET /api/v1/chat/training?site_id=` (their courses and status), `GET …/:id` (lessons and quiz questions, **never the answers**), `POST …/:id/complete` (answers are scored on the server; a pass records the sign-off, a miss returns which questions were wrong and nothing else). A course with no quiz is signed off with `confirm: true`.
 - **Status:** done, "renew" once `renew_months` have passed since the last sign-off, otherwise to do. Recipients are the same people as for updates (`recipientsOf`).
 - **Chat header:** checklists, updates and training now sit behind one "work" button with a combined count, so the header fits a phone. Manage's phone bottom bar scrolls sideways.
+
+## Get help (support)
+
+- `POST /api/v1/support` (any signed-in person, never gated by billing): `{ message, kind: problem|question|idea, org_id?, site_id?, page?, source: manage|chat, device? }`. It posts to the support Slack channel at once (who, role, company, venue, where, device), files a `tickets` row when a venue is known, emails the support inbox if `SUPPORT_EMAIL` is set (reply-to is the customer, so replying answers them), and sends the customer a receipt. 6 messages an hour per person.
+- Manage: "Get help" in the top bar (a "?" on a phone). Chat: "Get help" in the work menu.

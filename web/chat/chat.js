@@ -19,7 +19,7 @@ const svg = (d, size = 20, extra = {}) => {
   for (const p of [].concat(d)) { const e = document.createElementNS(ns, 'path'); e.setAttribute('d', p); s.append(e); }
   return s;
 };
-const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z', list: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 3h6v4H9z', 'M9 13l2 2 4-4'], tick: 'M5 12l5 5L20 7', hub: ['M4 5h7v7H4z', 'M13 5h7v7h-7z', 'M4 14h7v6H4z', 'M13 14h7v6h-7z'], cap: ['M22 10L12 5 2 10l10 5 10-5z', 'M6 12v5c3 2 9 2 12 0v-5', 'M22 10v6'], back: 'M15 6l-6 6 6 6', mega: ['M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z', 'M15 9a4 4 0 0 1 0 6', 'M18 6.5a8 8 0 0 1 0 11'] };
+const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z', list: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 3h6v4H9z', 'M9 13l2 2 4-4'], tick: 'M5 12l5 5L20 7', help: ['M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', 'M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7', 'M12 17h.01'], hub: ['M4 5h7v7H4z', 'M13 5h7v7h-7z', 'M4 14h7v6H4z', 'M13 14h7v6h-7z'], cap: ['M22 10L12 5 2 10l10 5 10-5z', 'M6 12v5c3 2 9 2 12 0v-5', 'M22 10v6'], back: 'M15 6l-6 6 6 6', mega: ['M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z', 'M15 9a4 4 0 0 1 0 6', 'M18 6.5a8 8 0 0 1 0 11'] };
 const logoSrc = '/manage/assets/logo-stacked.png';
 const markSrc = '/manage/assets/favicon-192.png'; // the Stacked mark: the chat wears it unless a venue brings its own logo
 const isHttps = (u) => /^https:\/\//i.test(String(u || ''));
@@ -282,6 +282,7 @@ function hubItems() {
     { label: 'Checklists', note: 'Today', icon: ICON.list, count: open, show: st.lists.length > 0, go: () => openChecklists() },
     { label: 'Updates', note: 'From your managers', icon: ICON.mega, count: st.unread || 0, show: st.updates.length > 0, go: () => openUpdates() },
     { label: 'Training', note: 'Courses and sign-offs', icon: ICON.cap, count: st.todo || 0, show: st.courses.length > 0, go: () => openTraining() },
+    { label: 'Get help', note: 'Message Stacked support', icon: ICON.help, count: 0, show: true, go: () => openSupport() },
   ].filter((x) => x.show);
 }
 function paintHub() {
@@ -297,6 +298,32 @@ function toggleHub() {
     svg(x.icon, 22), h('span', { class: 'hubtxt' }, h('b', { text: x.label }), h('small', { text: x.note })), x.count ? h('i', { class: 'chkdot inline', text: String(x.count) }) : null)));
   const away = (e) => { if (!menu.contains(e.target) && !hubBtn.contains(e.target)) { menu.remove(); document.removeEventListener('click', away, true); } };
   document.body.append(menu); setTimeout(() => document.addEventListener('click', away, true), 0);
+}
+
+// ---- Get help: a message to Stacked support. Straight to their Slack; they reply by email. -----------------------
+function openSupport() {
+  const scrim = h('div', { class: 'scrim' }); const body = h('div', { class: 'sheetbody' });
+  const close = () => { scrim.remove(); sheet.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const sheet = h('section', { class: 'sheet small', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Get help' },
+    h('header', null, h('h2', { text: 'Get help' }), h('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: close }, svg(ICON.close))), body);
+  scrim.addEventListener('click', close); document.addEventListener('keydown', onKey); document.body.append(scrim, sheet);
+  let kind = 'question'; const kinds = [['problem', 'Something is not working'], ['question', 'A question'], ['idea', 'An idea']];
+  const chips = h('div', { class: 'kindrow', role: 'radiogroup', 'aria-label': 'What is this about?' }, kinds.map(([k, label]) =>
+    h('button', { type: 'button', role: 'radio', class: `kind ${kind === k ? 'on' : ''}`, 'aria-checked': String(kind === k), onclick: (e) => { kind = k; chips.querySelectorAll('.kind').forEach((b) => { b.classList.toggle('on', b === e.currentTarget); b.setAttribute('aria-checked', String(b === e.currentTarget)); }); } }, label)));
+  const text = h('textarea', { rows: 6, maxlength: 2000, placeholder: 'Tell us what you need. If something is not working, say what you were doing and what you saw.', 'aria-label': 'Your message' });
+  const err = h('div'); const send = h('button', { class: 'btn' }, 'Send to Stacked support');
+  send.onclick = async () => {
+    clear(err);
+    if (text.value.trim().length < 3) { err.append(h('div', { class: 'err', role: 'alert', text: 'Tell us a little about what you need.' })); return; }
+    send.disabled = true; send.textContent = 'Sending…';
+    try {
+      await api.post('/api/v1/support', { message: text.value.trim(), kind, org_id: st.site.org_id, site_id: st.site.site_id, source: 'chat', device: `${navigator.platform || ''} · ${navigator.userAgent}`.slice(0, 300) });
+      clear(body); body.append(h('div', { class: 'passed' }, h('span', { class: 'tickbig' }, svg(ICON.tick, 28, { 'stroke-width': 3 })), h('b', { text: 'Sent. We have it.' }), h('p', { class: 'muted', text: `Someone from Stacked will email you back at ${auth.email()}.` }), h('button', { class: 'btn', onclick: close }, 'Done')));
+    } catch (e) { send.disabled = false; send.textContent = 'Send to Stacked support'; err.append(h('div', { class: 'err', role: 'alert', text: e.message })); }
+  };
+  body.append(h('p', { class: 'muted', style: 'margin:0', text: 'This goes straight to the Stacked team. For a question about how things work at your venue, use “Ask my manager” under an answer instead.' }), chips, text, err, send);
+  text.focus();
 }
 
 // ---- checklists: today's opening / closing lists for this venue --------------------------------------------------
