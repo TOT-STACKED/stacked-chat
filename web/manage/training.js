@@ -1,5 +1,6 @@
 import { clear, h, modal, toast } from './dom.js';
 import { atLeast, audienceLabel, audienceParams, audienceValue, bestRole, canManage } from './lib.js';
+import { COURSE_TEMPLATES } from './templates.js';
 import { pageHeader, tile } from './ui.js';
 
 const day = (iso) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/London' });
@@ -34,13 +35,13 @@ export async function renderTraining(main, ctx) {
     clear(main);
     const canAdd = scopes().length > 0;
     main.append(pageHeader({ icon: 'training', title: 'Training', sub: 'Short courses with a quiz, and a record of who has signed them off.',
-      actions: canAdd ? [h('button', { class: 'btn line', onclick: () => openDraft() }, 'Draft from a document'), h('button', { class: 'btn cta', onclick: () => openEditor() }, 'New course')] : null }));
+      actions: canAdd ? [h('button', { class: 'btn line', onclick: () => openTemplates() }, 'Ready-made courses'), h('button', { class: 'btn line', onclick: () => openDraft() }, 'Draft from a document'), h('button', { class: 'btn cta', onclick: () => openEditor() }, 'New course')] : null }));
     if (st.error) { main.append(h('div', { class: 'banner', role: 'alert' }, st.error + ' ', h('button', { class: 'lnk', onclick: load }, 'Try again'))); return; }
     if (st.loading) { main.append(h('p', { class: 'muted', text: 'Loading…' })); return; }
     if (!st.items.length) {
       main.append(h('div', { class: 'card empty-state' }, tile('training', 64), h('h2', { text: 'Write your first course' }),
         h('p', { text: 'Food safety, fire, allergens, how you do things here. Write a few short lessons and a quick quiz. Your team takes it on their phone, and you keep the record of who passed and when to refresh it.' }),
-        canAdd ? h('div', { class: 'actions', style: 'justify-content:center' }, h('button', { class: 'btn cta', onclick: () => openDraft() }, 'Draft one from a document'), h('button', { class: 'btn line', onclick: () => openEditor() }, 'Write a course')) : null));
+        canAdd ? h('div', { class: 'actions', style: 'justify-content:center' }, h('button', { class: 'btn cta', onclick: () => openTemplates() }, 'Start from a ready-made course'), h('button', { class: 'btn line', onclick: () => openDraft() }, 'Draft one from a document'), h('button', { class: 'btn line', onclick: () => openEditor() }, 'Write a course')) : null));
       return;
     }
     main.append(h('div', { class: 'upgrid' }, st.items.map(card)));
@@ -73,6 +74,15 @@ export async function renderTraining(main, ctx) {
       })();
       return body;
     });
+  }
+
+  /** Ready-made courses. Picking one opens the editor filled in; nothing is saved until the manager saves. */
+  function openTemplates() {
+    modal('Ready-made courses', (close) => h('div', { class: 'stack' },
+      h('p', { class: 'muted', style: 'margin:0', text: 'Start from a course that is already written, then change anything you like before you save it.' }),
+      ...COURSE_TEMPLATES.map((t) => h('button', { class: 'card qacard', type: 'button', style: 'width:100%', onclick: () => { close(); openEditor(null, t); } },
+        tile('training', 40), h('b', { text: t.title }), h('span', { class: 'muted', text: t.summary }))),
+      h('div', { class: 'row' }, h('button', { class: 'btn line', onclick: close }, 'Cancel'))));
   }
 
   /** Pick a document from Knowledge and have the AI draft lessons and a quiz from it. Nothing is saved until the manager has checked it. */
@@ -113,8 +123,8 @@ export async function renderTraining(main, ctx) {
       const desc = h('textarea', { id: 't-desc', rows: 2, maxlength: 500, placeholder: 'One line on what it covers and who it is for (optional)' }); desc.value = seed ? seed.description || '' : '';
       const sc = scopes();
       const where = h('select', { id: 't-where', disabled: editing }, (editing ? [{ id: audienceValue(existing), name: audience(existing) }] : sc).map((s) => h('option', { value: s.id }, s.name)));
-      const pass = h('select', { id: 't-pass' }, PASS.map((p) => h('option', { value: p, selected: (editing ? existing.pass_percent : 80) === p }, `${p}%`)));
-      const renew = h('select', { id: 't-renew' }, RENEW.map(([v, label]) => h('option', { value: v === null ? '' : v, selected: (editing ? existing.renew_months : null) === v }, label)));
+      const pass = h('select', { id: 't-pass' }, PASS.map((p) => h('option', { value: p, selected: ((seed && seed.pass_percent) || 80) === p }, `${p}%`)));
+      const renew = h('select', { id: 't-renew' }, RENEW.map(([v, label]) => h('option', { value: v === null ? '' : v, selected: ((seed && seed.renew_months) || null) === v }, label)));
       const active = h('input', { type: 'checkbox', id: 't-active', checked: !editing || existing.active });
       const lessonBox = h('div', { class: 'stack' }); const quizBox = h('div', { class: 'stack' });
 

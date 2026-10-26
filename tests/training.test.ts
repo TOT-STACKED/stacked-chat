@@ -182,3 +182,21 @@ describe('draft a course from a document', () => {
     expect((await bare.inject({ method: 'POST', url: `/api/v1/orgs/${org.id}/training/draft`, headers: { authorization: 'Bearer o' }, payload: { knowledge_id: d.id } })).statusCode).toBe(503);
   });
 });
+
+import { COURSE_TEMPLATES } from '../web/manage/templates.js';
+describe('ready-made courses', () => {
+  it('every template passes the same checks a saved course does, with a correct answer on each question', () => {
+    expect(COURSE_TEMPLATES.length).toBeGreaterThan(0);
+    for (const t of COURSE_TEMPLATES) {
+      expect(() => cleanLessons(t.lessons), t.id).not.toThrow();
+      const quiz = cleanQuiz(t.quiz);
+      expect(quiz.length, t.id).toBe(t.quiz.length);
+      expect(t.pass_percent).toBeGreaterThanOrEqual(50);
+      expect(new Set(t.quiz.map((q: { answer: number }) => q.answer)).size, 'correct answers are not all in the same position').toBeGreaterThan(1);
+    }
+  });
+  it('the fire course asks managers to fill in their own venue details before publishing', () => {
+    const fire = COURSE_TEMPLATES.find((t: { id: string }) => t.id === 'fire-safety')!;
+    expect(fire.lessons.some((l: { body: string }) => l.body.includes('[ADD:'))).toBe(true); expect(fire.note).toContain('[ADD');
+  });
+});

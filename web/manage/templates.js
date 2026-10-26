@@ -1,0 +1,33 @@
+/**
+ * Ready-made courses a manager can start from. They open in the editor, so every word can be changed, and nothing is
+ * saved until the manager saves it. Places a venue has to fill in are marked [ADD: ...].
+ */
+export const COURSE_TEMPLATES = [
+  {
+    id: 'fire-safety',
+    title: 'Fire safety for hospitality teams',
+    summary: 'Stopping fires, raising the alarm, getting everyone out, and which extinguisher to use. 6 lessons and an 8-question quiz.',
+    description: 'What to do if there is a fire, how to stop one starting, and how to get everyone out safely. Take it when you join and once a year.',
+    note: 'A ready-made fire safety course. Before you publish it, fill in the lesson “Know your venue” (look for [ADD: …]) and check everything matches your own fire risk assessment and procedures. It is general training, not a replacement for your fire risk assessment or a competent person’s advice.',
+    pass_percent: 80,
+    renew_months: 12,
+    lessons: [
+      { title: 'Why this matters', body: 'A fire can spread in minutes, and the smoke is usually the biggest danger. In a restaurant, bar or hotel, guests rely on you to know what to do.\n\nYour employer is required by law to train you in fire safety. This course is part of that. Your manager will also show you your own venue’s exits, alarm and equipment, so ask if anything is not clear.' },
+      { title: 'Stopping a fire before it starts', body: 'Most fires can be prevented.\n\nIn the kitchen: keep fryers, grills and extraction clean and free of grease. Never leave hot oil or cooking unattended. Switch equipment off when you finish.\n\nElectrics: do not overload sockets or extension leads. Report damaged cables, plugs and equipment straight away and do not use them.\n\nStorage and rubbish: keep boxes, cardboard and bins away from heat and away from exits. Empty bins regularly.\n\nCandles and smoking: never leave a candle burning on its own, and smoke only in the places allowed.\n\nExits: keep every fire exit, corridor and stairway clear at all times. Never block them with deliveries, stock or furniture.\n\nFire doors: they only work if they are shut. Never wedge or prop one open. If you find one open, close it and tell a manager.' },
+      { title: 'If you find a fire', body: 'Stay calm and follow these steps in order.\n\n1. Raise the alarm. Shout “Fire” and press the nearest call point.\n2. Get people out. Guests first, then colleagues. Do not stop to collect belongings.\n3. Call 999. Ask for the fire service and give the venue name and address. If a manager or the designated person is calling, make sure it is done.\n4. Only tackle a fire if it is very small, you have been trained, and you have a clear way out behind you.\n\nNever put yourself at risk. If you are in any doubt, get out and shut the door behind you.' },
+      { title: 'When the alarm sounds', body: 'Treat every alarm as a real fire until you are told otherwise.\n\nStop what you are doing. If it takes a few seconds and is safe, switch off gas and fryers. If it is not, leave them.\n\nGuide guests calmly to the nearest safe exit. Walk, do not run. Use the stairs, not the lift. Close doors behind you but do not lock them.\n\nTell your manager straight away about any guest who may need help to leave. Your venue has a plan for them.\n\nGo to the assembly point and stay there. Your manager will take a headcount. Do not go back inside for any reason until the fire service says it is safe.' },
+      { title: 'Fire extinguishers and fire blankets', body: 'Only use one if you have been trained, the fire is small, and you have your escape route behind you.\n\nAll extinguishers are red. The colour of the label tells you what is inside:\n\nWater (red label): paper, wood and fabric. Never on electrical equipment or cooking fat.\nFoam (cream label): most everyday fires, including liquids. Not for cooking oil.\nCO2 (black label): electrical fires. Does not leave a mess.\nDry powder (blue label): general use, but it is hard to see in a room full of powder.\nWet chemical (yellow label): cooking oil and fat fires in kitchens.\n\nA fire blanket is for a small pan or fryer fire. Turn off the heat if it is safe, then lay the blanket over the pan and leave it there.\n\nRemember PASS: Pull the pin, Aim at the base of the fire, Squeeze the handle, Sweep from side to side.' },
+      { title: 'Know your venue', body: 'Your manager completes this lesson for your venue.\n\nAssembly point: [ADD: where everyone meets]\nNearest fire exits from the bar and dining areas: [ADD: where they are]\nNearest fire exits from the kitchen and back of house: [ADD: where they are]\nAlarm call points: [ADD: where they are]\nFire extinguishers and fire blankets: [ADD: where they are]\nOur fire marshals: [ADD: names]\nHelping guests who need extra help to leave: [ADD: our plan]\nWho calls 999 and takes the headcount: [ADD: roles]\nWhere the fire risk assessment is kept: [ADD: where]' },
+    ],
+    quiz: [
+      { q: 'You discover a fire. What is the first thing you do?', options: ['Try to put it out on your own', 'Raise the alarm: shout and press the nearest call point', 'Finish serving the table'], answer: 1 },
+      { q: 'A guest asks to go back for their coat during an evacuation. What do you say?', options: ['Of course, it will only take a minute', 'Please leave now. Your coat can be collected later', 'Offer to fetch it yourself'], answer: 1 },
+      { q: 'Which way do you leave the building when the alarm sounds?', options: ['By the nearest safe exit, using the stairs', 'Only by the front door', 'By the lift, to be quick'], answer: 0 },
+      { q: 'Which extinguisher or equipment is made for cooking oil and fat fires?', options: ['Water (red label)', 'Wet chemical (yellow label) or a fire blanket', 'CO2 (black label)'], answer: 1 },
+      { q: 'What must you never use on an electrical fire?', options: ['A CO2 extinguisher', 'Water', 'A dry powder extinguisher'], answer: 1 },
+      { q: 'You find a fire door wedged open. What do you do?', options: ['Leave it, the wedge is only for a minute', 'Close it and tell a manager', 'Prop it further open for air'], answer: 1 },
+      { q: 'Everyone is at the assembly point. When can people go back in?', options: ['When the alarm stops ringing', 'When the fire service says it is safe', 'After ten minutes'], answer: 1 },
+      { q: 'When should you tackle a fire with an extinguisher?', options: ['Only if it is small, you are trained, and you have a clear way out behind you', 'Always, to protect the venue', 'Whenever the alarm has not yet sounded'], answer: 0 },
+    ],
+  },
+];
