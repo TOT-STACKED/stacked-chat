@@ -59,7 +59,9 @@ function showNoAccess() {
 }
 function signOut() { auth.signOut(); st.ctx = null; showSignIn(); }
 /** Starting a new chat (or opening an old one) leaves any answer still on its way behind: it is dropped, not shown in the new chat. */
-function resetChat() { st.gen = (st.gen || 0) + 1; st.sending = false; st.conversationId = null; st.messages = []; st.error = null; st.npsShown = false; st.shown = new Set(); }
+/** four prompts picked at random from the venue's pool, so the welcome screen is different each time */
+function pickChips(list, n = 4) { const a = [...(list || [])]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a.slice(0, n); }
+function resetChat() { st.chips = null; st.gen = (st.gen || 0) + 1; st.sending = false; st.conversationId = null; st.messages = []; st.error = null; st.npsShown = false; st.shown = new Set(); }
 
 const ownLogo = () => isHttps(st.site.branding.logo_url);
 /** The assistant's picture: the Stacked mark, or the first letter in the venue's colour when they use their own logo. */
@@ -141,7 +143,7 @@ function hello() {
   return h('div', { class: 'hello' }, face('dotbig'),
     h('h1', { text: b.welcome_heading || 'Ask anything about work' }),
     h('p', { text: b.welcome_message || 'Handbooks, procedures and how things work here. Ask in your own words.' }),
-    h('div', { class: 'chipsrow' }, st.site.suggestions.map((q) => h('button', { class: 'suggest', onclick: () => send(q) }, q))));
+    h('div', { class: 'chipsrow' }, (st.chips = st.chips || pickChips(st.site.suggestions)).map((q) => h('button', { class: 'suggest', onclick: () => send(q) }, q))));
 }
 
 const titleCase = (s) => String(s).replace(/\b\w/g, (c) => c.toUpperCase());

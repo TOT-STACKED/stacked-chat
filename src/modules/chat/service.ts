@@ -7,6 +7,7 @@ import { checkNps, type NpsMirror, type NpsStore } from './nps.js';
 import { buildSystemPrompt } from './prompt.js';
 import type { ChatModel, ChatTurn } from './model.js';
 import { asItem, type WorkContext } from './work.js';
+import { startersFor } from './starters.js';
 import { wantsTeam } from './team.js';
 import { imagesBehind, pickMedia, retrievePassages, visibleTo, wantsVideo } from './retrieve.js';
 import type { ConversationStore, StoredMessage } from './store.js';
@@ -219,6 +220,8 @@ export function createChat(deps: ChatDeps) {
     void deps.mirrorNps?.(row).catch(() => undefined);
   }
 
-  return { ask, list, open, rate };
+  /** prompts for the welcome screen, made from what this venue's knowledge can answer */
+  async function starters(orgId: string, siteId: string): Promise<string[]> { return startersFor(await deps.items(orgId), { siteId }); }
+  return { ask, list, open, rate, starters };
 }
 export type Chat = ReturnType<typeof createChat>;

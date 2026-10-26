@@ -67,18 +67,21 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     };
   }
 
-  async function suggestionsFor(siteId: string): Promise<string[]> {
+  /** What the welcome screen offers: this venue's most-asked questions, then questions made from its own knowledge, then a starter set. The page shows four at random. */
+  async function suggestionsFor(siteId: string, orgId: string): Promise<string[]> {
     const hit = popular.get(siteId); const t = (ctx.now ?? Date.now)();
     if (hit && t - hit.at < 600_000) return hit.q;
-    let q: string[] = [];
+    let asked: string[] = []; let made: string[] = [];
     try {
       if (ctx.insights) {
         const convs = await ctx.insights.conversations([siteId], new Date(t - 30 * 86_400_000).toISOString());
-        q = groupAsks(extractAsks(convs).filter((a) => !a.unanswered)).filter((g) => g.count >= 2).slice(0, 4).map((g) => g.question);
+        asked = groupAsks(extractAsks(convs).filter((a) => !a.unanswered)).filter((g) => g.count >= 2).slice(0, 4).map((g) => g.question);
       }
-    } catch { /* fall back to the defaults */ }
-    q = q.length ? q : DEFAULT_SUGGESTIONS;
-    popular.set(siteId, { at: t, q }); return q;
+    } catch { /* the other sources still work */ }
+    try { made = (await ctx.chat?.starters(orgId, siteId)) ?? []; } catch { /* fall back to the starter set */ }
+    const seen = new Set<string>(); const q: string[] = [];
+    for (const x of [...asked, ...(made.length ? made : DEFAULT_SUGGESTIONS)]) { const k = x.toLowerCase(); if (!seen.has(k)) { seen.add(k); q.push(x); } }
+    popular.set(siteId, { at: t, q: q.slice(0, 12) }); return q.slice(0, 12);
   }
 
   r.get('/api/v1/chat/context', {
@@ -95,7 +98,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     for (const s of sites) {
       if (!branding.has(s.org_id)) branding.set(s.org_id, await ctx.branding?.list(s.org_id).catch(() => []) ?? []);
       const b = branding.get(s.org_id)!.find((x) => x.id === s.site_id);
-      out.push({ ...s, branding: { bot_name: b?.bot_name ?? null, welcome_heading: b?.welcome_heading ?? null, welcome_message: b?.welcome_message ?? null, primary_color: b?.primary_color ?? null, logo_url: b?.logo_url ?? null }, suggestions: await suggestionsFor(s.site_id) });
+      out.push({ ...s, branding: { bot_name: b?.bot_name ?? null, welcome_heading: b?.welcome_heading ?? null, welcome_message: b?.welcome_message ?? null, primary_color: b?.primary_color ?? null, logo_url: b?.logo_url ?? null }, suggestions: await suggestionsFor(s.site_id, s.org_id) });
     }
     const me = sites[0] ? (await repo().listMembers(sites[0].org_id)).find((m) => m.email.toLowerCase() === p.email.toLowerCase() && m.display_name) : null;
     return { user: { email: p.email, name: me?.display_name ?? null }, sites: out };
