@@ -17,6 +17,8 @@ export const schema = z.object({
   TWILIO_FROM: z.string().optional(),
   /** Signs phone sessions and hashes sign-in codes. At least 32 random characters. Phone sign-in is off without it. */
   AUTH_SECRET: z.string().min(32).optional(),
+  /** How many proxies sit in front of the app (Render: set after checking /api/v1/diag/ip). Unset trusts the header as-is, which is only safe where the host overwrites X-Forwarded-For. */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).optional(),
   /** Public base URL used in links inside emails. */
   PUBLIC_URL: z.string().url().default('https://stackedchat.io'),
   /** Billing (Stripe, test mode). Billing stays switched off, and fails closed, unless ALL of these are set. */

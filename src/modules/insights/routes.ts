@@ -56,7 +56,7 @@ export async function insightsRoutes(app: FastifyInstance, ctx: Ctx) {
       tags: ['insights'], security: SECURITY,
       summary: 'Write draft answers (never published) for unanswered questions, into Knowledge for review',
       params: z.object({ orgId: Id }),
-      body: z.object({ keys: z.array(z.string().min(1).max(300)).min(1).max(10), days: z.number().int().default(30) }),
+      body: z.object({ keys: z.array(z.string().min(1).max(300)).min(1).max(10), days: z.number().int().min(1).max(366).default(30) }),
       response: {
         200: z.object({
           created: z.array(z.object({ key: z.string(), item_id: z.string(), title: z.string(), site_id: z.string().nullable() })),

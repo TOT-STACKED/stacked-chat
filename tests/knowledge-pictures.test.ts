@@ -56,6 +56,7 @@ describe('picture upload and reading', () => {
     repo.addMember(org, 'owner@a.com', 'owner', null, U.owner); repo.addMember(org, 'mgr@a.com', 'site_manager', n, U.mgr); repo.addMember(org, 'staff@a.com', 'staff', n, U.staff);
     const reader: PictureReader = { async read() { reads++; return readerText; } };
     const storage = {
+      pathFromUrl: (u: unknown) => (typeof u === 'string' && u.startsWith('https://files.test/') ? u.slice('https://files.test/'.length) : null),
       async signUrls(urls: Array<string | null | undefined>) { return urls.map((u) => (u ? `data:image/png;base64,${PNG.toString('base64')}` : null)); },
       async uploadObject(path: string, data: Uint8Array, type: string) { if (failUpload) throw new Error('boom'); stored.push({ path, type, bytes: data.length }); return `https://files.test/${path}`; },
     };
@@ -121,5 +122,21 @@ describe('picture upload and reading', () => {
     readerText = null;
     const r = await read('o', made.id);
     expect(r.statusCode).toBe(502); expect(r.json().error.message).toContain('type the details');
+  });
+});
+
+describe('pictures can only be read from our own storage', () => {
+  it('refuses to fetch an address someone typed in, and will not let a picture be re-pointed at one', async () => {
+    const repo = new FakeRepo(); const store = new FakeKnowledgeStore(); const U = randomUUID(); const org = repo.addOrg('Acme'); const n = repo.addSite(org, 'North');
+    store.addOrg(org.id, 'acme', 'acme'); store.sites.push({ id: n.id, org_id: org.id }); repo.addMember(org, 'owner@a.com', 'owner', null, U);
+    let fetched = 0; const real = globalThis.fetch; globalThis.fetch = (async () => { fetched++; return new Response('x'); }) as typeof fetch;
+    try {
+      const app = await buildApp(testConfig, { repo, knowledgeStore: store, storage: { pathFromUrl: () => null, signUrls: async (u: Array<string | null | undefined>) => u.map((x) => x ?? null) }, pictureReader: { async read() { return 'text'; } }, verifyToken: fakeVerifier({ o: { userId: U, email: 'owner@a.com' } }) });
+      const item = await store.insertItem({ org_id: org.id, kind: 'image', title: 'Pic', status: 'draft', site_id: null, team_id: null, body: null, url: 'http://10.0.0.5:8080/admin', description: null, doc_filename: null, video_id: null, image_id: null, source: 'manager', source_question: null, created_by: 'owner@a.com', published_at: null });
+      const r = await app.inject({ method: 'POST', url: `/api/v1/orgs/${org.id}/knowledge/${item.id}/read-picture`, headers: { authorization: 'Bearer o' } });
+      expect(r.statusCode).toBe(400); expect(fetched).toBe(0); // nothing was requested from that address
+      const p = await app.inject({ method: 'PATCH', url: `/api/v1/orgs/${org.id}/knowledge/${item.id}`, headers: { authorization: 'Bearer o' }, payload: { url: 'http://169.254.169.254/latest/meta-data' } });
+      expect(p.statusCode).toBe(400);
+    } finally { globalThis.fetch = real; }
   });
 });

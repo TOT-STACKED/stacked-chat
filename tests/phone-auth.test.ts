@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
 import { createTwilioSender } from '../src/lib/sms.js';
+import { createSupabaseTokenVerifier } from '../src/lib/auth.js';
 import { formatPhone, isPhoneKey, normalizePhone, phoneKey, phoneOfKey, userIdForPhone } from '../src/lib/phone.js';
 import { createPhoneAuth } from '../src/modules/phone-auth/service.js';
 import { FakeMailer, FakeRepo, fakeVerifier } from '../src/testing/fakes.js';
@@ -95,6 +96,21 @@ describe('signing in with a mobile number', () => {
     await pa.start(PHONE); const code = sms.lastCode(PHONE)!;
     advance(10 * 60_000 + 1000);
     await expect(pa.verify(PHONE, code)).rejects.toMatchObject({ statusCode: 401 });
+  });
+  it('only ever gives five guesses, even when thousands of requests arrive at the same instant', async () => {
+    await pa.start(PHONE); const code = sms.lastCode(PHONE)!;
+    const wrongs = Array.from({ length: 300 }, (_, i) => String(100000 + i)).filter((c) => c !== code);
+    const attempts = [...wrongs.slice(0, 150), code, ...wrongs.slice(150)]; // the right code is buried in the flood
+    const results = await Promise.allSettled(attempts.map((c) => pa.verify(PHONE, c)));
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(code === attempts[0] || attempts.indexOf(code) < 5 ? 1 : 0);
+    expect(store.rows.find((r) => r.phone === PHONE)!.attempts).toBeLessThanOrEqual(5);
+    await expect(pa.verify(PHONE, code)).rejects.toMatchObject({ statusCode: expect.any(Number) }); // and the real code no longer works either
+  });
+  it('refuses to text numbers outside the UK and Ireland, and numbers that cost the sender extra', async () => {
+    const abroad = '+14155550100'; await repo.createMember({ org_id: [...repo.orgs][0]!.id, site_id: null, email: phoneKey(abroad), display_name: 'X', phone: abroad, role: 'staff', status: 'invited' }).catch(() => null);
+    expect(await pa.start(abroad)).toEqual({ sent: false });
+    for (const n of ['+447012345678', '+447612345678', '+448001234567', '+449012345678']) expect(await pa.start(n)).toEqual({ sent: false });
+    expect(sms.sent).toHaveLength(0);
   });
   it('limits how many texts one number can be sent: one a minute, five an hour', async () => {
     await pa.start(PHONE);
@@ -210,6 +226,25 @@ describe('phone sign-in and adding staff by number, through the app', () => {
     for (let i = 0; i < 32; i++) { const r = await add('o', { phone: `07700 9${String(10000 + i).padStart(5, '0')}`, display_name: `P${i}` }); last = r.statusCode; if (r.statusCode === 429) break; expect(r.statusCode).toBe(201); }
     expect(last).toBe(429); expect(sms.sent.length).toBe(30);
   });
+  it('will not add a number that cannot be texted, or one abroad', async () => {
+    for (const phone of ['+1 415 555 0100', '0901 234 5678', '07012 345678']) expect((await add('m', { phone, display_name: 'A' })).statusCode, phone).toBe(400);
+    expect((await add('m', { phone: '087 123 4567', display_name: 'Irish' })).statusCode).toBe(400); // Irish numbers need their +353 code
+    expect((await add('m', { phone: '+353 87 123 4567', display_name: 'Irish' })).statusCode).toBe(201);
+  });
+  it('never makes someone active by hand: restoring a person who has not signed in puts them back to invited', async () => {
+    const created = (await add('m', { phone: '07700 900123', display_name: 'Amy' })).json();
+    await call('PATCH', `/api/v1/orgs/${org.id}/members/${created.id}`, { status: 'disabled' }, 'o');
+    const back = await call('PATCH', `/api/v1/orgs/${org.id}/members/${created.id}`, { status: 'active' }, 'o');
+    expect(back.statusCode).toBe(200); expect(back.json().status).toBe('invited');
+    const e = (await add('m', { email: 'ben@acme.com', display_name: 'Ben' })).json();
+    expect((await call('PATCH', `/api/v1/orgs/${org.id}/members/${e.id}`, { status: 'active' }, 'o')).json().status).toBe('invited'); // an unverified address cannot be marked active
+  });
+  it('keeps web addresses out of company, venue and team names, which appear in messages sent from our address', async () => {
+    for (const name of ['Claim your refund at evil.example.com', 'Visit www.evil.co', 'http://x.y/z']) {
+      expect((await call('PATCH', `/api/v1/orgs/${org.id}`, { name }, 'o')).statusCode, name).toBe(400);
+    }
+    expect((await call('PATCH', `/api/v1/orgs/${org.id}`, { name: 'Acme Pubs Ltd' }, 'o')).statusCode).toBe(200);
+  });
   it('is off, saying so, when texts or the secret are not set up', async () => {
     const off = await buildApp(testConfig, { repo, sms: null, verifyToken: fakeVerifier({}) });
     expect((await off.inject({ method: 'POST', url: '/api/v1/auth/phone/start', payload: { phone: '07700 900123' } })).statusCode).toBe(503);
@@ -221,5 +256,13 @@ describe('phone sign-in and adding staff by number, through the app', () => {
     expect(r.statusCode).toBe(201);
     const to = mailer.sent.map((m) => m.to);
     expect(to).toContain('ben@acme.com'); expect(to.some((a) => a.endsWith('@phone.invalid'))).toBe(false);
+  });
+});
+
+describe('sign-in through the email path', () => {
+  it('never accepts the placeholder address that stands for a phone number', async () => {
+    const mk = (email: string) => createSupabaseTokenVerifier({ url: 'https://x.supabase.co', anonKey: 'k', fetchImpl: (async () => new Response(JSON.stringify({ id: randomUUID(), email, email_confirmed_at: '2026-01-01T00:00:00Z' }), { status: 200 })) as unknown as typeof fetch });
+    expect(await mk('447700900123@phone.invalid')('tok1')).toBeNull();
+    expect(await mk('amy@acme.com')('tok2')).toMatchObject({ email: 'amy@acme.com' });
   });
 });

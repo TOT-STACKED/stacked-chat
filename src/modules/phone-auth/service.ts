@@ -2,7 +2,7 @@ import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { ApiHttpError } from '../../lib/errors.js';
 import { RateLimiter } from '../../lib/rate-limit.js';
 import type { VerifiedUser } from '../../lib/auth.js';
-import { normalizePhone, phoneKey, userIdForPhone } from '../../lib/phone.js';
+import { isSmsDestinationAllowed, normalizePhone, phoneKey, userIdForPhone } from '../../lib/phone.js';
 import type { Repo } from '../../lib/repo.js';
 import type { SmsSender } from '../../lib/sms.js';
 import type { PhoneCodeStore } from './store.js';
@@ -31,6 +31,10 @@ export function createPhoneAuth(deps: { store: PhoneCodeStore; repo: Repo; sms: 
   // Asked of every number, known or not and before any lookup, so a slow-down never reveals who is on the system.
   const perMinute = new RateLimiter(1, 60_000, () => now().getTime());
   const perHour = new RateLimiter(5, 3_600_000, () => now().getTime());
+  // Texts actually sent, all numbers together: a ceiling on the bill. Only real sends count, so strangers cannot use it up.
+  const sentToday = new RateLimiter(600, 3_600_000, () => now().getTime());
+  // Guesses at codes, per number, whatever else is going on: even a flood from many places only ever gets a handful of tries.
+  const guessing = new RateLimiter(12, 600_000, () => now().getTime());
   const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
   function issue(phone: string, iat = now().getTime()): { access_token: string; expires_at: number } {
@@ -60,10 +64,12 @@ export function createPhoneAuth(deps: { store: PhoneCodeStore; repo: Repo; sms: 
     if (!perMinute.hit(phone).allowed) throw new ApiHttpError(429, 'rate_limited', 'A code was only just sent. Wait a minute, then ask for another.');
     if (!perHour.hit(phone).allowed) throw new ApiHttpError(429, 'rate_limited', 'Too many codes for this number. Try again in an hour.');
     // Only numbers a manager has added get a text. The answer is the same either way, so nobody can find out who is on the system.
-    if (!(await deps.repo.memberLoginable(phoneKey(phone)))) return { sent: false };
+    if (!isSmsDestinationAllowed(phone) || !(await deps.repo.memberLoginable(phoneKey(phone)))) return { sent: false };
     const t = now();
-    // a second, database-backed limit for when the server has been restarted or there is more than one copy of it
-    if ((await deps.store.countSince(phone, new Date(t.getTime() - 60_000).toISOString())) >= 1 || (await deps.store.countSince(phone, new Date(t.getTime() - 3_600_000).toISOString())) >= 5) throw new ApiHttpError(429, 'rate_limited', 'Too many codes for this number. Try again in a little while.');
+    // a second, database-backed limit for when the server has been restarted or there is more than one copy of it.
+    // It answers like "no text sent" rather than "too many": a different answer for known numbers would give them away.
+    if ((await deps.store.countSince(phone, new Date(t.getTime() - 60_000).toISOString())) >= 1 || (await deps.store.countSince(phone, new Date(t.getTime() - 3_600_000).toISOString())) >= 5) return { sent: false };
+    if (!sentToday.hit('all').allowed) throw new ApiHttpError(503, 'busy', 'Sign-in by text is very busy right now. Please try again in a little while.');
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     await deps.store.insert({ phone, code_hash: hashCode(phone, code), expires_at: new Date(t.getTime() + CODE_MINUTES * 60_000).toISOString() });
     const res = await deps.sms.send(phone, `${code} is your ${deps.brand ?? 'Stacked Chat'} sign-in code. It expires in ${CODE_MINUTES} minutes. Never share it.`);
@@ -75,9 +81,12 @@ export function createPhoneAuth(deps: { store: PhoneCodeStore; repo: Repo; sms: 
     const bad = () => new ApiHttpError(401, 'bad_code', "That code didn't work. Check it, or ask for a new one.");
     const phone = normalizePhone(rawPhone); const code = String(rawCode ?? '').replace(/\s+/g, '');
     if (!phone || !/^\d{6}$/.test(code)) throw bad();
+    if (!guessing.hit(phone).allowed) throw new ApiHttpError(429, 'rate_limited', 'Too many tries. Wait a few minutes, then ask for a new code.');
     const row = await deps.store.latest(phone);
     if (!row || row.attempts >= MAX_ATTEMPTS || new Date(row.expires_at).getTime() <= now().getTime()) throw bad();
-    if (!same(row.code_hash, hashCode(phone, code))) { await deps.store.bump(row.id); throw bad(); }
+    // take a guess BEFORE comparing, atomically: sending thousands of requests at once still only ever buys MAX_ATTEMPTS guesses
+    if (!(await deps.store.claimAttempt(row.id, MAX_ATTEMPTS))) throw bad();
+    if (!same(row.code_hash, hashCode(phone, code))) throw bad();
     await deps.store.clear(phone);
     return { ...issue(phone), phone };
   }

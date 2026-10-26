@@ -21,3 +21,7 @@ export const ApiKeyOut = z.object({
 });
 
 export const SECURITY: Array<Record<string, string[]>> = [{ bearerAuth: [] }, { apiKey: [] }];
+
+/** Names are shown in invitation emails and texts sent from our address: no web links in them, so they cannot be used to phish. */
+export const noLinks = (v: string) => !/https?:\/\/|www\.|\b[a-z0-9-]+\.(com|co\.uk|io|net|org|uk|app|link|click|xyz|info|site|online)\b/i.test(v);
+export const NO_LINKS = 'Please use a name, not a web address';

@@ -166,7 +166,8 @@ export function createKnowledge(deps: KnowledgeDeps) {
     }
     if (patch.body !== undefined && item.kind !== 'document') throw badRequest('Only documents have text');
     if (patch.body !== undefined && patch.body.length > MAX_BODY) throw badRequest(`That document is too long (the limit is ${MAX_BODY.toLocaleString('en-GB')} characters)`);
-    if (patch.url !== undefined && (item.kind === 'document' || !isHttpUrl(patch.url))) throw badRequest('Enter a web link that starts with https://');
+    if (patch.url !== undefined && item.kind === 'image') throw badRequest('A picture cannot be pointed somewhere else. Upload the new picture instead.');
+    if (patch.url !== undefined && (item.kind === 'document' || !/^https:\/\//i.test(patch.url) || !isHttpUrl(patch.url))) throw badRequest('Enter a web link that starts with https://');
     if (patch.title !== undefined && item.kind === 'document' && patch.title !== item.title) await assertFreeTitle(orgId, patch.title, item.id);
 
     const wasPublished = item.status === 'published';

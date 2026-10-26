@@ -34,7 +34,8 @@ export function createSupabaseTokenVerifier(opts: { url: string; anonKey: string
       if (res.ok) {
         const j = (await res.json()) as { id?: string; email?: string; email_confirmed_at?: string | null };
         // Only an email the person has actually proven (via the emailed code) counts.
-        if (j.id && j.email && j.email_confirmed_at) user = { userId: j.id, email: j.email.toLowerCase() };
+        // (and never a phone placeholder address: those identities come only from our own texted codes)
+        if (j.id && j.email && j.email_confirmed_at && !/@phone\.invalid$/i.test(j.email)) user = { userId: j.id, email: j.email.toLowerCase() };
       }
     } catch { user = null; }
     cache.set(ck, { user, exp: now() + (user ? ttl : 10_000) });

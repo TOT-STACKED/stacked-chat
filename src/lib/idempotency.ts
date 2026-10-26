@@ -25,7 +25,7 @@ export class IdempotencyStore {
       return r.body;
     }
     if (key.length < 8 || key.length > 128) throw badRequest('Idempotency-Key must be 8-128 characters');
-    const id = `${principalId}|${req.method}|${req.routeOptions.url}|${key}`;
+    const id = `${principalId}|${req.method}|${req.url.split('?')[0]}|${key}`; // the real path, so one key cannot replay across companies
     const fingerprint = createHash('sha256').update(JSON.stringify(req.body ?? null)).digest('hex');
 
     const hit = this.done.get(id);

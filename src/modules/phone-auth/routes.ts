@@ -14,7 +14,6 @@ export async function phoneAuthRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const hour = 3_600_000;
   const startByIp = new RateLimiter(20, hour, ctx.now);   // texts cost money: a script cannot ask for more than this from one place
-  const startAll = new RateLimiter(600, hour, ctx.now);   // and a circuit breaker for the whole service
   const verifyByIp = new RateLimiter(60, hour, ctx.now);
   const pa = (): PhoneAuth => { if (!ctx.phoneAuth) throw new ApiHttpError(503, 'phone_signin_unavailable', 'Signing in by mobile number is not switched on yet'); return ctx.phoneAuth; };
 
@@ -23,7 +22,7 @@ export async function phoneAuthRoutes(app: FastifyInstance, ctx: Ctx) {
     schema: { tags: ['auth'], summary: 'Text a sign-in code to a mobile number a manager has added', body: z.object({ phone: z.string().min(5).max(30) }), response: { 200: z.object({ ok: z.literal(true) }), 400: ErrorBody, 429: ErrorBody, 502: ErrorBody, 503: ErrorBody } },
   }, async (req, reply) => {
     const ip = startByIp.hit(req.ip);
-    if (!ip.allowed || !startAll.hit('all').allowed) { reply.header('Retry-After', String(ip.retryAfterSeconds)); throw new ApiHttpError(429, 'rate_limited', 'Too many requests. Try again in a little while.'); }
+    if (!ip.allowed) { reply.header('Retry-After', String(ip.retryAfterSeconds)); throw new ApiHttpError(429, 'rate_limited', 'Too many requests. Try again in a little while.'); }
     await pa().start(req.body.phone);
     return { ok: true as const };
   });

@@ -139,6 +139,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
   // ---- checklists: what staff tick off at their venue today ---------------------------------------------------
   const opsSvc = () => { if (!ctx.ops) throw notFound('Checklists are not available'); return ctx.ops; };
   const tickLimiter = new RateLimiter(120, 60_000, ctx.now);
+  const quizTries = new RateLimiter(8, 3_600_000, ctx.now); // a sign-off must be earned: no trying every combination of answers
   async function siteAccess(p: UserPrincipal, siteId: string) {
     const site = await repo().getSite(siteId);
     if (!site || bestRole(p, site.org_id, siteId) === null) throw forbidden('You do not have access to that venue');
@@ -220,6 +221,8 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
       response: { 200: ResultOut, 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody } },
   }, async (req, reply) => {
     const p = userOnly(req);
+    const tries = quizTries.hit(`quiz:${p.userId}:${req.params.id}`);
+    if (!tries.allowed) throw new ApiHttpError(429, 'rate_limited', 'That is a lot of attempts. Read the lessons again, then try once more in a while.');
     const rl = tickLimiter.hit('train:' + p.userId);
     if (!rl.allowed) { reply.header('Retry-After', String(rl.retryAfterSeconds)); throw new ApiHttpError(429, 'rate_limited', 'Slow down a moment.'); }
     return trainingSvc().submit(learner(await whoAsks(p, req.body.site_id)), req.params.id, { answers: req.body.answers, confirm: req.body.confirm });

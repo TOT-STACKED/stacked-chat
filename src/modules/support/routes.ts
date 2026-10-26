@@ -1,13 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { notFound } from '../../lib/errors.js';
+import { ApiHttpError, notFound } from '../../lib/errors.js';
+import { RateLimiter } from '../../lib/rate-limit.js';
 import { userOnly } from '../access.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
 import { KINDS, type Support } from './service.js';
 
 export async function supportRoutes(app: FastifyInstance, ctx: { support: Support | null }) {
   const r = app.withTypeProvider<ZodTypeProvider>();
+  const everyone = new RateLimiter(120, 3_600_000); // a ceiling on messages into Stacked's Slack and inbox, whoever sends them
   r.post('/api/v1/support', {
     preHandler: app.authenticate,
     schema: {
@@ -19,6 +21,7 @@ export async function supportRoutes(app: FastifyInstance, ctx: { support: Suppor
   }, async (req) => {
     const p = userOnly(req);
     if (!ctx.support) throw notFound('Support is not available');
+    if (!everyone.hit('all').allowed) throw new ApiHttpError(429, 'rate_limited', 'We are getting a lot of messages right now. Please try again in a little while.');
     const out = await ctx.support.send(p, req.body);
     return { sent: true as const, emailed: out.emailed, ticket: out.ticket, slack: out.slack };
   });

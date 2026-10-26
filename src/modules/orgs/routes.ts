@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { principalId } from '../../lib/auth.js';
 import { ApiHttpError, badRequest, conflict, forbidden, notFound } from '../../lib/errors.js';
 import { inviteEmail, type Mailer, type SendResult } from '../../lib/email.js';
-import { formatPhone, isPhoneKey, normalizePhone, phoneKey } from '../../lib/phone.js';
+import { formatPhone, isPhoneKey, isSmsDestinationAllowed, normalizePhone, phoneKey } from '../../lib/phone.js';
 import { RateLimiter } from '../../lib/rate-limit.js';
 import type { SmsSender } from '../../lib/sms.js';
 import type { IdempotencyStore } from '../../lib/idempotency.js';
@@ -15,7 +15,7 @@ import {
 } from '../../lib/permissions.js';
 import type { MemberRow, Repo } from '../../lib/repo.js';
 import { assertOrgAccess, userOnly } from '../access.js';
-import { ErrorBody, Id, MemberOut, RoleEnum, SECURITY, SiteOut } from '../schemas.js';
+import { ErrorBody, Id, MemberOut, NO_LINKS, noLinks, RoleEnum, SECURITY, SiteOut } from '../schemas.js';
 
 interface Ctx {
   repo?: Repo; idempotency: IdempotencyStore; mailer?: Mailer; /** texts invitations to people added by mobile number; null = switched off */ sms?: SmsSender | null; publicUrl: string;
@@ -40,7 +40,10 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     for (let i = 0; i < count; i++) if (!smsByActor.hit(actorId).allowed || !smsByOrg.hit(orgId).allowed || !smsAll.hit('all').allowed) return false;
     return true;
   };
-  const smsLimited = () => new ApiHttpError(429, 'rate_limited', 'That is a lot of text invitations. Try again later, or ask Stacked support to raise the limit.');
+  const mailByActor = new RateLimiter(30, 3_600_000);
+  const mailByOrg = new RateLimiter(100, 86_400_000);
+  const mailAllowed = (orgId: string, actorId: string) => mailByActor.hit(actorId).allowed && mailByOrg.hit(orgId).allowed;
+  const smsLimited = () => new ApiHttpError(429, 'rate_limited', 'That is a lot of invitations. Try again later, or ask Stacked support to raise the limit.');
 
   /** Attach each member's team ids (one query for the whole organisation). */
   async function withTeams(orgId: string, rows: MemberRow[]) {
@@ -68,7 +71,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
 
   // ---- the organisation itself --------------------------------------------------------------
   const OrgOut = z.object({ id: Id, name: z.string(), slug: z.string() });
-  const CompanyName = z.string().trim().min(2).max(80).refine((v) => !/[<>]/.test(v), 'Names cannot contain < or >');
+  const CompanyName = z.string().trim().min(2).max(80).refine((v) => !/[<>]/.test(v), 'Names cannot contain < or >').refine(noLinks, NO_LINKS);
 
   r.get('/api/v1/orgs/:orgId', {
     preHandler: app.authenticate,
@@ -121,7 +124,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     schema: {
       tags: ['organisations'], summary: 'Add a site (venue) to the organisation', security: SECURITY,
       params: z.object({ orgId: Id }),
-      body: z.object({ name: z.string().trim().min(2).max(80) }),
+      body: z.object({ name: z.string().trim().min(2).max(80).refine((v) => !/[<>]/.test(v), 'Names cannot contain < or >').refine(noLinks, NO_LINKS) }),
       response: { 201: SiteOut, 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 409: ErrorBody, 422: ErrorBody },
     },
   }, async (req, reply) => {
@@ -217,9 +220,10 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     if (req.body.phone) {
       phone = normalizePhone(req.body.phone);
       if (!phone) throw badRequest('That does not look like a mobile number. Try 07700 900123');
+      if (!isSmsDestinationAllowed(phone)) throw badRequest('We can only text UK and Irish mobile numbers (07… or 08…). Add this person by email instead.');
       email = phoneKey(phone);
     }
-    if (phone && !smsAllowed(orgId, principalId(actor))) throw smsLimited();
+    if (phone ? !smsAllowed(orgId, principalId(actor)) : !mailAllowed(orgId, principalId(actor))) throw smsLimited();
     return ctx.idempotency.run(req, reply, principalId(actor), async () => {
       const row = await repo().createMember({ org_id: orgId, site_id: siteId, email, display_name: req.body.display_name ?? null, phone, role: req.body.role, status: 'invited' });
       if (teamIds.length) await repo().setMemberTeams(row.id, teamIds);
@@ -246,7 +250,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     if (target.status !== 'invited') throw badRequest('Only pending invitations can be re-sent');
     const last = lastInvite.get(memberId) ?? 0;
     if (Date.now() - last < 60_000) throw new ApiHttpError(429, 'rate_limited', 'That invitation was only just sent. Try again in a minute.');
-    if (isPhoneKey(target.email) && !smsAllowed(orgId, principalId(actor))) throw smsLimited();
+    if (isPhoneKey(target.email) ? !smsAllowed(orgId, principalId(actor)) : !mailAllowed(orgId, principalId(actor))) throw smsLimited();
     lastInvite.set(memberId, Date.now());
     return { invite: await sendInvite(target, actor) };
   });
@@ -277,7 +281,9 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     const losingOwner = target.role === 'owner' && target.status === 'active' &&
       ((req.body.role && req.body.role !== 'owner') || req.body.status === 'disabled');
     if (losingOwner && (await repo().countActiveOwners(orgId)) <= 1) throw conflict("You can't remove the organisation's last owner");
-    const updated = await repo().updateMember(memberId, { role: req.body.role, status: req.body.status });
+    // Only signing in (with a code sent to that address or number) makes a person active. Restoring access to someone who never signed in puts them back to invited.
+    const status = req.body.status === 'active' && !target.user_id ? 'invited' as const : req.body.status;
+    const updated = await repo().updateMember(memberId, { role: req.body.role, status });
     return (await withTeams(orgId, [updated]))[0]!;
   });
 

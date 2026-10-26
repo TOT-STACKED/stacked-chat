@@ -14,7 +14,7 @@ import { knowledgeView } from './service.js';
 import type { ItemRow } from './store.js';
 
 /** Private file storage for pictures, and the model that reads writing off them. Either can be absent (the buttons then say so). */
-export interface FileStore { signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>>; uploadObject?(path: string, data: Uint8Array, contentType: string): Promise<string> }
+export interface FileStore { /** the path of a file in OUR storage, or null for any other address */ pathFromUrl?(url: unknown): string | null; signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>>; uploadObject?(path: string, data: Uint8Array, contentType: string): Promise<string> }
 interface Ctx { knowledge: Knowledge | null; gate: (orgId: string) => Promise<void>; files?: FileStore | null; reader?: PictureReader | null }
 
 const Title = z.string().trim().min(1).max(120);
@@ -107,7 +107,7 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
   }
   r.post('/api/v1/orgs/:orgId/knowledge/upload', {
     bodyLimit: MAX_UPLOAD_BYTES + 1024,
-    preHandler: app.authenticate,
+    onRequest: app.authenticate, // before the body is read, so a stranger cannot make us buffer 10 MB
     schema: {
       tags: ['knowledge'], security: SECURITY,
       summary: 'Upload a PDF, Word (.docx) or text file. The text is extracted and saved as a draft to review.',
@@ -140,7 +140,7 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
   }
   r.post('/api/v1/orgs/:orgId/knowledge/upload-image', {
     bodyLimit: MAX_IMAGE_BYTES + 1024,
-    preHandler: app.authenticate,
+    onRequest: app.authenticate,
     schema: {
       tags: ['knowledge'], security: SECURITY,
       summary: 'Upload a picture (PNG, JPEG or WebP, up to 10 MB). It is saved as a draft to describe and publish.',
@@ -186,13 +186,19 @@ export async function knowledgeRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!item || item.kind !== 'image' || !item.url || !canSee(actor, orgId, item)) throw notFound('Picture not found');
     if (!canWrite(actor, orgId, item.site_id)) throw forbidden('You cannot change this item');
     if (!ctx.reader || !ctx.files) throw new ApiHttpError(503, 'reader_unavailable', 'Reading text from pictures is not switched on yet');
+    // Only files in our own storage are ever fetched: an address a person typed in is never followed from the server.
+    if (!ctx.files.pathFromUrl || !ctx.files.pathFromUrl(item.url)) throw badRequest('That picture is not stored here, so it cannot be read. Upload it again.');
     const [signed] = await ctx.files.signUrls([item.url]);
+    if (!signed) throw new ApiHttpError(502, 'picture_unavailable', 'We could not open that picture. Please try again.');
     let data: Buffer;
     try {
-      const res = await fetch(signed ?? item.url);
-      if (!res.ok) throw new Error(String(res.status));
-      data = Buffer.from(await res.arrayBuffer());
-    } catch { throw new ApiHttpError(502, 'picture_unavailable', 'We could not open that picture. Please try again.'); }
+      const res = await fetch(signed, { redirect: 'manual', signal: AbortSignal.timeout(20_000) });
+      if (!res.ok || !res.body) throw new Error(String(res.status));
+      // read in pieces and stop at the limit, so a huge file can never fill the server's memory
+      const parts: Buffer[] = []; let size = 0;
+      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) { size += chunk.length; if (size > MAX_READABLE_BYTES) { await res.body.cancel().catch(() => {}); throw badRequest('That picture is too large to read. Upload a smaller version (under 5 MB).'); } parts.push(Buffer.from(chunk)); }
+      data = Buffer.concat(parts);
+    } catch (e) { if (e instanceof ApiHttpError) throw e; throw new ApiHttpError(502, 'picture_unavailable', 'We could not open that picture. Please try again.'); }
     if (data.length > MAX_READABLE_BYTES) throw badRequest('That picture is too large to read. Upload a smaller version (under 5 MB).');
     const text = await ctx.reader.read({ data, mediaType: sniffImage(data) });
     if (!text) throw new ApiHttpError(502, 'reader_failed', 'We could not read that picture just now. You can type the details in instead.');

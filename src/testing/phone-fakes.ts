@@ -7,7 +7,7 @@ export class FakePhoneCodeStore implements PhoneCodeStore {
   constructor(private readonly now: () => Date = () => new Date()) {}
   async insert(r: { phone: string; code_hash: string; expires_at: string }) { this.rows.push({ id: randomUUID(), attempts: 0, created_at: this.now().toISOString(), ...r }); }
   async latest(phone: string) { return [...this.rows].filter((r) => r.phone === phone).sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null; }
-  async bump(id: string) { const r = this.rows.find((x) => x.id === id); if (r) r.attempts++; }
+  async claimAttempt(id: string, max: number) { const r = this.rows.find((x) => x.id === id); if (!r || r.attempts >= max) return false; r.attempts++; return true; }
   async clear(phone: string) { this.rows = this.rows.filter((r) => r.phone !== phone); }
   async countSince(phone: string, iso: string) { return this.rows.filter((r) => r.phone === phone && r.created_at >= iso).length; }
 }

@@ -35,3 +35,9 @@ export function formatPhone(e164: string): string {
   const m = /^\+44(\d{4})(\d{6})$/.exec(e164);
   return m ? `0${m[1]} ${m[2]}` : e164;
 }
+
+/**
+ * Where we will send texts: UK mobiles (07, but not 070 personal numbers or 076 pagers, which cost the sender extra) and Irish mobiles.
+ * Staff are in the UK, so anything else, including premium-rate and far-away numbers, is refused: it cannot be added or texted.
+ */
+export const isSmsDestinationAllowed = (e164: string) => /^\+447[1-57-9]\d{8}$/.test(e164) || /^\+3538[3-9]\d{7}$/.test(e164);

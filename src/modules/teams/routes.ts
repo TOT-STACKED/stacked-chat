@@ -6,11 +6,11 @@ import { bestRole, canManageMembers, type Principal } from '../../lib/permission
 import type { Repo, TeamRow } from '../../lib/repo.js';
 import { assertOrgAccess, userOnly } from '../access.js';
 import { assertSiteInOrg } from '../orgs/routes.js';
-import { ErrorBody, Id, SECURITY, TeamOut } from '../schemas.js';
+import { ErrorBody, Id, SECURITY, TeamOut, NO_LINKS, noLinks } from '../schemas.js';
 
 interface Ctx { repo?: Repo; gate: (orgId: string) => Promise<void> }
 
-const Name = z.string().trim().min(1).max(60);
+const Name = z.string().trim().min(1).max(60).refine(noLinks, NO_LINKS);
 
 export async function teamRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();

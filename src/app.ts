@@ -115,7 +115,7 @@ export interface Deps {
   npsStore?: NpsStore;
   mirrorNps?: NpsMirror | null;
   chatModel?: ChatModel | null;
-  storage?: { signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>>; uploadObject?(path: string, data: Uint8Array, contentType: string): Promise<string> } | null;
+  storage?: { pathFromUrl?(url: unknown): string | null; signUrls(urls: Array<string | null | undefined>, ttlSeconds?: number): Promise<Array<string | null>>; uploadObject?(path: string, data: Uint8Array, contentType: string): Promise<string> } | null;
   /** reads writing off pictures (spec cards, menus); null = switched off */
   pictureReader?: PictureReader | null;
   drafter?: AnswerDrafter | null;
@@ -158,8 +158,18 @@ export async function buildApp(
       ...(overrides.logStream ? { stream: overrides.logStream } : {}),
     },
     genReqId: (req) => (typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : randomUUID()),
-    trustProxy: true,
+    // trust exactly this many proxies (see TRUST_PROXY_HOPS); unset trusts the header as sent
+    trustProxy: config.TRUST_PROXY_HOPS === undefined ? true : (_addr: string, hop: number) => hop < config.TRUST_PROXY_HOPS!,
   });
+
+  // Safe defaults on every response (a route or the static files may set its own first)
+  app.addHook('onSend', async (req, reply) => {
+    if (!reply.hasHeader('x-content-type-options')) reply.header('X-Content-Type-Options', 'nosniff');
+    if (req.headers['x-forwarded-proto'] === 'https' && !reply.hasHeader('strict-transport-security')) reply.header('Strict-Transport-Security', 'max-age=31536000');
+    if (req.url.startsWith('/api/') && !reply.hasHeader('cache-control')) reply.header('Cache-Control', 'no-store');
+  });
+  // TEMPORARY: shows what the host's proxies put in X-Forwarded-For, to choose TRUST_PROXY_HOPS. Returns only the caller's own request details.
+  app.get('/api/v1/diag/ip', { schema: { hide: true } }, async (req) => ({ xff: req.headers['x-forwarded-for'] ?? null, ip: req.ip, ips: req.ips ?? null, socket: req.socket.remoteAddress ?? null, proto: req.headers['x-forwarded-proto'] ?? null, cf: !!req.headers['cf-connecting-ip'], trueClient: req.headers['true-client-ip'] ?? null }));
 
   // Billing (Stripe, test mode). Off, and failing closed, unless every Stripe setting is present.
   const billingCfg = loadBillingConfig(config);
