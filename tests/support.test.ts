@@ -24,7 +24,7 @@ describe('support requests', () => {
 
   it('tells Slack straight away with who, where and what, and logs a ticket', async () => {
     const r = await send('m', { message: 'The Operations page will not load', kind: 'problem', org_id: org.id, site_id: n.id, page: '#/operations', source: 'manage', device: 'iPhone Safari' });
-    expect(r.statusCode).toBe(200); expect(r.json()).toEqual({ sent: true, emailed: true, ticket: true });
+    expect(r.statusCode).toBe(200); expect(r.json()).toEqual({ sent: true, emailed: true, ticket: true, slack: true });
     expect(slack).toHaveLength(1);
     expect(slack[0]).toContain('Amy Manager (mgr@a.com), Site manager'); expect(slack[0]).toContain('Acme'); expect(slack[0]).toContain('North');
     expect(slack[0]).toContain('Something is not working'); expect(slack[0]).toContain('Manage (#/operations)'); expect(slack[0]).toContain('The Operations page will not load'); expect(slack[0]).toContain('iPhone Safari');
