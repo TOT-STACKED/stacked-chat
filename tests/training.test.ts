@@ -101,6 +101,14 @@ describe('training', () => {
     expect(p.people.map((x: { email: string; status: string }) => [x.email, x.status])).toEqual([['mgr@a.com', 'todo'], ['one@a.com', 'renew'], ['two@a.com', 'done']]);
     expect((await list('a')).data[0].status).toBe('renew'); expect((await list('a')).todo).toBe(1);
   });
+  it('counts an owner who takes the course themselves, so the numbers are never "nobody"', async () => {
+    const c = await make('o');
+    expect((await call('o', 'GET', base())).json().data[0].stats.recipients).toBe(4); // venue people only: mgr, one, two, three
+    await call('o', 'POST', `/api/v1/chat/training/${c.id}/complete`, { site_id: n.id, answers: [1, 1] });
+    const d = (await call('o', 'GET', `${base()}/${c.id}/progress`)).json();
+    expect(d.stats).toEqual({ recipients: 5, done: 1, renew: 0, todo: 4 });
+    expect(d.people.find((p: { email: string }) => p.email === 'owner@a.com')).toMatchObject({ status: 'done' });
+  });
   it('hides switched-off courses from staff, keeps sign-offs when edited, and removes everything on delete', async () => {
     const c = await make('o', { site_id: n.id });
     await call('a', 'POST', `/api/v1/chat/training/${c.id}/complete`, { site_id: n.id, answers: [1, 1] });

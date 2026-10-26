@@ -83,7 +83,13 @@ export function createTraining(deps: { store: TrainingStore; repo: Repo; now?: (
   async function remove(orgId: string, id: string) { if (!(await store.getCourse(orgId, id))) throw notFound('Course not found'); await store.deleteCourse(id); }
 
   async function people(c: CourseRow, members: Awaited<ReturnType<Repo['listMembers']>>, links: Array<{ member_id: string; team_id: string }>, done: CompletionRow[]): Promise<Person[]> {
-    return recipientsOf(c, members, links).map((m) => ({ email: m.email, name: nameOf(m), ...pick(statusOf(c, done.filter((d) => d.course_id === c.id && d.email.toLowerCase() === m.email.toLowerCase()), now())) }));
+    // The people it is for, plus anyone else in the company who has taken it (an owner who tries the course themselves).
+    const target = recipientsOf(c, members, links);
+    const have = new Set(target.map((m) => m.email.toLowerCase()));
+    const extra = members.filter((m) => m.status === 'active' && m.email && !have.has(m.email.toLowerCase()) && done.some((d) => d.course_id === c.id && d.email.toLowerCase() === m.email.toLowerCase()));
+    const seen = new Set<string>();
+    return [...target, ...extra].filter((m) => { const k = m.email.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; })
+      .map((m) => ({ email: m.email, name: nameOf(m), ...pick(statusOf(c, done.filter((d) => d.course_id === c.id && d.email.toLowerCase() === m.email.toLowerCase()), now())) }));
   }
   const pick = (s: ReturnType<typeof statusOf>) => ({ status: s.status, completed_at: s.completed_at, expires_at: s.expires_at, score: s.score });
   const stats = (ps: Person[]): Stats => ({ recipients: ps.length, done: ps.filter((p) => p.status === 'done').length, renew: ps.filter((p) => p.status === 'renew').length, todo: ps.filter((p) => p.status === 'todo').length });
