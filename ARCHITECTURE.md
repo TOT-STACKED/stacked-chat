@@ -197,6 +197,14 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 - **Status:** done, "renew" once `renew_months` have passed since the last sign-off, otherwise to do. Recipients are the same people as for updates (`recipientsOf`).
 - **Chat header:** checklists, updates and training now sit behind one "work" button with a combined count, so the header fits a phone. Manage's phone bottom bar scrolls sideways.
 
+### What the chat knows about a person's work
+
+- `chat/work.ts` (`createWork`) gives every question a `WorkContext`: **notes** (today's checklists with progress, unread or unconfirmed updates, courses not done or due a refresher) and **docs** (the pages themselves). It is always loaded, in parallel, and each source fails on its own.
+- **Notes** go into the prompt as "THIS PERSON'S WORK TODAY"; the prompt says to use them only when the question is about what to do, or their checklists, updates or training. When they ask and there is nothing, the chat says nothing is waiting (`WORK_INTENT`).
+- **Docs** are searched exactly like Knowledge (`asItem` wraps each as a published document): updates (title and text, last 60 days), checklist items (active lists for their venue), and course lessons (`training.outlinesFor`). Titles are prefixed `Update:`, `Checklist:`, `Training:` and are cited as sources. Quiz questions and answers are never included.
+- Visibility is applied before anything is wrapped: the same venue and team rules as the staff screens, so one venue's list never reaches another venue's chat.
+- Not covered yet: a manager asking about their team ("who has not done fire training?").
+
 ## Get help (support)
 
 - `POST /api/v1/support` (any signed-in person, never gated by billing): `{ message, kind: problem|question|idea, org_id?, site_id?, page?, source: manage|chat, device? }`. It posts to the support Slack channel at once (who, role, company, venue, where, device), files a `tickets` row when a venue is known, emails the support inbox if `SUPPORT_EMAIL` is set (reply-to is the customer, so replying answers them), and sends the customer a receipt. 6 messages an hour per person.

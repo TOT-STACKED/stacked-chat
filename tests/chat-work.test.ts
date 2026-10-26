@@ -36,5 +36,14 @@ describe('the chat knows what a person has to do today (wired through the app)',
     expect(sys).toContain('Update "New menu": not read yet');
     expect(sys).toContain('Training "Fire safety": not done yet');
     expect(sys).not.toContain('South only');
+
+    // the pages themselves are searchable: checklist items, update text and lessons, but never quiz answers
+    await post(`/api/v1/orgs/${org.id}/training`, { title: 'Food hygiene', lessons: [{ title: 'Fridges', body: 'Keep the fridge at five degrees or below.' }], quiz: [{ q: 'What is the secret code word?', options: ['plum', 'pear', 'fig'], answer: 1 }], pass_percent: 80 });
+    const ask = async (message: string) => { await app.inject({ method: 'POST', url: '/api/v1/chat', headers: { authorization: 'Bearer a' }, payload: { site_id: north.id, message } }); return model.calls.at(-1)!.system; };
+    expect(await ask('what are the opening checklist items? unlock ovens')).toContain('2. Ovens on');
+    expect(await ask('when does the new menu start?')).toContain('Starts Monday.');
+    const lesson = await ask('how cold should the fridge be?');
+    expect(lesson).toContain('five degrees or below'); expect(lesson).not.toContain('secret code word');
+    expect(await ask('what is on the south only cellar checklist?')).not.toContain('Check the cellar');
   });
 });

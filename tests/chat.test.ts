@@ -203,18 +203,29 @@ describe('the chat service', () => {
     await chat.ask(me(), { message: 'where is the fire assembly point?' });
     expect(model.calls.at(-1)!.system).not.toContain('THIS PERSON\'S TRAINING');
   });
-  it('knows what the person has to do today when they ask, and only then', async () => {
-    chat = createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, work: async () => ['Checklist "Opening" (opening): 2 of 7 items ticked, due by 09:00', 'Update "New menu": not read yet', 'Training "Fire safety": not done yet'] });
-    for (const q of ['what do i need to do today?', 'have i got any updates?', 'is the opening checklist done', 'whats on my list']) {
+  it('always knows what the person has to do today, whatever they ask, and says nothing is waiting when they ask and there is nothing', async () => {
+    const ctx = (notes: string[], docs: Array<{ id: string; title: string; body: string }> = []) => createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, work: async () => ({ notes, docs }) });
+    chat = ctx(['Checklist "Opening" (opening): 2 of 7 items ticked, due by 09:00', 'Update "New menu": not read yet', 'Training "Fire safety": not done yet']);
+    for (const q of ['what do i need to do today?', 'have i got any updates?', 'is the opening checklist done', 'whats on my list', 'where is the fire assembly point?']) {
       await chat.ask(me(), { message: q });
       const sys = model.calls.at(-1)!.system;
       expect(sys, q).toContain('Checklist "Opening" (opening): 2 of 7 items ticked, due by 09:00'); expect(sys).toContain('Update "New menu": not read yet'); expect(sys).toContain('Training "Fire safety"'); expect(sys).toContain('four-square button');
     }
+    chat = ctx([]);
+    await chat.ask(me(), { message: 'what do i need to do today?' });
+    expect(model.calls.at(-1)!.system).toContain('Nothing is waiting for them');
     await chat.ask(me(), { message: 'where is the fire assembly point?' });
     expect(model.calls.at(-1)!.system).not.toContain("THIS PERSON'S WORK TODAY");
     chat = createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, work: async () => { throw new Error('db down'); } });
     await chat.ask(me(), { message: 'what do i need to do today?' }); // a failing lookup must not break the answer
     expect(model.calls.at(-1)!.system).not.toContain("THIS PERSON'S WORK TODAY");
+  });
+  it('searches updates, checklists and course lessons like documents, and cites them', async () => {
+    chat = createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, work: async () => ({ notes: [], docs: [{ id: randomUUID(), title: 'Update: New menu', body: 'The new autumn menu starts on Monday. The pumpkin soup replaces the tomato soup.' }] }) });
+    model.reply = 'It starts Monday.\nSource: Update: New menu';
+    const r = await chat.ask(me(), { message: 'when does the new autumn menu start?' });
+    expect(model.calls.at(-1)!.system).toContain('pumpkin soup replaces the tomato soup');
+    expect(r.sources.map((s) => s.title)).toEqual(['Update: New menu']);
   });
   it('lists every course when asked what training is available, and says so when there are none', async () => {
     const mk = (list: Array<{ title: string; status: 'todo' | 'done' | 'renew'; completed_at: string | null; expires_at: string | null }>) => createChat({ items: async (o) => kstore.listItems(o), conversations: convs, model, training: async () => list });

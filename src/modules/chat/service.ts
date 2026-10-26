@@ -6,6 +6,7 @@ import { pickProfiles, supportLink, takeNpsTag, vendorAnswerToRatingQuestion, ve
 import { checkNps, type NpsMirror, type NpsStore } from './nps.js';
 import { buildSystemPrompt } from './prompt.js';
 import type { ChatModel, ChatTurn } from './model.js';
+import { asItem, type WorkContext } from './work.js';
 import { imagesBehind, pickMedia, retrievePassages, visibleTo, wantsVideo } from './retrieve.js';
 import type { ConversationStore, StoredMessage } from './store.js';
 import { detectSensitive, TOPIC_IDS, withConfirmLine, type TopicId, type TopicMode } from '../sensitive/topics.js';
@@ -27,11 +28,12 @@ async function trainingNotesFor(load: (who: Who) => Promise<TrainingStatus[]>, w
 }
 
 /** Questions about what the person has to do: today's checklists, updates to read, training to take. Only these get that list added to the prompt. */
+/** Not needed to decide whether to look (the chat always knows) but used to say "nothing waiting" when they ask and there is nothing. */
 export const WORK_INTENT = /\b(to do|todo|to-do|tasks?|checklists?|check lists?|opening|closing|open up|close up|updates?|announcements?|news|outstanding|overdue|what (?:do|should|have|am|is|are)\b.{0,40}\b(?:today|now|first|next|left|on)|what'?s (?:on|left|next)|anything (?:for me|i need|i should|to do)|my (?:day|shift|jobs?|list))\b/i;
 
 export interface ChatDeps {
-  /** this person's work today: checklists at their venue and how far along they are, updates not yet read, for questions about what to do */
-  work?: (who: Who) => Promise<string[]>;
+  /** this person's work (checklists, updates, training) as short lines, plus pages the chat can search and quote */
+  work?: (who: Who) => Promise<WorkContext>;
   /** this person's courses and sign-offs, for questions about their training */
   training?: (who: Who) => Promise<TrainingStatus[]>;
   /** all knowledge items for an organisation (the service filters what this person may see) */
@@ -121,12 +123,16 @@ export function createChat(deps: ChatDeps) {
 
     // a short follow-up ("and on Sundays?") makes sense only with the previous question, so search with both
     const lastQuestion = [...stored].reverse().find((m) => m.role === 'user')?.content ?? '';
-    const passages = retrievePassages(visible.filter((i) => i.kind === 'document' || i.kind === 'image'), `${message} ${message.split(/\s+/).length < 6 ? lastQuestion : ''}`);
+    // Updates, checklists and courses are searched like documents. A failing source just means no extra pages.
+    const work = deps.work ? await deps.work(who).catch(() => null) : null;
+    const workPages = (work?.docs ?? []).map((d) => asItem(who.orgId, d));
+    const searchable = [...visible.filter((i) => i.kind === 'document' || i.kind === 'image'), ...workPages];
+    const passages = retrievePassages(searchable, `${message} ${message.split(/\s+/).length < 6 ? lastQuestion : ''}`);
     // Pictures and videos are shown when asked for, or once when this question is about them. Not again on every follow-up:
     // the page tells us what it has already shown in this chat, and asking for one again always works.
     const shown = new Set(input.shown_media ?? []);
     const picked = pickMedia(visible, message);
-    const ownPassages = retrievePassages(visible.filter((i) => i.kind === 'document' || i.kind === 'image'), message); // this message only, not the one before it
+    const ownPassages = retrievePassages(searchable, message); // this message only, not the one before it
     const behind = imagesBehind(visible, ownPassages).filter((i) => !shown.has(i.id) && !picked.images.some((p) => p.id === i.id));
     const media = {
       videos: wantsVideo(message) ? picked.videos : picked.videos.filter((v) => !shown.has(v.id)),
@@ -136,7 +142,7 @@ export function createChat(deps: ChatDeps) {
     const system = buildSystemPrompt({
       botName: who.botName || 'Stacked Chat', orgName: who.orgName, siteName: who.siteName, personName: who.name,
       trainingNotes: deps.training && TRAINING_INTENT.test(message) ? await trainingNotesFor(deps.training, who) : undefined,
-      workNotes: deps.work && WORK_INTENT.test(message) ? await deps.work(who).catch(() => []) : undefined,
+      workNotes: work ? (work.notes.length ? work.notes : WORK_INTENT.test(message) ? ['Nothing is waiting for them: no checklists are set up for their venue, no unread updates and no training to take.'] : []) : undefined,
       passages, hasVideo: media.videos.length > 0, videoNotes: media.videos.map((v) => (v.description ? `${v.title}: ${v.description}` : v.title)), hasImage: media.images.length > 0,
       vendorNotes: pickProfiles(message, history.map((m) => ({ role: m.role, content: m.content })), who.techStack ?? null).map((k) => PROFILES[k]!),
       techStack: who.techStack ?? null, techCategories: TECH_CATEGORIES,

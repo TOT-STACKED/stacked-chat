@@ -115,6 +115,10 @@ export function createTraining(deps: { store: TrainingStore; repo: Repo; now?: (
     return courses.map((c) => ({ id: c.id, title: c.title, description: c.description, lessons: c.lessons.length, questions: c.quiz.length, pass_percent: c.pass_percent, renew_months: c.renew_months,
       ...statusOf(c, done.filter((d) => d.course_id === c.id && d.email.toLowerCase() === who.email.toLowerCase()), now()) }));
   }
+  /** The lessons (never the quiz) of the active courses this person can take, so the chat can answer from them. */
+  async function outlinesFor(who: Who): Promise<Array<{ id: string; title: string; description: string | null; lessons: Array<{ title: string; body: string }> }>> {
+    return (await store.listCourses(who.orgId)).filter((c) => c.active && visibleTo(c, who)).map((c) => ({ id: c.id, title: c.title, description: c.description, lessons: c.lessons.map((l) => ({ title: l.title, body: l.body })) }));
+  }
   async function openFor(who: Who, id: string): Promise<CourseRow> {
     const c = await store.getCourse(who.orgId, id);
     if (!c || !c.active || !visibleTo(c, who)) throw notFound('Course not found');
@@ -140,6 +144,6 @@ export function createTraining(deps: { store: TrainingStore; repo: Repo; now?: (
     return { passed, score, correct, total: c.quiz.length, wrong, completed_at: passed ? at : null };
   }
 
-  return { create, update, remove, get: (orgId: string, id: string) => store.getCourse(orgId, id), list, progress, listFor, courseFor, submit, audienceFor };
+  return { create, update, remove, get: (orgId: string, id: string) => store.getCourse(orgId, id), list, progress, listFor, outlinesFor, courseFor, submit, audienceFor };
 }
 export type Training = ReturnType<typeof createTraining>;
