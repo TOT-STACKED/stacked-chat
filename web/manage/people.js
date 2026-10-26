@@ -45,7 +45,7 @@ export async function renderPeople(main, ctx) {
       return;
     }
     if (st.loading) { main.append(h('p', { class: 'muted', text: 'Loading…' })); return; }
-    main.append(h('div', { class: 'cols' }, tree(), h('div', { class: 'tablewrap' }, h('div', { class: 'toolbar' }, chips()), table(), ruleCard())));
+    main.append(h('div', { class: 'cols' }, tree(), h('div', { class: 'tablewrap' }, scopePicker(), h('div', { class: 'toolbar' }, chips()), table(), ruleCard())));
   }
 
   function tree() {
@@ -74,6 +74,23 @@ export async function renderPeople(main, ctx) {
         canAddSite && h('button', { class: 'lnk', onclick: openAddSite }, 'Add a site'),
         canTeam && h('button', { class: 'lnk', onclick: () => openAddTeam(st.sel.kind === 'company' ? null : selSite) }, 'Add a team')),
     );
+  }
+
+  /** On a phone the big company tree is replaced by one dropdown (and the add links), so the people come first. */
+  function scopePicker() {
+    const val = st.sel.kind === 'company' ? 'company' : `${st.sel.kind}:${st.sel.id}`;
+    const c = countMembers(st.members, st.sites, st.teams);
+    const opts = [h('option', { value: 'company', selected: val === 'company' }, `${orgName} (${c.total})`)];
+    for (const t of st.teams.filter((x) => x.site_id === null)) opts.push(h('option', { value: `team:${t.id}`, selected: val === `team:${t.id}` }, `Team: ${t.name} (${c.byTeam[t.id]})`));
+    for (const x of st.sites) {
+      opts.push(h('option', { value: `site:${x.id}`, selected: val === `site:${x.id}` }, `${x.name} (${c.bySite[x.id]})`));
+      for (const t of st.teams.filter((y) => y.site_id === x.id)) opts.push(h('option', { value: `team:${t.id}`, selected: val === `team:${t.id}` }, `   ${t.name} team (${c.byTeam[t.id]})`));
+    }
+    const pick = h('select', { 'aria-label': 'Whose people to show', onchange: (e) => { const [k, id] = e.target.value.split(':'); select(k === 'company' ? { kind: 'company' } : { kind: k, id }); } }, opts);
+    const selSite = st.sel.kind === 'site' ? st.sel.id : st.sel.kind === 'team' ? (st.teams.find((t) => t.id === st.sel.id) || {}).site_id ?? null : null;
+    const canTeam = canManage(memberships, orgId, st.sel.kind === 'company' ? null : selSite);
+    return h('div', { class: 'scopepick' }, pick,
+      h('div', { class: 'treeactions' }, canAddSite && h('button', { class: 'lnk', onclick: openAddSite }, 'Add a site'), canTeam && h('button', { class: 'lnk', onclick: () => openAddTeam(st.sel.kind === 'company' ? null : selSite) }, 'Add a team')));
   }
 
   function chips() {
@@ -107,7 +124,7 @@ export async function renderPeople(main, ctx) {
       );
     });
     return h('div', { class: 'card scroll' },
-      rows.length ? h('table', null, h('thead', null, head), h('tbody', null, body))
+      rows.length ? h('table', { class: 'ptable' }, h('thead', null, head), h('tbody', null, body))
         : h('p', { class: 'empty', text: st.members.length ? 'No one matches this view.' : 'No one here yet. Invite your first person to get started.' }));
   }
 
@@ -142,7 +159,8 @@ export async function renderPeople(main, ctx) {
   function openInvite() {
     const scopes = manageable();
     const startSite = st.sel.kind === 'site' ? st.sel.id : null;
-    const initial = scopes.some((s) => s.id === startSite) ? startSite : (scopes.find((s) => s.id) || scopes[0]).id; // staff work at a venue, so start there
+    // staff work at a venue, so start there: the one being looked at, otherwise the first venue (never "Whole company" unless that is all there is)
+    const initial = startSite && scopes.some((s) => s.id === startSite) ? startSite : (scopes.find((s) => s.id) || scopes[0]).id;
     let mode = 'phone';
     modal('Add people', (close) => {
       const people = h('textarea', { id: 'inv-people', rows: 5, placeholder: 'Amy Smith 07700 900123\nBen Jones 07700 900456', 'aria-describedby': 'inv-h' });
