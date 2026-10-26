@@ -15,11 +15,13 @@ import type { Help } from './help.js';
 import type { Ops } from '../operations/service.js';
 import type { Comms } from '../communicate/service.js';
 import { FeedOut } from '../communicate/routes.js';
+import type { Training } from '../training/service.js';
+import { LearnerCourse, ListedOut, ResultOut } from '../training/routes.js';
 import { RunOut, ChecklistOut } from '../operations/routes.js';
 import { MAX_MESSAGE, type Chat, type Who } from './service.js';
 
 interface Ctx {
-  chat: Chat | null; repo?: Repo; branding: BrandingStore | null; insights: InsightsStore | null; techStack?: TechStackStore | null; help?: Help | null; ops?: Ops | null; comms?: Comms | null;
+  chat: Chat | null; repo?: Repo; branding: BrandingStore | null; insights: InsightsStore | null; techStack?: TechStackStore | null; help?: Help | null; ops?: Ops | null; comms?: Comms | null; training?: Training | null;
   perMinute?: number; now?: () => number;
 }
 
@@ -189,6 +191,32 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     const who = await whoAsks(userOnly(req), req.body.site_id);
     await commsSvc().markRead({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds }, req.params.id, req.body.ack === true);
     return { ok: true as const };
+  });
+
+  // ---- training: courses for you, and signing them off -------------------------------------------------------------
+  const trainingSvc = () => { if (!ctx.training) throw notFound('Training is not available'); return ctx.training; };
+  const learner = (who: Who) => ({ orgId: who.orgId, siteId: who.siteId, email: who.email, teamIds: who.teamIds });
+  r.get('/api/v1/chat/training', {
+    preHandler: app.authenticate,
+    schema: { tags: ['chat'], summary: 'Courses for you and your venue, with what you have done', security: SECURITY, querystring: z.object({ site_id: Id }), response: { 200: z.object({ data: z.array(ListedOut), todo: z.number() }), 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => {
+    const data = await trainingSvc().listFor(learner(await whoAsks(userOnly(req), req.query.site_id)));
+    return { data, todo: data.filter((c) => c.status !== 'done').length };
+  });
+  r.get('/api/v1/chat/training/:id', {
+    preHandler: app.authenticate,
+    schema: { tags: ['chat'], summary: 'One course: its lessons and quiz questions (never the answers)', security: SECURITY, params: z.object({ id: Id }), querystring: z.object({ site_id: Id }), response: { 200: LearnerCourse, 403: ErrorBody, 404: ErrorBody } },
+  }, async (req) => trainingSvc().courseFor(learner(await whoAsks(userOnly(req), req.query.site_id)), req.params.id));
+  r.post('/api/v1/chat/training/:id/complete', {
+    preHandler: app.authenticate,
+    schema: { tags: ['chat'], summary: 'Hand in the quiz (or confirm you have read a course with no quiz). Passing records your sign-off.', security: SECURITY, params: z.object({ id: Id }),
+      body: z.object({ site_id: Id, answers: z.array(z.number().int().min(0).max(3)).max(40).optional(), confirm: z.boolean().optional() }),
+      response: { 200: ResultOut, 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody } },
+  }, async (req, reply) => {
+    const p = userOnly(req);
+    const rl = tickLimiter.hit('train:' + p.userId);
+    if (!rl.allowed) { reply.header('Retry-After', String(rl.retryAfterSeconds)); throw new ApiHttpError(429, 'rate_limited', 'Slow down a moment.'); }
+    return trainingSvc().submit(learner(await whoAsks(p, req.body.site_id)), req.params.id, { answers: req.body.answers, confirm: req.body.confirm });
   });
 
   r.post('/api/v1/chat/help', {

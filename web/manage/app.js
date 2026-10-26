@@ -8,6 +8,7 @@ import { renderKnowledge } from './knowledge.js';
 import { renderInsights } from './insights.js';
 import { renderOperations } from './operations.js';
 import { renderCommunicate } from './communicate.js';
+import { renderTraining } from './training.js';
 import { ICONS, avatar, logo, pageHeader, tile } from './ui.js';
 import { ROLE_LABEL, atLeast, bestRole, isManagerAnywhere } from './lib.js';
 import { labelTables } from './responsive.js';
@@ -17,10 +18,10 @@ labelTables(root);
 let cfg; let auth; let api;
 const state = { memberships: [], orgs: [], orgId: null };
 
-const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['operations', 'Operations'], ['communicate', 'Communicate'], ['settings', 'Settings']];
+const NAV = [['home', 'Home'], ['knowledge', 'Knowledge'], ['people', 'People'], ['insights', 'Insights'], ['operations', 'Operations'], ['communicate', 'Communicate'], ['training', 'Training'], ['settings', 'Settings']];
 /** The phone's bottom bar is narrow: a few items use a shorter word there. */
 const SHORT = { communicate: 'Updates', operations: 'Ops' };
-const SOON_NAV = [['training', 'Training']];
+const SOON_NAV = [];
 
 // ---- sign in -------------------------------------------------------------------------------
 function showSignIn(message) {
@@ -138,8 +139,8 @@ function drawShell() {
       orgBox,
       h('nav', { class: 'nav', 'aria-label': 'Main' }, h('span', { class: 'navlabel', text: 'Workspace' }),
         NAV.map(([k, label]) => h('a', { href: '#/' + k, id: 'nav-' + k }, tile(k, 28), SHORT[k] ? [h('span', { class: 'lg', text: label }), h('span', { class: 'sh', text: SHORT[k] })] : label))),
-      h('nav', { class: 'nav soonwrap', 'aria-label': 'Coming next', style: 'margin-top:8px' }, h('span', { class: 'navlabel', text: 'Coming next' }),
-        SOON_NAV.map(([k, label]) => h('span', { class: 'soonitem' }, tile(k, 28), label, h('span', { class: 'tag', text: 'Soon' })))),
+      SOON_NAV.length ? h('nav', { class: 'nav soonwrap', 'aria-label': 'Coming next', style: 'margin-top:8px' }, h('span', { class: 'navlabel', text: 'Coming next' }),
+        SOON_NAV.map(([k, label]) => h('span', { class: 'soonitem' }, tile(k, 28), label, h('span', { class: 'tag', text: 'Soon' })))) : null,
       h('div', { class: 'grow' }),
       h('button', { class: 'btn line small mobsignout', onclick: signOut }, 'Sign out')),
     h('div', { class: 'content' },
@@ -152,13 +153,14 @@ function drawShell() {
 const SOON = {
   insights: ['Insights', 'What people ask most, what the AI could not answer, and usage by site and team.', 'What your teams ask, and what the AI could not answer.'],
 };
-const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', operations: 'Operations', communicate: 'Communicate', settings: 'Settings' };
+const TITLES = { home: 'Home', knowledge: 'Knowledge', people: 'People', insights: 'Insights', operations: 'Operations', communicate: 'Communicate', training: 'Training', settings: 'Settings' };
 
 function route() {
   if (!main) return;
   const key = (location.hash.replace('#/', '') || 'home').split('?')[0].split('/')[0];
   const view = NAV.some(([k]) => k === key) ? key : 'home';
   document.querySelectorAll('.nav a').forEach((a) => { a.classList.toggle('on', a.id === 'nav-' + view); if (a.id === 'nav-' + view) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+  const onNav = document.querySelector('.nav a.on'); if (onNav && onNav.scrollIntoView) onNav.scrollIntoView({ inline: 'center', block: 'nearest' }); // the phone's bar scrolls sideways
   clear(main);
   const org = state.orgs.find((o) => o.id === state.orgId);
   const orgRole = bestRole(state.memberships, state.orgId, null);
@@ -188,6 +190,11 @@ function route() {
   if (view === 'insights') {
     if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Insights', 'insights', 'What your teams ask.', 'This area is for managers'); return; }
     renderInsights(main, { api, memberships: state.memberships, orgId: state.orgId });
+    return;
+  }
+  if (view === 'training') {
+    if (!isManagerAnywhere(state.memberships, state.orgId)) { restricted('Training', 'training', 'Courses and sign-offs.', 'This area is for managers'); return; }
+    renderTraining(main, { api, memberships: state.memberships, orgId: state.orgId });
     return;
   }
   if (view === 'communicate') {

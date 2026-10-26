@@ -19,7 +19,7 @@ const svg = (d, size = 20, extra = {}) => {
   for (const p of [].concat(d)) { const e = document.createElementNS(ns, 'path'); e.setAttribute('d', p); s.append(e); }
   return s;
 };
-const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z', list: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 3h6v4H9z', 'M9 13l2 2 4-4'], tick: 'M5 12l5 5L20 7', mega: ['M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z', 'M15 9a4 4 0 0 1 0 6', 'M18 6.5a8 8 0 0 1 0 11'] };
+const ICON = { send: 'M5 12h14M13 6l6 6-6 6', history: ['M3 12a9 9 0 1 0 3-6.7L3 8', 'M3 3v5h5', 'M12 7v5l3 2'], plus: 'M12 5v14M5 12h14', close: 'M6 6l12 12M18 6L6 18', mic: ['M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z', 'M19 11a7 7 0 0 1-14 0', 'M12 18v3'], stop: 'M7 7h10v10H7z', list: ['M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2', 'M9 3h6v4H9z', 'M9 13l2 2 4-4'], tick: 'M5 12l5 5L20 7', hub: ['M4 5h7v7H4z', 'M13 5h7v7h-7z', 'M4 14h7v6H4z', 'M13 14h7v6h-7z'], cap: ['M22 10L12 5 2 10l10 5 10-5z', 'M6 12v5c3 2 9 2 12 0v-5', 'M22 10v6'], back: 'M15 6l-6 6 6 6', mega: ['M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z', 'M15 9a4 4 0 0 1 0 6', 'M18 6.5a8 8 0 0 1 0 11'] };
 const logoSrc = '/manage/assets/logo-stacked.png';
 const markSrc = '/manage/assets/favicon-192.png'; // the Stacked mark: the chat wears it unless a venue brings its own logo
 const isHttps = (u) => /^https:\/\//i.test(String(u || ''));
@@ -133,7 +133,7 @@ function micButton() {
 }
 
 // ---- the chat screen ---------------------------------------------------------------------------------------
-let thread; let input; let sendBtn; let checkBtn; let updatesBtn;
+let thread; let input; let sendBtn; let hubBtn;
 function draw() {
   applyBrand(); clear(root);
   const b = st.site.branding; const sites = st.ctx.sites;
@@ -144,19 +144,18 @@ function draw() {
   sendBtn = h('button', { class: 'send', type: 'submit', 'aria-label': 'Send' }, svg(ICON.send));
   input.addEventListener('input', () => { input.style.height = 'auto'; input.style.height = Math.min(160, input.scrollHeight) + 'px'; sendBtn.disabled = st.sending || !input.value.trim(); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
-  updatesBtn = h('button', { class: 'iconbtn chkbtn', hidden: true, 'aria-label': 'Updates', title: 'Updates from your managers', onclick: openUpdates }, svg(ICON.mega), h('i', { class: 'chkdot', hidden: true }));
-  checkBtn = h('button', { class: 'iconbtn chkbtn', hidden: true, 'aria-label': 'Checklists', title: 'Checklists', onclick: openChecklists }, svg(ICON.list), h('i', { class: 'chkdot', hidden: true }));
+  hubBtn = h('button', { class: 'iconbtn chkbtn', hidden: true, 'aria-label': 'Work: checklists, updates and training', 'aria-haspopup': 'true', onclick: toggleHub }, svg(ICON.hub), h('i', { class: 'chkdot', hidden: true }));
   const form = h('form', { onsubmit: (e) => { e.preventDefault(); submit(); } }, input, micButton(), sendBtn);
   root.append(h('div', { class: 'app' },
     h('header', { class: 'bar' },
       h('button', { class: 'iconbtn', 'aria-label': 'Your conversations', onclick: openHistory }, svg(ICON.history)),
       h('div', { class: 'brand' }, ownLogo() ? h('img', { src: b.logo_url, alt: '' }) : h('img', { class: 'mark', src: markSrc, alt: '', width: 32, height: 32 }), h('b', { text: brandName() })),
-      venue, updatesBtn, checkBtn, h('button', { class: 'iconbtn', 'aria-label': 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus)),
+      venue, hubBtn, h('button', { class: 'iconbtn', 'aria-label': 'New chat', onclick: () => { resetChat(); draw(); input.focus(); } }, svg(ICON.plus)),
       h('button', { class: 'avatar', title: `Sign out ${auth.email()}`, 'aria-label': `Sign out ${auth.email()}`, style: 'border:0;cursor:pointer', onclick: signOut }, (auth.email()[0] || '?').toUpperCase())),
     thread,
     h('div', { class: 'composer' }, form, h('p', { class: 'fine', text: 'Answers come from your company’s knowledge. For anything safety-critical, such as allergens, check with your manager.' }))));
   sendBtn.disabled = true; drawThread(); input.focus();
-  refreshChecklists(); refreshUpdates();
+  refreshChecklists(); refreshUpdates(); refreshTraining();
 }
 
 function hello() {
@@ -275,6 +274,31 @@ async function send(text) {
   st.sending = false; drawThread(); if (sendBtn) sendBtn.disabled = !input.value.trim(); if (input) input.focus();
 }
 
+// ---- the work menu: checklists, updates and training behind one header button ------------------------------------
+st.lists = []; st.updates = []; st.courses = [];
+function hubItems() {
+  const open = st.lists.filter((l) => !l.run.completed_at).length;
+  return [
+    { label: 'Checklists', note: 'Today', icon: ICON.list, count: open, show: st.lists.length > 0, go: () => openChecklists() },
+    { label: 'Updates', note: 'From your managers', icon: ICON.mega, count: st.unread || 0, show: st.updates.length > 0, go: () => openUpdates() },
+    { label: 'Training', note: 'Courses and sign-offs', icon: ICON.cap, count: st.todo || 0, show: st.courses.length > 0, go: () => openTraining() },
+  ].filter((x) => x.show);
+}
+function paintHub() {
+  if (!hubBtn || !hubBtn.isConnected) return;
+  const items = hubItems(); const total = items.reduce((n, x) => n + x.count, 0);
+  hubBtn.hidden = items.length === 0;
+  const dot = hubBtn.querySelector('.chkdot'); if (dot) { dot.hidden = total === 0; dot.textContent = total ? String(total) : ''; }
+}
+function toggleHub() {
+  const open = document.getElementById('hubmenu');
+  if (open) { open.remove(); return; }
+  const menu = h('div', { class: 'hubmenu', id: 'hubmenu', role: 'menu' }, hubItems().map((x) => h('button', { class: 'hubitem', role: 'menuitem', onclick: () => { menu.remove(); x.go(); } },
+    svg(x.icon, 22), h('span', { class: 'hubtxt' }, h('b', { text: x.label }), h('small', { text: x.note })), x.count ? h('i', { class: 'chkdot inline', text: String(x.count) }) : null)));
+  const away = (e) => { if (!menu.contains(e.target) && !hubBtn.contains(e.target)) { menu.remove(); document.removeEventListener('click', away, true); } };
+  document.body.append(menu); setTimeout(() => document.addEventListener('click', away, true), 0);
+}
+
 // ---- checklists: today's opening / closing lists for this venue --------------------------------------------------
 st.lists = [];
 const clTime = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
@@ -284,12 +308,7 @@ async function refreshChecklists() {
   try { st.lists = (await api.get(`/api/v1/chat/checklists?site_id=${st.site.site_id}`)).data; } catch { st.lists = []; }
   paintCheckBtn();
 }
-function paintCheckBtn() {
-  if (!checkBtn || !checkBtn.isConnected) return;
-  checkBtn.hidden = st.lists.length === 0;
-  const open = st.lists.filter((l) => !l.run.completed_at).length;
-  const dot = checkBtn.querySelector('.chkdot'); if (dot) { dot.hidden = open === 0; dot.textContent = open ? String(open) : ''; }
-}
+function paintCheckBtn() { paintHub(); }
 async function openChecklists() {
   const scrim = h('div', { class: 'scrim' }); const body = h('div', { class: 'list chklist' });
   const close = () => { scrim.remove(); drawer.remove(); document.removeEventListener('keydown', onKey); paintCheckBtn(); };
@@ -344,11 +363,7 @@ async function refreshUpdates() {
   try { const r = await api.get(`/api/v1/chat/updates?site_id=${st.site.site_id}`); st.updates = r.data; st.unread = r.unread; } catch { st.updates = []; st.unread = 0; }
   paintUpdatesBtn();
 }
-function paintUpdatesBtn() {
-  if (!updatesBtn || !updatesBtn.isConnected) return;
-  updatesBtn.hidden = st.updates.length === 0;
-  const dot = updatesBtn.querySelector('.chkdot'); if (dot) { dot.hidden = st.unread === 0; dot.textContent = st.unread ? String(st.unread) : ''; }
-}
+function paintUpdatesBtn() { paintHub(); }
 async function openUpdates() {
   const scrim = h('div', { class: 'scrim' }); const body = h('div', { class: 'list chklist' });
   const close = () => { scrim.remove(); drawer.remove(); document.removeEventListener('keydown', onKey); };
@@ -375,6 +390,88 @@ async function openUpdates() {
   // opening the list counts as reading: remember which were new so they stand out for now
   for (const u of st.updates) { u.isNew = !u.read_at; if (!u.read_at) { post(u, false).then(() => { u.read_at = new Date().toISOString(); recount(); }).catch(() => {}); } }
   paint();
+}
+
+// ---- training: courses for you, and signing them off ------------------------------------------------------------
+st.courses = []; st.todo = 0;
+const trDay = (iso) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/London' });
+async function refreshTraining() {
+  try { const r = await api.get(`/api/v1/chat/training?site_id=${st.site.site_id}`); st.courses = r.data; st.todo = r.todo; } catch { st.courses = []; st.todo = 0; }
+  paintTrainBtn();
+}
+function paintTrainBtn() { paintHub(); }
+function openTraining() {
+  const scrim = h('div', { class: 'scrim' }); const body = h('div', { class: 'sheetbody' }); const title = h('h2', { text: 'Training' });
+  const back = h('button', { class: 'iconbtn', 'aria-label': 'Back', hidden: true }, svg(ICON.back));
+  const close = () => { scrim.remove(); sheet.remove(); document.removeEventListener('keydown', onKey); paintTrainBtn(); };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  const sheet = h('section', { class: 'sheet', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Training' },
+    h('header', null, back, title, h('button', { class: 'iconbtn', 'aria-label': 'Close', onclick: close }, svg(ICON.close))), body);
+  scrim.addEventListener('click', close); document.addEventListener('keydown', onKey); document.body.append(scrim, sheet);
+  const statusText = (c) => (c.status === 'done' ? `Done ${trDay(c.completed_at)}${c.score !== null ? ` · ${c.score}%` : ''}` : c.status === 'renew' ? `Time for a refresher (last done ${trDay(c.completed_at)})` : 'To do');
+
+  function showList() {
+    title.textContent = 'Training'; back.hidden = true; back.onclick = null; clear(body);
+    if (!st.courses.length) { body.append(h('p', { class: 'muted', text: 'No courses for you yet.' })); return; }
+    for (const c of st.courses) {
+      body.append(h('button', { class: `course ${c.status}`, onclick: () => showCourse(c) },
+        h('b', { text: c.title }), c.description ? h('span', { class: 'cdesc', text: c.description }) : null,
+        h('span', { class: 'cmeta' }, h('i', { class: `cdot ${c.status}` }), statusText(c), h('em', { text: ` · ${c.lessons} lesson${c.lessons === 1 ? '' : 's'}${c.questions ? `, ${c.questions} questions` : ''}` }))));
+    }
+  }
+
+  async function showCourse(listed) {
+    title.textContent = listed.title; back.hidden = false; back.onclick = () => { showList(); }; clear(body);
+    body.append(h('p', { class: 'muted', text: 'Loading…' }));
+    let c;
+    try { c = await api.get(`/api/v1/chat/training/${listed.id}?site_id=${st.site.site_id}`); }
+    catch (e) { clear(body); body.append(h('div', { class: 'err', role: 'alert', text: e.message })); return; }
+    clear(body);
+    if (c.description) body.append(h('p', { class: 'cintro', text: c.description }));
+    c.lessons.forEach((l, i) => body.append(h('article', { class: 'lesson' }, h('small', { text: `Lesson ${i + 1} of ${c.lessons.length}` }), h('h3', { text: l.title }), h('p', { text: l.body }),
+      l.url && /^https:\/\//i.test(l.url) ? h('a', { class: 'btn small line', href: l.url, target: '_blank', rel: 'noopener noreferrer' }, 'Watch the video') : null)));
+    const result = h('div'); const picks = c.quiz.map(() => -1); let wrong = new Set();
+    const finish = h('button', { class: 'btn' }, c.quiz.length ? 'Hand in my answers' : 'Sign this off');
+    let sure = null;
+    if (c.quiz.length) {
+      const qs = h('div', { class: 'quiz' }, h('h3', { text: 'Quick check' }), h('p', { class: 'muted', text: `Answer every question. You need ${c.pass_percent}% to pass.` }));
+      const paintQs = () => { qs.querySelectorAll('.q').forEach((n) => n.remove());
+        c.quiz.forEach((q, i) => qs.append(h('fieldset', { class: `q ${wrong.has(q.id) ? 'bad' : ''}` }, h('legend', { text: `${i + 1}. ${q.q}` }),
+          ...q.options.map((o, k) => h('label', { class: 'opt' }, h('input', { type: 'radio', name: `q${i}`, checked: picks[i] === k, onchange: () => { picks[i] = k; } }), h('span', { text: o }))),
+          wrong.has(q.id) ? h('span', { class: 'notq', text: 'Not quite. Have another look at the lessons.' }) : null))); };
+      paintQs(); body.append(qs);
+      finish.onclick = async () => {
+        clear(result);
+        if (picks.some((p) => p < 0)) { result.append(h('div', { class: 'err', role: 'alert', text: 'Answer every question first.' })); return; }
+        finish.disabled = true;
+        try {
+          const r = await api.post(`/api/v1/chat/training/${c.id}/complete`, { site_id: st.site.site_id, answers: picks });
+          if (r.passed) { await refreshTraining(); showDone(`You passed with ${r.score}%. That is signed off.`); return; }
+          wrong = new Set(r.wrong); paintQs();
+          result.append(h('div', { class: 'err', role: 'alert', text: `You got ${r.correct} of ${r.total} (${r.score}%). You need ${c.pass_percent}%. Check the questions marked and try again.` }));
+        } catch (e) { result.append(h('div', { class: 'err', role: 'alert', text: e.message })); }
+        finish.disabled = false;
+      };
+    } else {
+      sure = h('input', { type: 'checkbox', id: 'sure' });
+      body.append(h('label', { class: 'opt sure', for: 'sure' }, sure, h('span', { text: 'I have read and understood this.' })));
+      finish.onclick = async () => {
+        clear(result);
+        if (!sure.checked) { result.append(h('div', { class: 'err', role: 'alert', text: 'Tick the box to confirm.' })); return; }
+        finish.disabled = true;
+        try { await api.post(`/api/v1/chat/training/${c.id}/complete`, { site_id: st.site.site_id, confirm: true }); await refreshTraining(); showDone('Thanks. That is signed off.'); return; }
+        catch (e) { result.append(h('div', { class: 'err', role: 'alert', text: e.message })); }
+        finish.disabled = false;
+      };
+    }
+    body.append(result, finish);
+  }
+  function showDone(msg) {
+    title.textContent = 'Done'; back.hidden = false; back.onclick = showList; clear(body);
+    body.append(h('div', { class: 'passed' }, h('span', { class: 'tickbig' }, svg(ICON.tick, 28, { 'stroke-width': 3 })), h('b', { text: msg }), h('button', { class: 'btn', onclick: showList }, 'Back to my training')));
+  }
+  showList();
+  refreshTraining().then(() => { if (!sheet.isConnected) return; if (body.querySelector('.course') || !body.querySelector('.cintro,.lesson')) showList(); });
 }
 
 // ---- history -------------------------------------------------------------------------------------------------

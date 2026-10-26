@@ -182,3 +182,11 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 - **Staff:** `GET /api/v1/chat/updates?site_id=` (the feed plus an unread count) and `POST …/:id/read` (opening it, or `ack: true` to confirm). Visibility is the knowledge rule: the whole company, their venue, or their team. Staff see the last 60 days.
 - **Recipients** (for read counts and email): active people at the venue (or at every venue for a company update), or the team's members. Company-level admins are the senders and are not counted unless they are in the team.
 - **Email** is optional per update ("also email it"), up to 500 people, via the same mailer as the rest. No push notifications: the chat header shows a megaphone with an unread count.
+
+## Training: courses and sign-offs
+
+- **Tables (migration 016):** `training_courses` (title, description, `lessons` `[{id,title,body,url}]`, `quiz` `[{id,q,options,answer}]`, `pass_percent`, `renew_months`, `active`, the same `site_id`/`team_id` audience as updates) and `training_completions` (one row per pass or sign-off; a renewal adds a row and the latest counts).
+- **Managers:** `GET/POST /api/v1/orgs/:orgId/training`, `PATCH/DELETE …/:id`, `GET …/:id/progress` (per person: done, due a refresher, or to do). Same write rule as knowledge, checklists and updates. The audience cannot change after creating. Editing a course never removes earlier sign-offs.
+- **Staff:** `GET /api/v1/chat/training?site_id=` (their courses and status), `GET …/:id` (lessons and quiz questions, **never the answers**), `POST …/:id/complete` (answers are scored on the server; a pass records the sign-off, a miss returns which questions were wrong and nothing else). A course with no quiz is signed off with `confirm: true`.
+- **Status:** done, "renew" once `renew_months` have passed since the last sign-off, otherwise to do. Recipients are the same people as for updates (`recipientsOf`).
+- **Chat header:** checklists, updates and training now sit behind one "work" button with a combined count, so the header fits a phone. Manage's phone bottom bar scrolls sideways.

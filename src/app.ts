@@ -57,6 +57,9 @@ import { operationsRoutes } from './modules/operations/routes.js';
 import { createComms, type Comms } from './modules/communicate/service.js';
 import { createSupabaseCommsStore, type CommsStore } from './modules/communicate/store.js';
 import { communicateRoutes } from './modules/communicate/routes.js';
+import { createTraining, type Training } from './modules/training/service.js';
+import { createSupabaseTrainingStore, type TrainingStore } from './modules/training/store.js';
+import { trainingRoutes } from './modules/training/routes.js';
 import { createReminders } from './modules/operations/reminders.js';
 import { createSignup } from './modules/signup/service.js';
 import { signupRoutes } from './modules/signup/routes.js';
@@ -83,6 +86,7 @@ export interface Deps {
   sensitiveStore?: SensitiveStore;
   opsStore?: OpsStore;
   commsStore?: CommsStore;
+  trainingStore?: TrainingStore;
   /** tests: tighter or looser sign-up limits */
   signupLimits?: { perIpPerHour?: number; perEmailPerHour?: number; allPerHour?: number };
   conversationStore?: ConversationStore;
@@ -158,6 +162,8 @@ export async function buildApp(
   const ops: Ops | null = opsStore ? createOps({ store: opsStore, now: overrides.now }) : null;
   const commsStore = overrides.commsStore ?? (db ? createSupabaseCommsStore(db) : null);
   const comms: Comms | null = commsStore && repo ? createComms({ store: commsStore, repo, mailer, publicUrl: config.PUBLIC_URL, now: overrides.now }) : null;
+  const trainingStore = overrides.trainingStore ?? (db ? createSupabaseTrainingStore(db) : null);
+  const training: Training | null = trainingStore && repo ? createTraining({ store: trainingStore, repo, now: overrides.now }) : null;
   const reminders = repo && opsStore && mailer ? createReminders({ store: opsStore, repo, mailer, publicUrl: config.PUBLIC_URL, now: overrides.now, log: app.log }) : null;
   app.decorate('opsReminders', reminders ? () => reminders.run() : null);
   const conversationStore = overrides.conversationStore ?? (db ? createSupabaseConversationStore(db) : null);
@@ -256,8 +262,9 @@ export async function buildApp(
   await app.register(async (instance) => brandingRoutes(instance, { store: brandingStore, repo, gate }));
   await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
   await app.register(async (instance) => communicateRoutes(instance, { comms, gate }));
+  await app.register(async (instance) => trainingRoutes(instance, { training, gate }));
   await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET }));
-  await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, comms, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
+  await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, comms, training, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
   const customers = repo ? createCustomers({ repo, mailer, publicUrl: config.PUBLIC_URL, billing, notify: overrides.notify !== undefined ? overrides.notify : (config.SLACK_WEBHOOK_URL ? createSlackNotifier(config.SLACK_WEBHOOK_URL) : null) }) : null;

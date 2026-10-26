@@ -160,3 +160,34 @@ button,input,select,textarea{font:inherit;color:inherit}
 .upd p{margin:2px 0 4px;white-space:pre-wrap;line-height:1.5;font-size:15px}
 .upnew{font-size:11px;font-weight:700;background:var(--brand);color:var(--brand-ink);border-radius:999px;padding:2px 9px}
 .upd .btn.small{height:40px;padding:0 16px;font-size:14px;align-self:flex-start}
+
+/* training sheet */
+.sheet{position:fixed;z-index:21;background:var(--surface);display:flex;flex-direction:column;inset:0;box-shadow:0 0 40px rgba(27,26,23,.25)}
+@media (min-width:760px){.sheet{inset:24px auto 24px 50%;width:680px;transform:translateX(-50%);border-radius:20px;overflow:hidden}}
+.sheet>header{display:flex;align-items:center;gap:10px;padding:12px 14px;padding-top:max(12px,env(safe-area-inset-top));border-bottom:1px solid var(--line);flex:none}
+.sheet>header h2{flex:1;margin:0;font-size:17px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sheet>header .iconbtn[hidden]{display:none}
+.sheetbody{flex:1;overflow:auto;padding:14px 16px calc(24px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px}
+.course{display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:16px;padding:14px;cursor:pointer}
+.course b{font-size:16px}.cdesc{color:var(--ink2);font-size:14px;line-height:1.4}
+.cmeta{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink2)}.cmeta em{font-style:normal;color:var(--faint)}
+.cdot{width:9px;height:9px;border-radius:50%;background:#E8A21A;flex:none}.cdot.done{background:#2DA85A}.cdot.renew{background:#D92D20}
+.cintro{margin:0;color:var(--ink2);line-height:1.5}
+.lesson{border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.lesson small{color:var(--faint);font-size:12.5px}.lesson h3{margin:0;font-size:17px}.lesson p{margin:0;white-space:pre-wrap;line-height:1.55}
+.lesson .btn.small{height:40px;padding:0 16px;font-size:14px;align-self:flex-start;display:inline-flex;align-items:center;text-decoration:none;border:1px solid var(--line-strong);background:#fff;color:var(--ink)}
+.quiz{display:flex;flex-direction:column;gap:10px}.quiz h3{margin:0}
+.q{border:1px solid var(--line);border-radius:14px;padding:12px;margin:0;display:flex;flex-direction:column;gap:6px}.q.bad{border-color:#D92D20;background:#FEF3F2}
+.q legend{font-weight:600;padding:0 4px;line-height:1.35}
+.opt{display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:10px;cursor:pointer;min-height:44px}.opt input{width:20px;height:20px;flex:none;accent-color:var(--ink)}
+.notq{color:#B3261E;font-size:13.5px}
+.sure{border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:12px}
+.passed{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding:40px 12px}.tickbig{width:64px;height:64px;border-radius:50%;background:#2DA85A;color:#fff;display:flex;align-items:center;justify-content:center}
+
+/* work menu */
+.hubmenu{position:fixed;top:max(60px,calc(env(safe-area-inset-top) + 56px));right:12px;z-index:23;background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 50px rgba(27,26,23,.22);padding:6px;min-width:250px;display:flex;flex-direction:column}
+.hubitem{display:flex;align-items:center;gap:14px;text-align:left;border:0;background:none;border-radius:12px;padding:12px;cursor:pointer;min-height:56px}
+.hubitem:hover{background:var(--bg)}
+.hubtxt{display:flex;flex-direction:column;flex:1;min-width:0}.hubtxt small{color:var(--muted);font-size:12.5px}
+.chkdot.inline{position:static;display:inline-block}
+.bar .brand{min-width:0}
