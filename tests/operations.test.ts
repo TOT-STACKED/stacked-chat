@@ -156,3 +156,53 @@ describe('checklist routes', () => {
     expect(mgr.recent).toHaveLength(1);
   });
 });
+
+import { parseChecklistDraft, createAnthropicChecklistDrafter, type ChecklistDrafter } from '../src/modules/operations/drafter.js';
+
+describe('draft a checklist with AI', () => {
+  it('reads the reply even in a code fence, tidies bullets, numbers and duplicates, and drops the unusable', () => {
+    const d = parseChecklistDraft('Sure!\n```json\n' + JSON.stringify({ title: ' Opening  checklist ', items: ['1. Unlock the door', '- Switch on the ovens', 'unlock the door', '', 42, 'x'.repeat(201), 'Count the float'] }) + '\n```');
+    expect(d).toEqual({ title: 'Opening checklist', items: ['Unlock the door', 'Switch on the ovens', 'Count the float'] });
+    expect(parseChecklistDraft('no json')).toBeNull(); expect(parseChecklistDraft('{"items": []}')).toBeNull(); expect(parseChecklistDraft('{"items": "x"}')).toBeNull();
+    expect(parseChecklistDraft(JSON.stringify({ items: Array.from({ length: 50 }, (_, i) => `Do thing ${i}`) }))!.items).toHaveLength(30);
+  });
+  it('sends the brief, kind, venue and document to the model, and returns null if the call fails', async () => {
+    let sent: { system: string; messages: Array<{ content: string }> } | null = null;
+    const ok = createAnthropicChecklistDrafter({ apiKey: 'k', model: 'm', fetchImpl: (async (_u: unknown, init: { body: string }) => { sent = JSON.parse(init.body); return new Response(JSON.stringify({ content: [{ type: 'text', text: '{"title":"Closing","items":["Lock up"]}' }] }), { status: 200 }); }) as unknown as typeof fetch });
+    expect(await ok.draft({ brief: 'A busy pub', kind: 'closing', venue: 'The Crown', source: { title: 'Policy', text: 'Lock the cellar.' } })).toEqual({ title: 'Closing', items: ['Lock up'] });
+    const msg = sent!.messages[0]!.content;
+    for (const bit of ['closing', 'The Crown', 'A busy pub', 'Policy', 'Lock the cellar.']) expect(msg).toContain(bit);
+    const bad = createAnthropicChecklistDrafter({ apiKey: 'k', model: 'm', fetchImpl: (async () => new Response('no', { status: 500 })) as unknown as typeof fetch });
+    expect(await bad.draft({ brief: 'x y z a b', kind: 'custom', venue: null, source: null })).toBeNull();
+  });
+
+  let repo: FakeRepo; let app: FastifyInstance; let asked: Array<Parameters<ChecklistDrafter['draft']>[0]>; let result: { title: string; items: string[] } | null;
+  const U = { owner: randomUUID(), mgr: randomUUID(), staff: randomUUID() };
+  let org: ReturnType<FakeRepo['addOrg']>; let north: ReturnType<FakeRepo['addSite']>;
+  beforeEach(async () => {
+    repo = new FakeRepo(); asked = []; result = { title: 'Opening checklist', items: ['Unlock', 'Ovens on'] };
+    org = repo.addOrg('Acme'); north = repo.addSite(org, 'North');
+    repo.addMember(org, 'owner@a.com', 'owner', null, U.owner); repo.addMember(org, 'mgr@a.com', 'site_manager', north, U.mgr); repo.addMember(org, 'staff@a.com', 'staff', north, U.staff);
+    app = await buildApp(testConfig, { repo, opsStore: new FakeOpsStore(), checklistDrafter: { async draft(i) { asked.push(i); return result; } },
+      verifyToken: fakeVerifier({ o: { userId: U.owner, email: 'owner@a.com' }, m: { userId: U.mgr, email: 'mgr@a.com' }, s: { userId: U.staff, email: 'staff@a.com' } }) });
+  });
+  const draft = (tok: string, payload: Record<string, unknown>) => app.inject({ method: 'POST', url: `/api/v1/orgs/${org.id}/checklists/draft`, headers: { authorization: 'Bearer ' + tok }, payload });
+
+  it('drafts for a manager, tells the AI the venue, and saves nothing', async () => {
+    const r = await draft('m', { brief: 'A busy city pub', kind: 'opening', site_id: north.id });
+    expect(r.statusCode).toBe(200); expect(r.json()).toEqual({ title: 'Opening checklist', items: ['Unlock', 'Ovens on'], source: null });
+    expect(asked[0]).toMatchObject({ brief: 'A busy city pub', kind: 'opening', venue: 'North', source: null });
+    const list = await app.inject({ method: 'GET', url: `/api/v1/orgs/${org.id}/checklists`, headers: { authorization: 'Bearer o' } });
+    expect(list.json().data).toHaveLength(0);
+  });
+  it('keeps staff out, rejects a too-short brief and a missing document, and says so when the AI cannot draft', async () => {
+    expect((await draft('s', { brief: 'A busy city pub' })).statusCode).toBe(403);
+    expect((await draft('m', { brief: 'hi' })).statusCode).toBe(400);
+    expect((await draft('o', { brief: 'A busy city pub', knowledge_id: randomUUID() })).statusCode).toBe(404);
+    result = null; expect((await draft('o', { brief: 'A busy city pub' })).statusCode).toBe(502);
+  });
+  it('is off without a drafter', async () => {
+    const bare = await buildApp(testConfig, { repo, opsStore: new FakeOpsStore(), checklistDrafter: null, verifyToken: fakeVerifier({ o: { userId: U.owner, email: 'owner@a.com' } }) });
+    expect((await bare.inject({ method: 'POST', url: `/api/v1/orgs/${org.id}/checklists/draft`, headers: { authorization: 'Bearer o' }, payload: { brief: 'A busy city pub' } })).statusCode).toBe(503);
+  });
+});

@@ -114,10 +114,11 @@ export async function renderOperations(main, ctx) {
           close(); toast('Saved'); await load();
         } catch (e) { save.disabled = false; save.textContent = editing ? 'Save' : 'Save checklist'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
       }
+      const aiBtn = h('button', { class: 'btn line', type: 'button', onclick: () => openDraft({ kind: kind.value, site: where.value, fill: (d) => { if (!title.value.trim()) title.value = d.title; items.value = d.items.join('\n'); items.focus(); } }) }, 'Draft the items with AI');
       return h('div', { class: 'stack' },
         h('div', { class: 'field' }, h('label', { for: 'c-title', text: 'Title' }), title),
         h('div', { class: 'cols2' }, h('div', { class: 'field' }, h('label', { for: 'c-kind', text: 'Type' }), kind), h('div', { class: 'field' }, h('label', { for: 'c-where', text: 'Who is it for?' }), where)),
-        h('div', { class: 'field' }, h('label', { for: 'c-items', text: 'Items' }), items, h('span', { class: 'hint', text: 'One item per line. Your team ticks them off in order, on their phone.' })),
+        h('div', { class: 'field' }, h('label', { for: 'c-items', text: 'Items' }), items, h('span', { class: 'hint', text: 'One item per line. Your team ticks them off in order, on their phone.' }), h('div', null, aiBtn)),
         h('div', { class: 'field' }, h('label', { for: 'c-due', text: 'Remind managers if it is not done by' }), due,
           h('span', { class: 'hint', text: 'Optional. Leave empty for no reminder. The venue’s managers get one email a day, only if it is not finished by this time (UK time), on the days you pick.' }),
           h('div', { class: 'days', role: 'group', 'aria-label': 'Days to check' }, dayBtns)),
@@ -125,6 +126,35 @@ export async function renderOperations(main, ctx) {
         err,
         h('div', { class: 'row' }, editing ? h('button', { class: 'lnk', style: 'margin-right:auto;color:#9C2F1B', onclick: () => confirmDelete(existing, close) }, 'Delete') : null,
           h('button', { class: 'btn line', onclick: close }, 'Cancel'), save));
+    });
+  }
+
+  /** Describe the checklist (and optionally pick a document) and have the AI propose items. Nothing is saved: they land in the editor for the manager to change. */
+  function openDraft({ kind, site, fill }) {
+    modal('Draft a checklist with AI', (close) => {
+      const body = h('div', { class: 'stack' }, h('p', { class: 'muted', style: 'margin:0', text: 'Loading…' }));
+      (async () => {
+        let docs = [];
+        try { docs = (await api.get(`/api/v1/orgs/${orgId}/knowledge`)).data.filter((i) => i.kind === 'document' && (i.chars || 0) >= 100).sort((a, b) => a.title.localeCompare(b.title)); } catch { /* the document is optional */ }
+        clear(body);
+        const brief = h('textarea', { id: 'd-brief', rows: 4, maxlength: 800, placeholder: kind === 'closing' ? 'e.g. Closing down a busy gastropub: kitchen, bar, till, security' : kind === 'opening' ? 'e.g. Opening a city-centre coffee shop with a small kitchen and outdoor seating' : 'e.g. A weekly deep clean for a restaurant kitchen' });
+        const pick = docs.length ? h('select', { id: 'd-doc' }, [h('option', { value: '' }, 'None, use common practice'), ...docs.map((d) => h('option', { value: d.id }, d.title))]) : null;
+        const err = h('div'); const go = h('button', { class: 'btn cta', onclick: run }, 'Draft the items');
+        async function run() {
+          clear(err);
+          if (brief.value.trim().length < 5) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Say a little about the checklist you need.' })); return; }
+          go.disabled = true; go.textContent = 'Writing…';
+          try {
+            const d = await api.post(`${base}/draft`, { brief: brief.value.trim(), kind, site_id: site || null, ...(pick && pick.value ? { knowledge_id: pick.value } : {}) });
+            close(); fill(d); toast('Draft added. Read every item and change what does not fit your venue.');
+          } catch (e) { go.disabled = false; go.textContent = 'Draft the items'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
+        }
+        body.append(h('div', { class: 'field' }, h('label', { for: 'd-brief', text: 'What is it for?' }), brief, h('span', { class: 'hint', text: 'Say what kind of venue it is and what the routine covers. The more specific, the better the draft.' })),
+          pick ? h('div', { class: 'field' }, h('label', { for: 'd-doc', text: 'Base it on a document (optional)' }), pick, h('span', { class: 'hint', text: 'For example your opening procedure or health and safety policy from Knowledge.' })) : null,
+          h('p', { class: 'muted', style: 'margin:0;font-size:13.5px', text: 'This replaces anything already in the Items box. Nothing is saved until you press Save. The AI can get things wrong, so check the list matches how your venue really works.' }),
+          err, h('div', { class: 'row' }, h('button', { class: 'btn line', onclick: close }, 'Cancel'), go));
+      })();
+      return body;
     });
   }
 

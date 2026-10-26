@@ -1,16 +1,19 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { forbidden, notFound, unauthorized } from '../../lib/errors.js';
+import { ApiHttpError, forbidden, notFound, unauthorized } from '../../lib/errors.js';
 import { safeEqualStr } from '../billing/util.js';
 import { atLeast, bestRole, canManageMembers, type Principal } from '../../lib/permissions.js';
 import type { Repo } from '../../lib/repo.js';
 import { assertOrgAccess, userOnly } from '../access.js';
 import { ErrorBody, Id, SECURITY } from '../schemas.js';
+import { RateLimiter } from '../../lib/rate-limit.js';
+import type { Knowledge } from '../knowledge/service.js';
+import { MAX_SOURCE_CHARS, type ChecklistDrafter } from './drafter.js';
 import { KINDS, MAX_ITEM_CHARS, MAX_ITEMS, type Ops } from './service.js';
 import type { ChecklistRow } from './store.js';
 
-interface Ctx { ops: Ops | null; repo?: Repo; gate: (orgId: string) => Promise<void>; reminders?: (() => Promise<{ checked: number; sent: number }>) | null; cronSecret?: string }
+interface Ctx { ops: Ops | null; repo?: Repo; gate: (orgId: string) => Promise<void>; reminders?: (() => Promise<{ checked: number; sent: number }>) | null; cronSecret?: string; knowledge?: Knowledge | null; drafter?: ChecklistDrafter | null }
 
 export const ChecklistOut = z.object({
   id: Id, org_id: Id, site_id: Id.nullable(), title: z.string(), kind: z.enum(['opening', 'closing', 'custom']),
@@ -86,6 +89,34 @@ export async function operationsRoutes(app: FastifyInstance, ctx: Ctx) {
     if (!canWrite(p, orgId, cur.site_id)) throw forbidden('You cannot delete this checklist');
     await ops().remove(orgId, id);
     return { ok: true as const };
+  });
+
+  // Draft a checklist from a short description (and optionally one of the company's documents). Nothing is saved: the manager reads it, changes it and saves it.
+  const draftLimiter = new RateLimiter(20, 3_600_000);
+  r.post('/api/v1/orgs/:orgId/checklists/draft', {
+    preHandler: app.authenticate,
+    schema: {
+      tags: ['operations'], summary: 'Draft a checklist with AI from a description. Nothing is saved.', security: SECURITY, params: z.object({ orgId: Id }),
+      body: z.object({ brief: z.string().trim().min(5).max(800), kind: Kind.default('custom'), site_id: Id.nullable().optional(), knowledge_id: Id.optional() }),
+      response: { 200: z.object({ title: z.string(), items: z.array(z.string()), source: z.object({ title: z.string(), truncated: z.boolean() }).nullable() }), 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody, 502: ErrorBody, 503: ErrorBody },
+    },
+  }, async (req, reply) => {
+    const { orgId } = req.params; const p = userOnly(req); assertOrgAccess(req, orgId);
+    if (!ctx.drafter) throw new ApiHttpError(503, 'drafting_unavailable', 'Drafting a checklist is not switched on yet');
+    if (!canSee(p, orgId, null)) throw forbidden('Only managers can draft checklists');
+    const rl = draftLimiter.hit(p.userId);
+    if (!rl.allowed) { reply.header('Retry-After', String(rl.retryAfterSeconds)); throw new ApiHttpError(429, 'rate_limited', 'You have drafted a lot of checklists this hour. Try again shortly.'); }
+    let source: { title: string; text: string } | null = null; let truncated = false;
+    if (req.body.knowledge_id) {
+      const item = ctx.knowledge ? await ctx.knowledge.get(orgId, req.body.knowledge_id) : null;
+      if (!item || item.kind !== 'document' || !canSee(p, orgId, item.site_id)) throw notFound('Document not found');
+      const text = (item.body ?? '').trim(); truncated = text.length > MAX_SOURCE_CHARS;
+      if (text) source = { title: item.title, text };
+    }
+    const venue = req.body.site_id ? (await ctx.repo!.listSites(orgId)).find((s) => s.id === req.body.site_id)?.name ?? null : null;
+    const d = await ctx.drafter.draft({ brief: req.body.brief, kind: req.body.kind as 'opening' | 'closing' | 'custom', venue, source });
+    if (!d || !d.items.length) throw new ApiHttpError(502, 'draft_failed', 'We could not draft a checklist just now. Please try again.');
+    return { title: d.title, items: d.items, source: source ? { title: source.title, truncated } : null };
   });
 
   // Called by a scheduler with the shared CRON_SECRET (the server also runs this itself every few minutes).

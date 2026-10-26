@@ -216,3 +216,13 @@ describe('the food hygiene course', () => {
     expect(food.lessons.some((l: { body: string }) => l.body.includes('[ADD:'))).toBe(true); expect(food.note).toContain('[ADD');
   });
 });
+
+describe('the allergen awareness course', () => {
+  it('has all 14 allergens, a high pass mark, the venue blanks and a yearly refresher', () => {
+    const a = COURSE_TEMPLATES.find((t: { id: string }) => t.id === 'allergen-awareness')!;
+    const list = a.lessons.find((l: { title: string }) => l.title === 'The 14 allergens')!.body;
+    for (const word of ['Celery', 'gluten', 'Crustaceans', 'Eggs', 'Fish', 'Lupin', 'Milk', 'Molluscs', 'Mustard', 'Peanuts', 'Sesame', 'Soya', 'sulphites', 'Tree nuts']) expect(list, word).toContain(word);
+    expect(a.pass_percent).toBe(90); expect(a.renew_months).toBe(12); expect(a.quiz.length).toBe(8);
+    expect(a.lessons.some((l: { body: string }) => l.body.includes('[ADD:'))).toBe(true);
+  });
+});

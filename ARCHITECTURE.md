@@ -175,6 +175,12 @@ Safeguards: an address that already belongs to anyone (`Repo.emailInUse`, any st
 - **Once only:** the first server to insert a `checklist_reminders` row for (checklist, venue, day) sends; everyone else skips. A failed email is logged and not retried that day.
 - Needs email (`RESEND_API_KEY`) to be configured; otherwise it does nothing. Manage's board marks a list "Overdue" using the same rule.
 
+### Draft a checklist with AI
+
+- `POST /api/v1/orgs/:orgId/checklists/draft` `{ brief, kind, site_id?, knowledge_id? }` returns `{ title, items, source }` and **saves nothing**. Any manager can use it; 20 per hour per person; 503 if no `ANTHROPIC_API_KEY`, 502 if the model's reply is unusable.
+- `operations/drafter.ts` (same shape as the course drafter): `ChecklistDrafter` interface, Anthropic fetch implementation (`CHAT_MODEL`), `parseChecklistDraft` strips bullets and numbers, dedupes and caps at 30 items. The prompt forbids invented numbers or temperatures and uses `[ADD: …]` blanks for venue details. An optional Knowledge document (one the manager can see) is sent as the source.
+- Manage: "Draft the items with AI" under Items in the checklist editor. The result fills the Items box (and the title if empty) for the manager to change, then Save as normal.
+
 ## Communicate: updates
 
 - **Tables (migration 015):** `announcements` (title, body, `site_id`/`team_id` audience, `requires_ack`) and `announcement_reads` (one row per person per update: `read_at`, `acked_at`). A team update carries the team's venue.

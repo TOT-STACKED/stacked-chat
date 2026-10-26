@@ -54,6 +54,7 @@ import { sensitiveRoutes } from './modules/sensitive/routes.js';
 import { createOps, type Ops } from './modules/operations/service.js';
 import { createSupabaseOpsStore, type OpsStore } from './modules/operations/store.js';
 import { operationsRoutes } from './modules/operations/routes.js';
+import { createAnthropicChecklistDrafter, type ChecklistDrafter } from './modules/operations/drafter.js';
 import { createComms, type Comms } from './modules/communicate/service.js';
 import { createSupabaseCommsStore, type CommsStore } from './modules/communicate/store.js';
 import { communicateRoutes } from './modules/communicate/routes.js';
@@ -92,6 +93,8 @@ export interface Deps {
   trainingStore?: TrainingStore;
   /** writes a first draft of a course from a document; null = switched off */
   courseDrafter?: CourseDrafter | null;
+  /** writes a first draft of a checklist from a description; null = switched off */
+  checklistDrafter?: ChecklistDrafter | null;
   /** tests: tighter or looser sign-up limits */
   signupLimits?: { perIpPerHour?: number; perEmailPerHour?: number; allPerHour?: number };
   conversationStore?: ConversationStore;
@@ -273,7 +276,7 @@ export async function buildApp(
   await app.register(async (instance) => communicateRoutes(instance, { comms, gate }));
   await app.register(async (instance) => trainingRoutes(instance, { training, gate, knowledge, drafter: overrides.courseDrafter !== undefined ? overrides.courseDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicCourseDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
   await app.register(async (instance) => supportRoutes(instance, { support }));
-  await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET }));
+  await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET, knowledge, drafter: overrides.checklistDrafter !== undefined ? overrides.checklistDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicChecklistDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, comms, training, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));
   await app.register(async (instance) => techStackRoutes(instance, { store: techStackStore, repo, gate }));
   await app.register(async (instance) => chatAppRoutes(instance, { config, devMode: overrides.devMode }));
