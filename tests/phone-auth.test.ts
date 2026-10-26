@@ -104,6 +104,21 @@ describe('signing in with a mobile number', () => {
     await expect(pa.start(PHONE)).rejects.toMatchObject({ statusCode: 429 });
     expect(sms.sent).toHaveLength(5);
   });
+  it('answers "too many" the same way for a number that is not on the system, so slowing down reveals nothing', async () => {
+    const stranger = '07700 900999';
+    expect(await pa.start(stranger)).toEqual({ sent: false });
+    await expect(pa.start(stranger)).rejects.toMatchObject({ statusCode: 429 }); // same as a real number asked twice in a minute
+    for (let i = 0; i < 4; i++) { advance(61_000); expect(await pa.start(stranger)).toEqual({ sent: false }); }
+    advance(61_000);
+    await expect(pa.start(stranger)).rejects.toMatchObject({ statusCode: 429 }); // and the same hourly wall
+    expect(sms.sent).toHaveLength(0);
+  });
+  it('ends a session at a hard limit however often it is renewed', async () => {
+    await pa.start(PHONE); let s = await pa.verify(PHONE, sms.lastCode(PHONE)!);
+    for (let i = 0; i < 3; i++) { advance(50 * 86_400_000); const next = await pa.refresh(s.access_token); expect(next, `renewal ${i + 1}`).not.toBeNull(); s = next as typeof s; }
+    advance(40 * 86_400_000); // 190 days after the first sign-in, past the 180-day cap
+    expect(await pa.refresh(s.access_token)).toBeNull(); expect(pa.verifyToken(s.access_token)).toBeNull();
+  });
   it('says so when the text could not be sent, and does not pretend it was', async () => {
     sms.fail = true; await expect(pa.start(PHONE)).rejects.toMatchObject({ statusCode: 502 });
   });
@@ -189,6 +204,11 @@ describe('phone sign-in and adding staff by number, through the app', () => {
     for (const url of ['/chat/config.json', '/manage/config.json']) expect((await call('GET', url)).json().phone).toBe(true);
     const off = await buildApp(testConfig, { repo, sms: null, verifyToken: fakeVerifier({}) });
     for (const url of ['/chat/config.json', '/manage/config.json']) expect((await off.inject({ method: 'GET', url })).json().phone).toBe(false);
+  });
+  it('caps invitation texts per person so a free trial cannot be used to spam numbers on our bill', async () => {
+    let last = 0;
+    for (let i = 0; i < 32; i++) { const r = await add('o', { phone: `07700 9${String(10000 + i).padStart(5, '0')}`, display_name: `P${i}` }); last = r.statusCode; if (r.statusCode === 429) break; expect(r.statusCode).toBe(201); }
+    expect(last).toBe(429); expect(sms.sent.length).toBe(30);
   });
   it('is off, saying so, when texts or the secret are not set up', async () => {
     const off = await buildApp(testConfig, { repo, sms: null, verifyToken: fakeVerifier({}) });

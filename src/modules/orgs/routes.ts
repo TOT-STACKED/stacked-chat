@@ -6,6 +6,7 @@ import { principalId } from '../../lib/auth.js';
 import { ApiHttpError, badRequest, conflict, forbidden, notFound } from '../../lib/errors.js';
 import { inviteEmail, type Mailer, type SendResult } from '../../lib/email.js';
 import { formatPhone, isPhoneKey, normalizePhone, phoneKey } from '../../lib/phone.js';
+import { RateLimiter } from '../../lib/rate-limit.js';
 import type { SmsSender } from '../../lib/sms.js';
 import type { IdempotencyStore } from '../../lib/idempotency.js';
 import {
@@ -31,6 +32,15 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const repo = (): Repo => ctx.repo!; // authenticate() has already guaranteed it exists
   const lastInvite = new Map<string, number>(); // per-member resend cooldown (per instance)
+  // Every invitation text costs money and anyone can start a free trial, so texts are capped per person, per company and overall.
+  const smsByActor = new RateLimiter(30, 3_600_000);
+  const smsByOrg = new RateLimiter(100, 86_400_000);
+  const smsAll = new RateLimiter(1000, 86_400_000);
+  const smsAllowed = (orgId: string, actorId: string, count = 1) => {
+    for (let i = 0; i < count; i++) if (!smsByActor.hit(actorId).allowed || !smsByOrg.hit(orgId).allowed || !smsAll.hit('all').allowed) return false;
+    return true;
+  };
+  const smsLimited = () => new ApiHttpError(429, 'rate_limited', 'That is a lot of text invitations. Try again later, or ask Stacked support to raise the limit.');
 
   /** Attach each member's team ids (one query for the whole organisation). */
   async function withTeams(orgId: string, rows: MemberRow[]) {
@@ -209,6 +219,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
       if (!phone) throw badRequest('That does not look like a mobile number. Try 07700 900123');
       email = phoneKey(phone);
     }
+    if (phone && !smsAllowed(orgId, principalId(actor))) throw smsLimited();
     return ctx.idempotency.run(req, reply, principalId(actor), async () => {
       const row = await repo().createMember({ org_id: orgId, site_id: siteId, email, display_name: req.body.display_name ?? null, phone, role: req.body.role, status: 'invited' });
       if (teamIds.length) await repo().setMemberTeams(row.id, teamIds);
@@ -235,6 +246,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     if (target.status !== 'invited') throw badRequest('Only pending invitations can be re-sent');
     const last = lastInvite.get(memberId) ?? 0;
     if (Date.now() - last < 60_000) throw new ApiHttpError(429, 'rate_limited', 'That invitation was only just sent. Try again in a minute.');
+    if (isPhoneKey(target.email) && !smsAllowed(orgId, principalId(actor))) throw smsLimited();
     lastInvite.set(memberId, Date.now());
     return { invite: await sendInvite(target, actor) };
   });

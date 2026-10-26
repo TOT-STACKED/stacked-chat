@@ -1,5 +1,6 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { ApiHttpError } from '../../lib/errors.js';
+import { RateLimiter } from '../../lib/rate-limit.js';
 import type { VerifiedUser } from '../../lib/auth.js';
 import { normalizePhone, phoneKey, userIdForPhone } from '../../lib/phone.js';
 import type { Repo } from '../../lib/repo.js';
@@ -11,6 +12,8 @@ export const MAX_ATTEMPTS = 5;
 /** A signed-in phone stays signed in this long. Anyone who is switched off in Manage loses access at once, whatever this says. */
 export const SESSION_DAYS = 60;
 export const REFRESH_AFTER_DAYS = 30;
+/** However often a session is renewed, it ends this long after the original sign-in and the person types a code again. */
+export const MAX_SESSION_DAYS = 180;
 const PREFIX = 'st1';
 
 const b64 = (s: string | Buffer) => Buffer.from(s).toString('base64url');
@@ -25,22 +28,27 @@ export function createPhoneAuth(deps: { store: PhoneCodeStore; repo: Repo; sms: 
   const now = deps.now ?? (() => new Date());
   const sign = (body: string) => createHmac('sha256', deps.secret).update(body).digest('base64url');
   const hashCode = (phone: string, code: string) => createHmac('sha256', deps.secret).update(`code:${phone}:${code}`).digest('hex');
+  // Asked of every number, known or not and before any lookup, so a slow-down never reveals who is on the system.
+  const perMinute = new RateLimiter(1, 60_000, () => now().getTime());
+  const perHour = new RateLimiter(5, 3_600_000, () => now().getTime());
   const same = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 
-  function issue(phone: string): { access_token: string; expires_at: number } {
-    const exp = now().getTime() + SESSION_DAYS * 86_400_000;
-    const body = b64(JSON.stringify({ p: phone, exp }));
+  function issue(phone: string, iat = now().getTime()): { access_token: string; expires_at: number } {
+    const exp = Math.min(now().getTime() + SESSION_DAYS * 86_400_000, iat + MAX_SESSION_DAYS * 86_400_000);
+    const body = b64(JSON.stringify({ p: phone, exp, iat }));
     return { access_token: `${PREFIX}.${body}.${sign(body)}`, expires_at: exp };
   }
 
   /** Who a token belongs to, or null if it is not one of ours, has been altered, or has expired. */
-  function verifyToken(token: string): { phone: string; expires_at: number } | null {
+  function verifyToken(token: string): { phone: string; expires_at: number; issued_at: number } | null {
     const [pre, body, sig] = token.split('.');
     if (pre !== PREFIX || !body || !sig || !same(sig, sign(body))) return null;
     try {
-      const j = JSON.parse(Buffer.from(body, 'base64url').toString()) as { p?: string; exp?: number };
+      const j = JSON.parse(Buffer.from(body, 'base64url').toString()) as { p?: string; exp?: number; iat?: number };
       if (!j.p || !j.exp || j.exp <= now().getTime() || normalizePhone(j.p) !== j.p) return null;
-      return { phone: j.p, expires_at: j.exp };
+      const iat = j.iat ?? j.exp - SESSION_DAYS * 86_400_000; // tokens from before the cap existed
+      if (now().getTime() - iat > MAX_SESSION_DAYS * 86_400_000) return null;
+      return { phone: j.p, expires_at: j.exp, issued_at: iat };
     } catch { return null; }
   }
 
@@ -48,11 +56,14 @@ export function createPhoneAuth(deps: { store: PhoneCodeStore; repo: Repo; sms: 
     if (!deps.sms) throw new ApiHttpError(503, 'phone_signin_unavailable', 'Signing in by mobile number is not switched on yet');
     const phone = normalizePhone(rawPhone);
     if (!phone) throw new ApiHttpError(400, 'bad_phone', 'Enter your mobile number, for example 07700 900123');
+    // The limits come first and apply to every number alike, so a "too many" answer says nothing about whether the number is known.
+    if (!perMinute.hit(phone).allowed) throw new ApiHttpError(429, 'rate_limited', 'A code was only just sent. Wait a minute, then ask for another.');
+    if (!perHour.hit(phone).allowed) throw new ApiHttpError(429, 'rate_limited', 'Too many codes for this number. Try again in an hour.');
     // Only numbers a manager has added get a text. The answer is the same either way, so nobody can find out who is on the system.
     if (!(await deps.repo.memberLoginable(phoneKey(phone)))) return { sent: false };
     const t = now();
-    if ((await deps.store.countSince(phone, new Date(t.getTime() - 60_000).toISOString())) >= 1) throw new ApiHttpError(429, 'rate_limited', 'A code was only just sent. Wait a minute, then ask for another.');
-    if ((await deps.store.countSince(phone, new Date(t.getTime() - 3_600_000).toISOString())) >= 5) throw new ApiHttpError(429, 'rate_limited', 'Too many codes for this number. Try again in an hour.');
+    // a second, database-backed limit for when the server has been restarted or there is more than one copy of it
+    if ((await deps.store.countSince(phone, new Date(t.getTime() - 60_000).toISOString())) >= 1 || (await deps.store.countSince(phone, new Date(t.getTime() - 3_600_000).toISOString())) >= 5) throw new ApiHttpError(429, 'rate_limited', 'Too many codes for this number. Try again in a little while.');
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
     await deps.store.insert({ phone, code_hash: hashCode(phone, code), expires_at: new Date(t.getTime() + CODE_MINUTES * 60_000).toISOString() });
     const res = await deps.sms.send(phone, `${code} is your ${deps.brand ?? 'Stacked Chat'} sign-in code. It expires in ${CODE_MINUTES} minutes. Never share it.`);
@@ -75,7 +86,7 @@ export function createPhoneAuth(deps: { store: PhoneCodeStore; repo: Repo; sms: 
   async function refresh(token: string): Promise<{ access_token: string; expires_at: number; phone: string } | null> {
     const v = verifyToken(token); if (!v) return null;
     if (!(await deps.repo.memberLoginable(phoneKey(v.phone)))) return null;
-    return { ...issue(v.phone), phone: v.phone };
+    return { ...issue(v.phone, v.issued_at), phone: v.phone };
   }
 
   /** For the app's token check: a token of ours becomes the person it names. */
