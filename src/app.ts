@@ -143,7 +143,7 @@ export async function buildApp(
   const mailer: Mailer | undefined = realMailer ? { send: (m) => (isPhoneKey(m.to) ? Promise.resolve('skipped' as const) : realMailer.send(m)) } : undefined;
   // Text messages and sign-in by mobile number. Off unless the SMS provider and AUTH_SECRET are both set.
   const sms: SmsSender | null = overrides.sms !== undefined ? overrides.sms
-    : (config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN && config.TWILIO_FROM ? createTwilioSender({ accountSid: config.TWILIO_ACCOUNT_SID, authToken: config.TWILIO_AUTH_TOKEN, from: config.TWILIO_FROM }) : null);
+    : (config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN && config.TWILIO_FROM ? createTwilioSender({ accountSid: config.TWILIO_ACCOUNT_SID, authToken: config.TWILIO_AUTH_TOKEN, from: config.TWILIO_FROM, log: (msg, info) => app.log.warn(info, msg) }) : null);
   const phoneCodes = overrides.phoneCodeStore ?? (db ? createSupabasePhoneCodeStore(db) : null);
   const phoneAuth: PhoneAuth | null = repo && sms && phoneCodes && config.AUTH_SECRET ? createPhoneAuth({ store: phoneCodes, repo, sms, secret: config.AUTH_SECRET, now: overrides.now }) : null;
   const supabaseVerify = overrides.verifyToken ?? createSupabaseTokenVerifier({ url: config.SUPABASE_URL, anonKey: config.SUPABASE_KEY });
@@ -307,13 +307,15 @@ export async function buildApp(
       version: config.APP_VERSION,
       slack_alerts: !!config.SLACK_WEBHOOK_URL, slack_support: !!config.SUPPORT_SLACK_WEBHOOK_URL, slack_support_falls_back: !config.SUPPORT_SLACK_WEBHOOK_URL && !!config.SLACK_WEBHOOK_URL,
       email: !!config.RESEND_API_KEY, email_from: config.RESEND_FROM ?? null, support_inbox: config.SUPPORT_EMAIL ?? null,
+      sms: !!sms, sms_from: sms ? config.TWILIO_FROM ?? null : null, phone_signin: !!phoneAuth, sms_last_error: sms?.lastError?.() ?? null,
       ai: !!config.ANTHROPIC_API_KEY, pictures: !!overrides.storage, database_admin: !!config.SUPABASE_SERVICE_KEY, billing: !!billing, nightly_job_secret: !!config.CRON_SECRET,
     }),
     test: async (to) => {
       const alerts = await checkSlack(config.SLACK_WEBHOOK_URL, '✅ *Stacked Chat test:* alerts (sign-ups, billing, help requests) are connected to this channel.');
       const support = config.SUPPORT_SLACK_WEBHOOK_URL ? await checkSlack(config.SUPPORT_SLACK_WEBHOOK_URL, '✅ *Stacked Chat test:* support requests will appear in this channel.') : null;
       const email = !mailer ? 'not_set' : (await mailer.send({ to, subject: 'Stacked Chat test email', text: 'This is a test from the Stacked Chat Console. If you can read this, email is connected.', html: '<p style="font-family:system-ui,sans-serif;font-size:15px">This is a test from the Stacked Chat Console. If you can read this, email is connected.</p>' })) === 'sent' ? 'sent' : 'failed';
-      return { alerts, support, support_uses_alerts: !config.SUPPORT_SLACK_WEBHOOK_URL, email, email_to: to };
+      const smsCheck = sms?.check ? await sms.check() : null;
+      return { alerts, support, support_uses_alerts: !config.SUPPORT_SLACK_WEBHOOK_URL, email, email_to: to, sms: smsCheck };
     },
   } }));
   await app.register(async (instance) => signupRoutes(instance, { signup: repo && customers ? createSignup({ repo, customers }) : null, now: overrides.now ? () => overrides.now!().getTime() : undefined, ...overrides.signupLimits }));

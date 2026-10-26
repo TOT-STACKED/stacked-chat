@@ -110,6 +110,7 @@ async function connections() {
       out.append(h('h2', { text: 'Test results' }), h('div', { class: 'card' },
         line('Slack alerts', r.alerts.ok, r.alerts.detail),
         r.support ? line('Slack support channel', r.support.ok, r.support.detail) : h('div', { class: 'qrow muted', text: 'Support requests use the alerts channel (no separate support link is set).' }),
+        r.sms ? line('Text messages (Twilio keys)', r.sms.ok, r.sms.detail) : h('div', { class: 'qrow muted', text: 'Text messages are not set up on this server.' }),
         r.email === 'not_set' ? line('Email', false, 'No email service is set (RESEND_API_KEY).') : line('Email', r.email === 'sent', r.email === 'sent' ? `A test email was sent to ${r.email_to}. Check your inbox (and spam).` : 'The email service refused it. Check the sending address in Resend.')));
     } catch (e) { out.append(failure(e, () => go.click())); }
     go.disabled = false; go.textContent = 'Send a test now';
@@ -121,6 +122,7 @@ async function connections() {
       row('Slack support channel', d.slack_support || d.slack_support_falls_back, d.slack_support ? 'Get help messages go to their own channel.' : d.slack_support_falls_back ? 'Get help messages use the alerts channel. Set SUPPORT_SLACK_WEBHOOK_URL to give them their own.' : 'Set SUPPORT_SLACK_WEBHOOK_URL (or SLACK_WEBHOOK_URL).'),
       row('Email', d.email, d.email ? `Sending as ${d.email_from || 'the default address'}.` : 'Set RESEND_API_KEY on Render.'),
       row('Support inbox', !!d.support_inbox, d.support_inbox ? `Get help messages are also emailed to ${d.support_inbox}.` : 'Optional. Set SUPPORT_EMAIL to get them by email as well.'),
+      row('Text messages (sign-in codes, invitations)', d.sms && d.phone_signin, d.sms_last_error ? `The last text failed. Twilio said: ${d.sms_last_error.message}${d.sms_last_error.code ? ` (code ${d.sms_last_error.code})` : ''}.` : d.sms && d.phone_signin ? `Sending from ${d.sms_from || 'the default sender'}.` : d.sms ? 'Twilio is set, but AUTH_SECRET (32+ characters) is missing, so sign-in by number is off.' : 'Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM and AUTH_SECRET.'),
       row('AI (answers, drafts, reading pictures)', d.ai, d.ai ? 'Anthropic key is set.' : 'Set ANTHROPIC_API_KEY.'),
       row('Picture storage', d.pictures, d.pictures ? 'Pictures and files can be stored.' : 'Needs the Supabase service key.'),
       row('Billing (Stripe)', d.billing, d.billing ? 'Billing is switched on.' : 'Stripe settings are not complete.'),

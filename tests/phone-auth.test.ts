@@ -39,6 +39,22 @@ describe('mobile numbers', () => {
     expect(await createTwilioSender({ accountSid: 'a', authToken: 'b', from: 'c', fetchImpl: (async () => new Response('no', { status: 400 })) as unknown as typeof fetch }).send('+447700900123', 'x')).toBe('failed');
     expect(await createTwilioSender({ accountSid: 'a', authToken: 'b', from: 'c', fetchImpl: (async () => { throw new Error('down'); }) as unknown as typeof fetch }).send('+447700900123', 'x')).toBe('failed');
   });
+  it('remembers why Twilio refused a text, without ever keeping the keys, and clears it after a good one', async () => {
+    let ok = false; const logged: unknown[] = [];
+    const tw = createTwilioSender({ accountSid: 'AC1', authToken: 'secret-token', from: 'StackedChat', log: (_m, i) => logged.push(i),
+      fetchImpl: (async () => (ok ? new Response('{}', { status: 201 }) : new Response(JSON.stringify({ code: 21408, message: "Permission to send an SMS has not been enabled for the region indicated by the 'To' number" }), { status: 400 }))) as unknown as typeof fetch });
+    expect(tw.lastError!()).toBeNull();
+    expect(await tw.send('+447700900123', 'x')).toBe('failed');
+    expect(tw.lastError!()).toMatchObject({ status: 400, code: 21408, message: expect.stringContaining('region') });
+    expect(JSON.stringify([tw.lastError!(), logged])).not.toContain('secret-token');
+    ok = true; expect(await tw.send('+447700900123', 'x')).toBe('sent'); expect(tw.lastError!()).toBeNull();
+  });
+  it('can ask Twilio whether the keys work without sending a text', async () => {
+    const good = createTwilioSender({ accountSid: 'AC1', authToken: 't', from: 'x', fetchImpl: (async (u: string) => { expect(u).toMatch(/Accounts\/AC1\.json$/); return new Response(JSON.stringify({ status: 'active', type: 'Full' }), { status: 200 }); }) as unknown as typeof fetch });
+    expect(await good.check!()).toMatchObject({ ok: true, detail: expect.stringContaining('active') });
+    const bad = createTwilioSender({ accountSid: 'AC1', authToken: 'wrong', from: 'x', fetchImpl: (async () => new Response(JSON.stringify({ code: 20003, message: 'Authenticate' }), { status: 401 })) as unknown as typeof fetch });
+    expect(await bad.check!()).toMatchObject({ ok: false, detail: expect.stringContaining('20003') });
+  });
 });
 
 describe('signing in with a mobile number', () => {
