@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** Environment the modern (TypeScript) API needs. The legacy server passes these in explicitly. */
-const schema = z.object({
+export const schema = z.object({
   SUPABASE_URL: z.string().url(),
   /** anon key: only used to ask Supabase Auth who a session token belongs to. Never for data. */
   SUPABASE_KEY: z.string().min(1),
