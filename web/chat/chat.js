@@ -83,7 +83,8 @@ function showNoAccess() {
     h('button', { class: 'btn', onclick: signOut }, 'Sign out')));
 }
 function signOut() { auth.signOut(); st.ctx = null; showSignIn(); }
-function resetChat() { st.conversationId = null; st.messages = []; st.error = null; st.npsShown = false; st.shown = new Set(); }
+/** Starting a new chat (or opening an old one) leaves any answer still on its way behind: it is dropped, not shown in the new chat. */
+function resetChat() { st.gen = (st.gen || 0) + 1; st.sending = false; st.conversationId = null; st.messages = []; st.error = null; st.npsShown = false; st.shown = new Set(); }
 
 const ownLogo = () => isHttps(st.site.branding.logo_url);
 /** The assistant's picture: the Stacked mark, or the first letter in the venue's colour when they use their own logo. */
@@ -253,9 +254,11 @@ function submit() { const t = input.value.trim(); if (t) { input.value = ''; inp
 
 async function send(text) {
   if (st.sending) return;
+  const gen = st.gen;
   st.error = null; st.messages.push({ role: 'user', content: text }); st.sending = true; drawThread(); if (sendBtn) sendBtn.disabled = true;
   try {
     const r = await api.post('/api/v1/chat', { site_id: st.site.site_id, message: text, ...(st.conversationId ? { conversation_id: st.conversationId } : {}), ...(st.shown.size ? { shown_media: [...st.shown] } : {}) });
+    if (gen !== st.gen) return; // they started a new chat while this was loading
     st.conversationId = r.conversation_id;
     for (const x of [...(r.videos || []), ...(r.images || [])]) st.shown.add(x.id); // so it is not offered again on every follow-up
     st.messages.push({ role: 'assistant', content: r.reply, unanswered: r.unanswered, sources: r.sources, videos: r.videos, images: r.images, support: r.support, sensitive: r.sensitive || null });
@@ -264,9 +267,9 @@ async function send(text) {
     // One card at a time, and never again for a product already rated or skipped. Asking to rate always works; a nudge only once per chat.
     const open = r.nps && st.messages.some((x) => x.role === 'nps' && !x.done && x.vendor === r.nps.vendor);
     const show = r.nps && !open && (r.nps.forced || (!st.npsShown && userTurns >= 2 && !recentlyRated(r.nps.vendor)));
-    if (show) { st.npsShown = true; setTimeout(() => { st.messages.push({ role: 'nps', vendor: r.nps.vendor }); drawThread(); }, 900); }
+    if (show) { st.npsShown = true; setTimeout(() => { if (gen !== st.gen) return; st.messages.push({ role: 'nps', vendor: r.nps.vendor }); drawThread(); }, 900); }
   } catch (e) {
-    if (e.status === 401) return;
+    if (e.status === 401 || gen !== st.gen) return;
     st.error = e.message || 'Something went wrong. Please try again.';
     st.messages.pop(); // let them send it again
     if (input && !input.value) input.value = text;
@@ -520,7 +523,7 @@ async function openHistory() {
 async function load(id) {
   try {
     const c = await api.get(`/api/v1/chat/conversations/${id}?site_id=${st.site.site_id}`);
-    st.conversationId = c.id; st.messages = c.messages.map((m) => ({ role: m.role, content: m.content })); st.error = null; draw();
+    st.gen = (st.gen || 0) + 1; st.sending = false; st.conversationId = c.id; st.messages = c.messages.map((m) => ({ role: m.role, content: m.content })); st.error = null; draw();
   } catch (e) { st.error = e.message; drawThread(); }
 }
 
