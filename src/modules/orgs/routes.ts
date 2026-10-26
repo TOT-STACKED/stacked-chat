@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { principalId } from '../../lib/auth.js';
 import { ApiHttpError, badRequest, conflict, forbidden, notFound } from '../../lib/errors.js';
 import { inviteEmail, type Mailer, type SendResult } from '../../lib/email.js';
+import { formatPhone, isPhoneKey, normalizePhone, phoneKey } from '../../lib/phone.js';
+import type { SmsSender } from '../../lib/sms.js';
 import type { IdempotencyStore } from '../../lib/idempotency.js';
 import {
   ROLE_RANK, atLeast, bestRole, canAssignRole, canManageMembers, canReadMembers, roleScopeValid,
@@ -15,7 +17,7 @@ import { assertOrgAccess, userOnly } from '../access.js';
 import { ErrorBody, Id, MemberOut, RoleEnum, SECURITY, SiteOut } from '../schemas.js';
 
 interface Ctx {
-  repo?: Repo; idempotency: IdempotencyStore; mailer?: Mailer; publicUrl: string;
+  repo?: Repo; idempotency: IdempotencyStore; mailer?: Mailer; /** texts invitations to people added by mobile number; null = switched off */ sms?: SmsSender | null; publicUrl: string;
   /** throws 402 when the organisation's billing makes it read-only */
   gate: (orgId: string) => Promise<void>;
   /** called after a site is added so billing can update the subscription */
@@ -39,6 +41,13 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
   }
 
   async function sendInvite(member: MemberRow, actor: UserPrincipal): Promise<SendResult> {
+    if (isPhoneKey(member.email)) {
+      // someone added by mobile number: the invitation is a text, and they sign in with that number
+      if (!ctx.sms || !member.phone) return 'skipped';
+      const org = await repo().getOrg(member.org_id);
+      const first = (member.display_name ?? '').trim().split(/\s+/)[0];
+      return ctx.sms.send(member.phone, `${first ? `Hi ${first}, ` : ''}${org?.name ?? 'your team'} has added you to Stacked Chat. Open ${ctx.publicUrl.replace(/\/$/, '')}/chat/ and sign in with this mobile number (${formatPhone(member.phone)}). We will text you a code.`);
+    }
     if (!ctx.mailer) return 'skipped';
     const [org, site] = await Promise.all([repo().getOrg(member.org_id), member.site_id ? repo().getSite(member.site_id) : Promise.resolve(null)]);
     return ctx.mailer.send(inviteEmail({
@@ -162,18 +171,21 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     return { data: await withTeams(orgId, rows.filter((m) => visible(p, orgId, m))) };
   });
 
+  /** A person is added by email (managers) or by mobile number (staff, who may not have a work email). A number needs a name. */
   const NewMemberBody = z.object({
-    email: z.email(),
+    email: z.email().optional(),
+    phone: z.string().trim().min(5).max(30).optional(),
     display_name: z.string().trim().min(1).max(120).optional(),
     role: RoleEnum,
     site_id: Id.nullable().optional(),
     team_ids: z.array(Id).max(20).optional(),
-  });
+  }).refine((b) => !!b.email !== !!b.phone, { message: 'Give either an email address or a mobile number' })
+    .refine((b) => !b.phone || !!b.display_name, { message: 'Give their name, so you can tell who is who' });
 
   r.post('/api/v1/orgs/:orgId/members', {
     preHandler: app.authenticate,
     schema: {
-      tags: ['organisations'], summary: 'Invite or add a member and email them (send an Idempotency-Key header to make retries safe)', security: SECURITY,
+      tags: ['organisations'], summary: 'Invite or add a member by email or mobile number and email or text them (send an Idempotency-Key header to make retries safe)', security: SECURITY,
       params: z.object({ orgId: Id }), body: NewMemberBody,
       response: { 201: MemberOut, 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 409: ErrorBody, 422: ErrorBody },
     },
@@ -191,8 +203,14 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
     const teamIds = [...new Set(req.body.team_ids ?? [])];
     await assertTeamsFit(repo(), orgId, siteId, teamIds);
 
+    let email = req.body.email ?? ''; let phone: string | null = null;
+    if (req.body.phone) {
+      phone = normalizePhone(req.body.phone);
+      if (!phone) throw badRequest('That does not look like a mobile number. Try 07700 900123');
+      email = phoneKey(phone);
+    }
     return ctx.idempotency.run(req, reply, principalId(actor), async () => {
-      const row = await repo().createMember({ org_id: orgId, site_id: siteId, email: req.body.email, display_name: req.body.display_name ?? null, role: req.body.role, status: 'invited' });
+      const row = await repo().createMember({ org_id: orgId, site_id: siteId, email, display_name: req.body.display_name ?? null, phone, role: req.body.role, status: 'invited' });
       if (teamIds.length) await repo().setMemberTeams(row.id, teamIds);
       const invite = await sendInvite(row, actor);
       return { status: 201, body: { ...row, team_ids: teamIds, invite } };
@@ -202,7 +220,7 @@ export async function orgRoutes(app: FastifyInstance, ctx: Ctx) {
   r.post('/api/v1/orgs/:orgId/members/:memberId/resend-invite', {
     preHandler: app.authenticate,
     schema: {
-      tags: ['organisations'], summary: 'Email an invitation again (once a minute at most)', security: SECURITY,
+      tags: ['organisations'], summary: 'Send an invitation again, by email or text (once a minute at most)', security: SECURITY,
       params: z.object({ orgId: Id, memberId: Id }),
       response: { 200: z.object({ invite: z.enum(['sent', 'skipped', 'failed']) }), 400: ErrorBody, 403: ErrorBody, 404: ErrorBody, 429: ErrorBody },
     },

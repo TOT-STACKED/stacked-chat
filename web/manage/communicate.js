@@ -1,9 +1,9 @@
 import { clear, h, modal, toast } from './dom.js';
-import { atLeast, audienceLabel, audienceParams, audienceValue, bestRole, canManage } from './lib.js';
+import { atLeast, audienceLabel, audienceParams, audienceValue, bestRole, canManage, whoIs } from './lib.js';
 import { pageHeader, tile } from './ui.js';
 
 const when = (iso) => new Date(iso).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
-const who = (email) => String(email || '').split('@')[0];
+const who = whoIs;
 
 /** Communicate: send an update to a venue, a team or everyone, and see who has read it. */
 export async function renderCommunicate(main, ctx) {

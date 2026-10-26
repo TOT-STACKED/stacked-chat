@@ -10,6 +10,13 @@ export const schema = z.object({
   /** Resend (invite emails). Optional: without it invites are saved but no email is sent. */
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().optional(),
+  /** Text messages (Twilio): sign-in codes and invitations for staff who sign in with a mobile number. Optional: without all three, phone sign-in is off. */
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  /** the sender: a name (letters, up to 11, such as StackedChat), a number, or a Messaging Service id (MG...) */
+  TWILIO_FROM: z.string().optional(),
+  /** Signs phone sessions and hashes sign-in codes. At least 32 random characters. Phone sign-in is off without it. */
+  AUTH_SECRET: z.string().min(32).optional(),
   /** Public base URL used in links inside emails. */
   PUBLIC_URL: z.string().url().default('https://stackedchat.io'),
   /** Billing (Stripe, test mode). Billing stays switched off, and fails closed, unless ALL of these are set. */

@@ -85,7 +85,7 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
     preHandler: app.authenticate,
     schema: {
       tags: ['chat'], summary: 'Who you are and which venues you can chat at, with how each chat looks', security: SECURITY,
-      response: { 200: z.object({ user: z.object({ email: z.string() }), sites: z.array(z.object({ org_id: Id, org_name: z.string(), site_id: Id, site_name: z.string(), slug: z.string(), branding: Branding, suggestions: z.array(z.string()) })) }), 403: ErrorBody },
+      response: { 200: z.object({ user: z.object({ email: z.string(), name: z.string().nullable().optional() }), sites: z.array(z.object({ org_id: Id, org_name: z.string(), site_id: Id, site_name: z.string(), slug: z.string(), branding: Branding, suggestions: z.array(z.string()) })) }), 403: ErrorBody },
     },
   }, async (req) => {
     const p = userOnly(req);
@@ -97,7 +97,8 @@ export async function chatRoutes(app: FastifyInstance, ctx: Ctx) {
       const b = branding.get(s.org_id)!.find((x) => x.id === s.site_id);
       out.push({ ...s, branding: { bot_name: b?.bot_name ?? null, welcome_heading: b?.welcome_heading ?? null, welcome_message: b?.welcome_message ?? null, primary_color: b?.primary_color ?? null, logo_url: b?.logo_url ?? null }, suggestions: await suggestionsFor(s.site_id) });
     }
-    return { user: { email: p.email }, sites: out };
+    const me = sites[0] ? (await repo().listMembers(sites[0].org_id)).find((m) => m.email.toLowerCase() === p.email.toLowerCase() && m.display_name) : null;
+    return { user: { email: p.email, name: me?.display_name ?? null }, sites: out };
   });
 
   const Media = z.object({ id: Id, title: z.string(), url: z.string() });

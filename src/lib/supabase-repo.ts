@@ -4,7 +4,7 @@ import type { Membership, Role } from './permissions.js';
 import type { ApiKeyRow, MemberRow, NewApiKey, NewMember, OrgRow, Repo, SiteRow, TeamRow } from './repo.js';
 
 const enc = encodeURIComponent;
-const MEMBER_COLS = 'id,org_id,site_id,user_id,email,display_name,role,status,created_at';
+const MEMBER_COLS = 'id,org_id,site_id,user_id,email,display_name,phone,role,status,created_at';
 const KEY_COLS = 'id,org_id,site_id,name,scopes,key_prefix,key_hash,created_by,created_at,last_used_at,expires_at,revoked_at';
 
 interface RawMembership {
@@ -40,6 +40,11 @@ export function createSupabaseRepo(db: Db): Repo {
       const seen = new Map<string, Membership>();
       for (const m of [...(must(byUser, 'memberships') ?? []), ...(must(byEmail, 'memberships') ?? [])]) seen.set(m.id, toMembership(m));
       return [...seen.values()];
+    },
+
+    async memberLoginable(email) {
+      const r = await db.rest<Array<{ id: string }>>(`/members?email=eq.${enc(email.toLowerCase())}&status=in.(invited,active)&select=id&limit=1`);
+      return (must(r, 'loginable') ?? []).length > 0;
     },
 
     async emailInUse(email) {
@@ -96,7 +101,7 @@ export function createSupabaseRepo(db: Db): Repo {
     async createMember(m: NewMember) {
       const r = await db.rest<MemberRow[]>(`/members?select=${MEMBER_COLS}`, {
         method: 'POST', headers: { Prefer: 'return=representation' },
-        body: { org_id: m.org_id, site_id: m.site_id, email: m.email.toLowerCase(), display_name: m.display_name ?? null, role: m.role, status: m.status },
+        body: { org_id: m.org_id, site_id: m.site_id, email: m.email.toLowerCase(), display_name: m.display_name ?? null, ...(m.phone ? { phone: m.phone } : {}), role: m.role, status: m.status },
       });
       return one(must(r, 'create member'))!;
     },

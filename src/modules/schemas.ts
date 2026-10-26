@@ -8,7 +8,7 @@ export const ErrorBody = z.object({ error: z.object({ code: z.string(), message:
 export const SiteOut = z.object({ id: Id, org_id: Id, name: z.string(), slug: z.string(), created_at: z.string().nullable() });
 export const TeamOut = z.object({ id: Id, org_id: Id, site_id: Id.nullable(), name: z.string(), created_at: z.string() });
 export const MemberOut = z.object({
-  id: Id, org_id: Id, site_id: Id.nullable(), email: z.string(), display_name: z.string().nullable(),
+  id: Id, org_id: Id, site_id: Id.nullable(), email: z.string(), display_name: z.string().nullable(), /** set for people who sign in with a mobile number (their email is then a placeholder) */ phone: z.string().nullable().optional(),
   role: RoleEnum, status: z.enum(['invited', 'active', 'disabled']), created_at: z.string(),
   team_ids: z.array(Id),
   /** Only on invite responses: was the invitation email sent? */

@@ -1,5 +1,7 @@
 import { clear, h } from '/manage/dom.js';
 import { createAuth } from '/manage/auth.js';
+import { signInForm } from '/manage/signin.js';
+import { whoIs } from '/manage/lib.js';
 import { createApi } from '/manage/api.js';
 import { parseBlocks, readableOn, youtubeThumb } from './render.js';
 
@@ -27,42 +29,15 @@ const isHttps = (u) => /^https:\/\//i.test(String(u || ''));
 // ---- sign in -----------------------------------------------------------------------------------------------
 function showSignIn(note) {
   document.documentElement.style.removeProperty('--brand'); document.documentElement.style.removeProperty('--brand-ink');
-  clear(root); let email = '';
+  clear(root);
   const box = h('div', { class: 'box' }); root.append(h('div', { class: 'signin' }, box));
-  const emailStep = () => {
-    clear(box);
-    const input = h('input', { type: 'email', id: 'em', autocomplete: 'email', placeholder: 'you@company.com', value: email });
-    const err = h('div'); const go = h('button', { class: 'btn', onclick: submit }, 'Email me a code');
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-    async function submit() {
-      email = input.value.trim().toLowerCase(); clear(err);
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.append(h('div', { class: 'err', role: 'alert', text: 'Enter a valid email address.' })); return; }
-      go.disabled = true; go.textContent = 'Sending…';
-      try { await auth.sendCode(email); codeStep(); } catch (e) { go.disabled = false; go.textContent = 'Email me a code'; err.append(h('div', { class: 'err', role: 'alert', text: e.message })); }
-    }
-    box.append(h('img', { src: logoSrc, alt: 'Stacked' }), h('h1', { text: 'Ask anything about work' }), note ? h('div', { class: 'err', text: note }) : null,
-      h('p', { class: 'muted', text: "Sign in with the email address your company invited. We'll send you a one-time code, so there is no password to remember." }),
-      h('div', null, h('label', { for: 'em', text: 'Email address' }), input), err, go,
-      h('p', { class: 'muted', style: 'font-size:13.5px;margin:0' }, 'Own the business? ', h('a', { href: '/start/', text: 'Start a free trial' })),
-      cfg.dev ? h('div', { class: 'devbox' }, h('span', { text: 'Local preview: sign in as' }), h('div', null, [['staff', 'Staff'], ['mgr', 'Site manager'], ['owner', 'Owner']].map(([r, l]) => h('button', { onclick: async () => { auth.devSignIn(r); await enter(); } }, l)))) : null);
-    input.focus();
-  };
-  const codeStep = () => {
-    clear(box);
-    const input = h('input', { type: 'text', id: 'cd', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '123456' });
-    const err = h('div'); const go = h('button', { class: 'btn', onclick: submit }, 'Sign in');
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-    async function submit() {
-      clear(err); const code = input.value.replace(/\s+/g, '');
-      if (code.length < 6) { err.append(h('div', { class: 'err', role: 'alert', text: 'Enter the code from your email.' })); return; }
-      go.disabled = true; go.textContent = 'Checking…';
-      try { await auth.verifyCode(email, code); await enter(); } catch (e) { go.disabled = false; go.textContent = 'Sign in'; err.append(h('div', { class: 'err', role: 'alert', text: e.message })); }
-    }
-    box.append(h('img', { src: logoSrc, alt: 'Stacked' }), h('h1', { text: 'Check your email' }), h('p', { class: 'muted', text: `We sent a code to ${email}. It can take a minute.` }),
-      h('div', null, h('label', { for: 'cd', text: 'Code' }), input), err, go, h('button', { class: 'lnk', onclick: emailStep }, 'Use a different email'));
-    input.focus();
-  };
-  emailStep();
+  const devBox = () => h('div', { class: 'devbox' }, h('span', { text: 'Local preview: sign in as' }), h('div', null, [['staff', 'Staff'], ['mgr', 'Site manager'], ['owner', 'Owner']].map(([r, l]) => h('button', { onclick: async () => { auth.devSignIn(r); await enter(); } }, l))));
+  signInForm({
+    auth, box, brand: h('img', { src: logoSrc, alt: 'Stacked' }), title: 'Ask anything about work', note, defaultMode: 'phone', btn: 'btn',
+    noteNode: (t) => h('div', { class: 'err', text: t }), errNode: (t) => h('div', { class: 'err', role: 'alert', text: t }),
+    extras: () => [h('p', { class: 'muted', style: 'font-size:13.5px;margin:0' }, 'Own the business? ', h('a', { href: '/start/', text: 'Start a free trial' })), cfg.dev ? devBox() : null].filter(Boolean),
+    done: () => enter(),
+  });
 }
 
 // ---- after sign in -----------------------------------------------------------------------------------------
@@ -154,7 +129,7 @@ function draw() {
       h('button', { class: 'iconbtn', 'aria-label': 'Your conversations', onclick: openHistory }, svg(ICON.history)),
       h('div', { class: 'brand' }, ownLogo() ? h('img', { src: b.logo_url, alt: '' }) : h('img', { class: 'mark', src: markSrc, alt: '', width: 32, height: 32 }), h('b', { text: brandName() })),
       venue, hubBtn, newBtn,
-      h('button', { class: 'avatar', title: `Sign out ${auth.email()}`, 'aria-label': `Sign out ${auth.email()}`, style: 'border:0;cursor:pointer', onclick: signOut }, (auth.email()[0] || '?').toUpperCase())),
+      h('button', { class: 'avatar', title: `Sign out ${auth.email()}`, 'aria-label': `Sign out ${auth.email()}`, style: 'border:0;cursor:pointer', onclick: signOut }, ((st.ctx.user.name || auth.email())[0] || '?').toUpperCase())),
     thread,
     h('div', { class: 'composer' }, form, h('p', { class: 'fine', text: 'Answers come from your company’s knowledge. For anything safety-critical, such as allergens, check with your manager.' }))));
   sendBtn.disabled = true; drawThread(); input.focus();
@@ -334,7 +309,7 @@ function openSupport() {
 // ---- checklists: today's opening / closing lists for this venue --------------------------------------------------
 st.lists = [];
 const clTime = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
-const clWho = (email) => String(email || '').split('@')[0];
+const clWho = whoIs;
 /** Fetch quietly: a venue with no checklists (or no checklist tables yet) simply never shows the button. */
 async function refreshChecklists() {
   try { st.lists = (await api.get(`/api/v1/chat/checklists?site_id=${st.site.site_id}`)).data; } catch { st.lists = []; }
@@ -412,7 +387,7 @@ async function openUpdates() {
       const fresh = u.isNew; const needs = u.requires_ack && !u.acked_at;
       body.append(h('article', { class: `upd ${fresh || needs ? 'new' : ''}` },
         h('div', { class: 'uphead' }, h('b', { text: u.title }), fresh ? h('span', { class: 'upnew', text: 'New' }) : null),
-        h('small', { text: `${upWhen(u.created_at)} · ${String(u.created_by || '').split('@')[0]}` }),
+        h('small', { text: `${upWhen(u.created_at)} · ${whoIs(u.created_by)}` }),
         h('p', { text: u.body }),
         u.err ? h('div', { class: 'err', role: 'alert', text: u.err }) : null,
         needs ? h('button', { class: 'btn small', onclick: async () => { try { await post(u, true); u.acked_at = new Date().toISOString(); u.read_at = u.read_at || u.acked_at; recount(); paint(); } catch (e) { u.err = e.message; paint(); } } }, 'I’ve read this')

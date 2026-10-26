@@ -1,4 +1,4 @@
-// Sign-in with a one-time email code (Supabase Auth). No passwords. The session lives in
+// Sign-in with a one-time code by text (our own, for staff) or email (Supabase Auth). No passwords. The session lives in
 // localStorage and is refreshed automatically. In local preview ("dev" config) you can pick a role.
 const KEY = 'stacked_manage_session';
 
@@ -23,12 +23,35 @@ export function createAuth(cfg) {
 
   return {
     email: () => (load() || {}).email || '',
+    /** a phone session is ours, not Supabase's: it lasts 60 days and is renewed quietly once it is more than half used */
     async token() {
       let s = load();
       if (!s) return null;
       if (s.dev) return s.access_token;
+      if (s.phone) {
+        if (Date.now() > (s.expires_at || 0)) { localStorage.removeItem(KEY); return null; }
+        if (Date.now() > (s.expires_at || 0) - 30 * 86400000) {
+          try {
+            const res = await fetch('/api/v1/auth/phone/refresh', { method: 'POST', headers: { Authorization: 'Bearer ' + s.access_token } });
+            if (res.ok) { const d = await res.json(); s = { ...s, access_token: d.access_token, expires_at: d.expires_at }; save(s); }
+            else if (res.status === 401) { localStorage.removeItem(KEY); return null; }
+          } catch (e) { /* offline: keep using the one we have */ }
+        }
+        return s.access_token;
+      }
       if (Date.now() > (s.expires_at || 0) - 60000) s = await refresh(s);
       return s ? s.access_token : null;
+    },
+    async sendPhoneCode(phone) {
+      const res = await fetch('/api/v1/auth/phone/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((d.error && d.error.message) || 'We could not send a code. Check the number and try again.');
+    },
+    async verifyPhoneCode(phone, code) {
+      const res = await fetch('/api/v1/auth/phone/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ phone, code }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !d.access_token) throw new Error((d.error && d.error.message) || "That code didn't work. Check it, or ask for a new one.");
+      save({ phone: true, access_token: d.access_token, expires_at: d.expires_at, email: d.phone.replace(/^\+44(\d{4})(\d{6})$/, '0$1 $2') });
     },
     async sendCode(email) {
       const { ok, data } = await post('/otp', { email, create_user: true });

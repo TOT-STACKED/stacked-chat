@@ -2,7 +2,7 @@ import { clear, h, modal, toast } from './dom.js';
 import { avatar, pageHeader } from './ui.js';
 import {
   ROLE_LABEL, bestRole, canEditMember, canManage, atLeast, countMembers, displayName, filterMembers,
-  inviteResultText, parseEmails, rolesFor, statusLabel, teamsForScope,
+  contactOf, inviteResultText, parseEmails, parsePeople, rolesFor, statusLabel, teamsForScope,
 } from './lib.js';
 
 /** The People screen: company > site > team tree on the left, members on the right. */
@@ -38,7 +38,7 @@ export async function renderPeople(main, ctx) {
     main.append(pageHeader({
       icon: 'people', title: 'People',
       sub: st.loading ? 'Loading…' : `${scopeLabel()}: ${filterMembers(st.members, st.sel, 'everyone').filter((m) => m.status !== 'disabled').length} people`,
-      actions: canInvite ? h('button', { class: 'btn cta', onclick: openInvite }, 'Invite people') : null,
+      actions: canInvite ? h('button', { class: 'btn cta', onclick: openInvite }, 'Add people') : null,
     }));
     if (st.error) {
       main.append(h('div', { class: 'banner', role: 'alert' }, st.error + ' ', h('button', { class: 'lnk', onclick: load }, 'Try again')));
@@ -97,7 +97,7 @@ export async function renderPeople(main, ctx) {
       const editable = canManage(memberships, orgId, m.site_id) && canEditMember(actorRole, m);
       const teams = m.team_ids.map(teamName).filter(Boolean);
       return h('tr', null,
-        h('td', null, h('div', { class: 'person' }, avatar(displayName(m)), h('div', { class: 'pm' }, h('span', { class: 'name', text: displayName(m) }), h('span', { class: 'email', text: m.email })))),
+        h('td', null, h('div', { class: 'person' }, avatar(displayName(m)), h('div', { class: 'pm' }, h('span', { class: 'name', text: displayName(m) }), h('span', { class: 'email', text: contactOf(m) })))),
         h('td', null, h('span', { class: `badge role-${m.role}`, text: ROLE_LABEL[m.role] }), m.site_id && st.sel.kind === 'company' && h('span', { class: 'email', text: siteName(m.site_id) })),
         h('td', { text: teams.length ? teams.join(', ') : '–' }),
         h('td', null, h('span', { class: 'status' }, h('span', { class: `dot ${m.status}` }), statusLabel(m))),
@@ -123,7 +123,7 @@ export async function renderPeople(main, ctx) {
   async function resend(m) {
     try {
       const r = await api.post(`/api/v1/orgs/${orgId}/members/${m.id}/resend-invite`);
-      toast(r.invite === 'sent' ? `Invitation sent again to ${m.email}` : 'Email sending is not set up yet, so nothing was sent');
+      toast(r.invite === 'sent' ? `Invitation ${m.phone ? 'texted' : 'sent'} again to ${contactOf(m)}` : `${m.phone ? 'Text messages' : 'Email sending'} are not set up yet, so nothing was sent`);
     } catch (e) { toast(e.message); }
   }
 
@@ -142,13 +142,15 @@ export async function renderPeople(main, ctx) {
   function openInvite() {
     const scopes = manageable();
     const startSite = st.sel.kind === 'site' ? st.sel.id : null;
-    const initial = scopes.some((s) => s.id === startSite) ? startSite : scopes[0].id;
-    modal('Invite people', (close) => {
+    const initial = scopes.some((s) => s.id === startSite) ? startSite : (scopes.find((s) => s.id) || scopes[0]).id; // staff work at a venue, so start there
+    let mode = 'phone';
+    modal('Add people', (close) => {
+      const people = h('textarea', { id: 'inv-people', rows: 5, placeholder: 'Amy Smith 07700 900123\nBen Jones 07700 900456', 'aria-describedby': 'inv-h' });
       const emails = h('textarea', { id: 'inv-emails', placeholder: 'name@company.com', 'aria-describedby': 'inv-h' });
       const name = h('input', { type: 'text', id: 'inv-name', autocomplete: 'off' });
       const nameField = h('div', { class: 'field', hidden: true }, h('label', { for: 'inv-name', text: 'Their name (optional)' }), name);
       const siteSel = selectField('Where will they work?', 'inv-site', scopes.map((s) => ({ value: s.id, label: s.name })), initial);
-      const roleBox = h('div'); const teamBox = h('div'); const result = h('div');
+      const roleBox = h('div'); const teamBox = h('div'); const result = h('div'); const how = h('div'); const inputs = h('div');
       const site = () => { const v = siteSel.querySelector('select').value; return v === '' ? null : v; };
       const drawRoleTeams = () => {
         clear(roleBox); clear(teamBox);
@@ -159,30 +161,44 @@ export async function renderPeople(main, ctx) {
       siteSel.querySelector('select').addEventListener('change', drawRoleTeams); drawRoleTeams();
       emails.addEventListener('input', () => { nameField.hidden = parseEmails(emails.value).valid.length !== 1; });
       const send = h('button', { class: 'btn cta', onclick: submit }, 'Send invitations');
+      const drawMode = () => {
+        clear(how); clear(inputs); clear(result);
+        const tab = (m, label) => h('button', { type: 'button', role: 'tab', 'aria-selected': String(mode === m), class: `signtab ${mode === m ? 'on' : ''}`, onclick: () => { mode = m; drawMode(); } }, label);
+        how.append(h('div', { class: 'signtabs', role: 'tablist', 'aria-label': 'How will they sign in?' }, tab('phone', 'Mobile number'), tab('email', 'Email')));
+        inputs.append(mode === 'phone'
+          ? h('div', { class: 'field' }, h('label', { for: 'inv-people', text: 'Names and mobile numbers' }), people, h('span', { class: 'hint', id: 'inv-h', text: 'One person per line. We text each of them a link, and they sign in with a code sent to that number. No email needed. Best for your team.' }))
+          : h('div', { class: 'stack', style: 'display:flex;flex-direction:column;gap:16px' }, h('div', { class: 'field' }, h('label', { for: 'inv-emails', text: 'Work email addresses' }), emails, h('span', { class: 'hint', id: 'inv-h', text: 'One or many, separated by commas or new lines. Best for managers with a company email. For your team, use mobile numbers instead.' })), nameField));
+      };
+      drawMode();
       async function submit() {
-        const { valid, invalid } = parseEmails(emails.value);
         clear(result);
-        if (!valid.length || invalid.length) { result.append(h('div', { class: 'banner', role: 'alert', text: invalid.length ? `These don't look like email addresses: ${invalid.join(', ')}` : 'Enter at least one email address.' })); return; }
         const role = document.getElementById('inv-role');
-        if (!role) { result.append(h('div', { class: 'banner', role: 'alert', text: "You can't invite people here." })); return; }
+        if (!role) { result.append(h('div', { class: 'banner', role: 'alert', text: "You can't add people here." })); return; }
+        const bad = (t) => result.append(h('div', { class: 'banner', role: 'alert', text: t }));
+        let jobs;
+        if (mode === 'phone') {
+          const { valid, invalid } = parsePeople(people.value);
+          if (invalid.length) return bad(`These need a name and a mobile number: ${invalid.join('; ')}`);
+          if (!valid.length) return bad('Enter at least one name and mobile number.');
+          jobs = valid.map((p) => ({ label: p.name, via: 'text', body: { phone: p.phone, display_name: p.name } }));
+        } else {
+          const { valid, invalid } = parseEmails(emails.value);
+          if (!valid.length || invalid.length) return bad(invalid.length ? `These don't look like email addresses: ${invalid.join(', ')}` : 'Enter at least one email address.');
+          jobs = valid.map((email) => ({ label: email, via: 'email', body: { email, ...(valid.length === 1 && name.value.trim() ? { display_name: name.value.trim() } : {}) } }));
+        }
         send.disabled = true; send.textContent = 'Sending…';
         const results = [];
-        for (const email of valid) {
+        for (const j of jobs) {
           try {
-            const r = await api.post(`/api/v1/orgs/${orgId}/members`, {
-              email, role: role.value, site_id: site(), team_ids: checked(teamBox),
-              ...(valid.length === 1 && name.value.trim() ? { display_name: name.value.trim() } : {}),
-            }, idem());
-            results.push({ ok: true, email, invite: r.invite });
-          } catch (e) { results.push({ ok: false, email, error: e.message }); }
+            const r = await api.post(`/api/v1/orgs/${orgId}/members`, { ...j.body, role: role.value, site_id: site(), team_ids: checked(teamBox) }, idem());
+            results.push({ ok: true, email: j.label, via: j.via, invite: r.invite });
+          } catch (e) { results.push({ ok: false, email: j.label, via: j.via, error: e.message }); }
         }
         clear(result); result.append(h('div', { class: 'result', text: inviteResultText(results) }));
         send.replaceWith(h('button', { class: 'btn cta', onclick: () => { close(); load(); } }, 'Done'));
         load();
       }
-      return h('div', { style: 'display:flex;flex-direction:column;gap:16px' },
-        h('div', { class: 'field' }, h('label', { for: 'inv-emails', text: 'Email addresses' }), emails, h('span', { class: 'hint', id: 'inv-h', text: 'One or many, separated by commas or new lines. We email each person a link to sign in.' })),
-        nameField, siteSel, roleBox, teamBox, result,
+      return h('div', { style: 'display:flex;flex-direction:column;gap:16px' }, how, inputs, siteSel, roleBox, teamBox, result,
         h('div', { class: 'row' }, h('button', { class: 'btn line', onclick: close }, 'Cancel'), send));
     });
   }
@@ -207,7 +223,7 @@ export async function renderPeople(main, ctx) {
       } }, 'Save');
       const toggle = m.status === 'disabled' ? 'Restore access' : 'Disable access';
       return h('div', { style: 'display:flex;flex-direction:column;gap:16px' },
-        h('span', { class: 'muted', text: m.email + (m.site_id ? ' · ' + siteName(m.site_id) : ' · whole company') }),
+        h('span', { class: 'muted', text: contactOf(m) + (m.site_id ? ' · ' + siteName(m.site_id) : ' · whole company') }),
         role, h('div', { class: 'field' }, h('span', { class: 'lbl', text: 'Teams' }), teams), err,
         h('div', { class: 'row', style: 'justify-content:space-between' },
           h('button', { class: 'lnk', onclick: async () => {

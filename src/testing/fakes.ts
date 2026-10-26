@@ -27,6 +27,7 @@ export class FakeRepo implements Repo {
       .map((m) => ({ memberId: m.id, orgId: m.org_id, siteId: m.site_id, role: m.role,
         orgName: this.orgs.find((o) => o.id === m.org_id)?.name ?? null, siteName: this.sites.find((s) => s.id === m.site_id)?.name ?? null }));
   }
+  async memberLoginable(email: string) { return this.members.some((m) => m.email === email.toLowerCase() && m.status !== 'disabled'); }
   async emailInUse(email: string) { return this.members.some((m) => m.email === email.toLowerCase()); }
   async linkUser(email: string, userId: string) { for (const m of this.members) if (m.email === email.toLowerCase() && m.user_id === null) { m.user_id = userId; if (m.status === 'invited') m.status = 'active'; } }
   async getOrg(id: string) { return this.orgs.find((o) => o.id === id) ?? null; }
@@ -40,7 +41,7 @@ export class FakeRepo implements Repo {
   async getMember(orgId: string, id: string) { return this.members.find((m) => m.id === id && m.org_id === orgId) ?? null; }
   async createMember(n: NewMember) {
     if (this.members.some((m) => m.org_id === n.org_id && m.site_id === n.site_id && m.email === n.email.toLowerCase())) throw conflict('That already exists');
-    const m: MemberRow = { id: randomUUID(), org_id: n.org_id, site_id: n.site_id, user_id: null, email: n.email.toLowerCase(), display_name: n.display_name ?? null, role: n.role, status: n.status, created_at: new Date().toISOString() };
+    const m: MemberRow = { id: randomUUID(), org_id: n.org_id, site_id: n.site_id, user_id: null, email: n.email.toLowerCase(), display_name: n.display_name ?? null, phone: n.phone ?? null, role: n.role, status: n.status, created_at: new Date().toISOString() };
     this.members.push(m); return m;
   }
   async createOrg(o: { name: string; slug: string }) {

@@ -1,4 +1,5 @@
 import { clear, h, modal, toast } from './dom.js';
+import { signInForm } from './signin.js';
 import { createAuth } from './auth.js';
 import { createApi } from './api.js';
 import { renderPeople } from './people.js';
@@ -26,60 +27,17 @@ const SOON_NAV = [];
 // ---- sign in -------------------------------------------------------------------------------
 function showSignIn(message) {
   clear(root);
-  let email = '';
   const box = h('div', { class: 'box' });
-  const brand = logo();
   root.append(h('div', { class: 'signin' }, box));
-
-  function stepEmail(note) {
-    clear(box);
-    const input = h('input', { type: 'email', id: 'si-email', autocomplete: 'email', placeholder: 'you@company.com', value: email });
-    const err = h('div');
-    const go = h('button', { class: 'btn cta', onclick: submit }, 'Email me a code');
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-    async function submit() {
-      email = input.value.trim().toLowerCase(); clear(err);
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Enter a valid email address.' })); return; }
-      go.disabled = true; go.textContent = 'Sending…';
-      try { await auth.sendCode(email); stepCode(); }
-      catch (e) { go.disabled = false; go.textContent = 'Email me a code'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
-    }
-    box.append(...[brand, h('h1', { text: 'Sign in to Manage' }),
-      note ? h('div', { class: 'result', text: note }) : null,
-      h('p', { class: 'muted', text: "Use the email address your company invited. We'll send you a one-time code, so there's no password to remember." }),
-      h('div', { class: 'field' }, h('label', { for: 'si-email', text: 'Email address' }), input), err, go,
-      h('p', { class: 'muted', style: 'font-size:13.5px;margin:0' }, 'Run a hospitality business and new to Stacked Chat? ', h('a', { href: '/start/', text: 'Start your free trial' })),
-      cfg.dev ? devBox() : null].filter(Boolean));
-    input.focus();
-  }
-
-  function stepCode() {
-    clear(box);
-    const input = h('input', { type: 'text', id: 'si-code', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '123456' });
-    const err = h('div');
-    const go = h('button', { class: 'btn cta', onclick: submit }, 'Sign in');
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
-    async function submit() {
-      clear(err); const code = input.value.replace(/\s+/g, '');
-      if (code.length < 6) { err.append(h('div', { class: 'banner', role: 'alert', text: 'Enter the code from your email.' })); return; }
-      go.disabled = true; go.textContent = 'Checking…';
-      try { await auth.verifyCode(email, code); await enter(); }
-      catch (e) { go.disabled = false; go.textContent = 'Sign in'; err.append(h('div', { class: 'banner', role: 'alert', text: e.message })); }
-    }
-    box.append(brand, h('h1', { text: 'Check your email' }),
-      h('p', { class: 'muted', text: `We sent a code to ${email}. It can take a minute to arrive.` }),
-      h('div', { class: 'field' }, h('label', { for: 'si-code', text: 'Code' }), input), err, go,
-      h('button', { class: 'lnk', style: 'align-self:flex-start', onclick: () => stepEmail() }, 'Use a different email'));
-    input.focus();
-  }
-
-  function devBox() {
-    return h('div', { class: 'devbox' }, h('span', { class: 'mono', text: 'Local preview: sign in as' }),
-      h('div', { class: 'chips' }, [['owner', 'Owner'], ['hq', 'HQ admin'], ['mgr', 'Site manager'], ['staff', 'Staff']].map(([r, label]) =>
-        h('button', { class: 'pill', onclick: async () => { auth.devSignIn(r); await enter(); } }, label))));
-  }
-
-  stepEmail(message);
+  const devBox = () => h('div', { class: 'devbox' }, h('span', { class: 'mono', text: 'Local preview: sign in as' }),
+    h('div', { class: 'chips' }, [['owner', 'Owner'], ['hq', 'HQ admin'], ['mgr', 'Site manager'], ['staff', 'Staff']].map(([r, label]) =>
+      h('button', { class: 'pill', onclick: async () => { auth.devSignIn(r); await enter(); } }, label))));
+  signInForm({
+    auth, box, brand: logo(), title: 'Sign in to Manage', note: message, defaultMode: 'email', btn: 'btn cta',
+    noteNode: (t) => h('div', { class: 'result', text: t }), errNode: (t) => h('div', { class: 'banner', role: 'alert', text: t }),
+    extras: () => [h('p', { class: 'muted', style: 'font-size:13.5px;margin:0' }, 'Run a hospitality business and new to Stacked Chat? ', h('a', { href: '/start/', text: 'Start your free trial' })), cfg.dev ? devBox() : null].filter(Boolean),
+    done: () => enter(),
+  });
 }
 
 // ---- Get help: a message to Stacked support, straight to the team's Slack, answered by email --------------------

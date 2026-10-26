@@ -3,7 +3,7 @@ import { formatGbp, homeAttention, planName } from './lib.js';
 import { pageHeader, tile } from './ui.js';
 
 const greeting = (email) => {
-  const first = (email || '').split('@')[0].split(/[._-]/)[0];
+  const first = /@phone\.invalid$/i.test(email || '') ? '' : (email || '').split('@')[0].split(/[._-]/)[0];
   const hour = Number(new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: 'Europe/London' }).format(new Date()));
   const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
   return first ? `${part}, ${first[0].toUpperCase()}${first.slice(1)}` : part;
@@ -44,7 +44,7 @@ export async function renderHome(main, ctx) {
         go('#/operations', 'Write a checklist', 'Opening, closing, anything', 'operations'),
         go('#/knowledge', 'Add knowledge', 'A document, a video or a photo', 'knowledge'),
         go('#/training', 'Create a course', 'Lessons and a quick quiz', 'training'),
-        go('#/people', 'Invite people', 'They get a code by email', 'people'),
+        go('#/people', 'Add people', 'By mobile number, no email needed', 'people'),
         h('button', { class: 'card qacard', type: 'button', onclick: () => onHelp && onHelp() }, tile('settings', 40), h('b', { text: 'Get help' }), h('span', { class: 'muted', text: 'Message the Stacked team' })))));
 
     // 3. at a glance
@@ -69,7 +69,7 @@ export async function renderHome(main, ctx) {
       done ? null : h('a', { class: 'btn line small', href, text: cta }));
     const steps = [
       step(sites.length > 0, 'Add your venues', 'Each venue is one site, with its own people and teams.', '#/people', 'Add a venue'),
-      step(live.length > 1, 'Invite your team', 'People get an email with a one-time code. No passwords.', '#/people', 'Invite people'),
+      step(live.length > 1, 'Add your team', 'Add their mobile numbers. They sign in with a texted code: no passwords, and no email needed.', '#/people', 'Add people'),
     ];
     if (isAdmin && billing) steps.push(step(!!billing.account, 'Start your free trial', '30 days free, no card needed. One price per venue, unlimited staff.', '#/settings/billing', 'Start trial'));
     steps.push(step(knowledge.length > 0, 'Add your knowledge', 'Write down policies and how-tos, or add videos, so the AI can answer from them.', '#/knowledge', 'Add knowledge'));

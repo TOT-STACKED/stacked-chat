@@ -54,6 +54,11 @@ import { sensitiveRoutes } from './modules/sensitive/routes.js';
 import { createOps, type Ops } from './modules/operations/service.js';
 import { createSupabaseOpsStore, type OpsStore } from './modules/operations/store.js';
 import { operationsRoutes } from './modules/operations/routes.js';
+import { createPhoneAuth, type PhoneAuth } from './modules/phone-auth/service.js';
+import { createSupabasePhoneCodeStore, type PhoneCodeStore } from './modules/phone-auth/store.js';
+import { phoneAuthRoutes } from './modules/phone-auth/routes.js';
+import { createTwilioSender, type SmsSender } from './lib/sms.js';
+import { isPhoneKey } from './lib/phone.js';
 import { createWork } from './modules/chat/work.js';
 import { createTeam } from './modules/chat/team.js';
 import { createAnthropicChecklistDrafter, type ChecklistDrafter } from './modules/operations/drafter.js';
@@ -84,6 +89,9 @@ export interface Deps {
   repo?: Repo;
   verifyToken?: TokenVerifier;
   mailer?: Mailer;
+  /** sends text messages; null = switched off */
+  sms?: SmsSender | null;
+  phoneCodeStore?: PhoneCodeStore;
   stripe?: StripeApi;
   billingStore?: BillingStore;
   knowledgeStore?: KnowledgeStore;
@@ -127,11 +135,19 @@ export async function buildApp(
     ? createSupabaseDb({ url: config.SUPABASE_URL, serviceKey: config.SUPABASE_SERVICE_KEY })
     : undefined);
   const repo = overrides.repo ?? (db ? createSupabaseRepo(db) : undefined);
-  const verifyToken = overrides.verifyToken ?? createSupabaseTokenVerifier({ url: config.SUPABASE_URL, anonKey: config.SUPABASE_KEY });
   const idempotency = new IdempotencyStore();
-  const mailer = overrides.mailer ?? (config.RESEND_API_KEY
+  const realMailer = overrides.mailer ?? (config.RESEND_API_KEY
     ? createResendMailer({ apiKey: config.RESEND_API_KEY, from: config.RESEND_FROM ?? 'Stacked Chat <onboarding@resend.dev>' })
     : undefined);
+  // People who sign in with a mobile number have no email: anything addressed to their placeholder is quietly skipped, never sent.
+  const mailer: Mailer | undefined = realMailer ? { send: (m) => (isPhoneKey(m.to) ? Promise.resolve('skipped' as const) : realMailer.send(m)) } : undefined;
+  // Text messages and sign-in by mobile number. Off unless the SMS provider and AUTH_SECRET are both set.
+  const sms: SmsSender | null = overrides.sms !== undefined ? overrides.sms
+    : (config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN && config.TWILIO_FROM ? createTwilioSender({ accountSid: config.TWILIO_ACCOUNT_SID, authToken: config.TWILIO_AUTH_TOKEN, from: config.TWILIO_FROM }) : null);
+  const phoneCodes = overrides.phoneCodeStore ?? (db ? createSupabasePhoneCodeStore(db) : null);
+  const phoneAuth: PhoneAuth | null = repo && sms && phoneCodes && config.AUTH_SECRET ? createPhoneAuth({ store: phoneCodes, repo, sms, secret: config.AUTH_SECRET, now: overrides.now }) : null;
+  const supabaseVerify = overrides.verifyToken ?? createSupabaseTokenVerifier({ url: config.SUPABASE_URL, anonKey: config.SUPABASE_KEY });
+  const verifyToken: TokenVerifier = async (token) => (phoneAuth && token.startsWith('st1.') ? phoneAuth.asVerifiedUser(token) : supabaseVerify(token));
   const deps: Deps = { config, db, repo, verifyToken };
 
   const app = Fastify({
@@ -269,7 +285,7 @@ export async function buildApp(
 
   await app.register(async (instance) => healthRoutes(instance, deps));
   await app.register(async (instance) => meRoutes(instance));
-  await app.register(async (instance) => orgRoutes(instance, { repo, idempotency, mailer, publicUrl: config.PUBLIC_URL, gate, onSiteAdded: (orgId) => { void billing?.syncQuietly(orgId); } }));
+  await app.register(async (instance) => orgRoutes(instance, { repo, idempotency, mailer, sms, publicUrl: config.PUBLIC_URL, gate, onSiteAdded: (orgId) => { void billing?.syncQuietly(orgId); } }));
   await app.register(async (instance) => teamRoutes(instance, { repo, gate }));
   await app.register(async (instance) => manageRoutes(instance, { config, devMode: overrides.devMode }));
   await app.register(async (instance) => apiKeyRoutes(instance, { repo, idempotency, gate }));
@@ -279,6 +295,7 @@ export async function buildApp(
   await app.register(async (instance) => sensitiveRoutes(instance, { settings: sensitiveSettings, gate }));
   await app.register(async (instance) => communicateRoutes(instance, { comms, gate }));
   await app.register(async (instance) => trainingRoutes(instance, { training, gate, knowledge, drafter: overrides.courseDrafter !== undefined ? overrides.courseDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicCourseDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
+  await app.register(async (instance) => phoneAuthRoutes(instance, { phoneAuth, now: overrides.now ? () => overrides.now!().getTime() : undefined }));
   await app.register(async (instance) => supportRoutes(instance, { support }));
   await app.register(async (instance) => operationsRoutes(instance, { ops, repo, gate, reminders: app.opsReminders, cronSecret: config.CRON_SECRET, knowledge, drafter: overrides.checklistDrafter !== undefined ? overrides.checklistDrafter : (config.ANTHROPIC_API_KEY ? createAnthropicChecklistDrafter({ apiKey: config.ANTHROPIC_API_KEY, model: config.CHAT_MODEL }) : null) }));
   await app.register(async (instance) => chatRoutes(instance, { chat, repo, ops, comms, training, branding: brandingStore, insights: insightsStore ?? null, techStack: techStackStore, help }));

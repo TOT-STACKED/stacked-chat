@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createModernHandler } from '../src/index.js';
 import {
   bannerFor, formatGbp, planName, usageRatio,
-  bestRole, canEditMember, canManage, filterMembers, grantableRoles, inviteResultText, parseEmails, rolesFor,
+  bestRole, canEditMember, canManage, filterMembers, grantableRoles, contactOf, formatPhone, inviteResultText, parseEmails, parsePeople, whoIs, rolesFor,
 } from '../web/manage/lib.js';
 import { testConfig } from './helpers.js';
 
@@ -209,5 +209,24 @@ describe('manage lib: what needs attention on Home', () => {
   });
   it('flags a payment problem as urgent', () => {
     expect(homeAttention({ billing: { account: { status: 'past_due' }, state: { mode: 'grace' } } }, now)[0]).toMatchObject({ tone: 'bad', title: 'Your payment is overdue' });
+  });
+});
+
+describe('people who sign in with a mobile number', () => {
+  it('reads a pasted list of names and numbers, and says which lines are not usable', () => {
+    const r = parsePeople('Amy Smith 07700 900123\nBen Jones, +44 7700 900456\nCat - 07700-900789\nNo Number Here\n07700 900999\nAmy Again 07700900123');
+    expect(r.valid).toEqual([{ name: 'Amy Smith', phone: '07700 900123' }, { name: 'Ben Jones', phone: '+44 7700 900456' }, { name: 'Cat', phone: '07700-900789' }]);
+    expect(r.invalid).toEqual(['No Number Here', '07700 900999']);
+  });
+  it('shows a number people can read instead of the placeholder address', () => {
+    expect(formatPhone('+447700900123')).toBe('07700 900123');
+    expect(contactOf({ phone: '+447700900123', email: '447700900123@phone.invalid' })).toBe('07700 900123');
+    expect(contactOf({ email: '447700900123@phone.invalid' })).toBe('07700 900123');
+    expect(contactOf({ email: 'amy@acme.com' })).toBe('amy@acme.com');
+    expect(whoIs('447700900123@phone.invalid')).toBe('07700 900123'); expect(whoIs('amy@acme.com')).toBe('amy');
+  });
+  it('says texted, not emailed, when everyone was added by number', () => {
+    expect(inviteResultText([{ ok: true, via: 'text', invite: 'sent' }, { ok: true, via: 'text', invite: 'sent' }])).toBe('2 invitations texted.');
+    expect(inviteResultText([{ ok: true, via: 'text', invite: 'skipped' }])).toContain('not texted');
   });
 });

@@ -1,12 +1,12 @@
 import { clear, h, modal, toast } from './dom.js';
-import { atLeast, bestRole, canManage, pastDue } from './lib.js';
+import { atLeast, bestRole, canManage, pastDue, whoIs } from './lib.js';
 import { pageHeader, tile } from './ui.js';
 
 const KIND_LABEL = { opening: 'Opening', closing: 'Closing', custom: 'Other' };
 const dayText = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 const timeText = (iso) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' });
 const DAYS = [[1, 'Mon'], [2, 'Tue'], [3, 'Wed'], [4, 'Thu'], [5, 'Fri'], [6, 'Sat'], [0, 'Sun']];
-const who = (email) => String(email || '').split('@')[0];
+const who = whoIs;
 
 /** Operations: checklists a manager writes, what each venue has ticked off today, and the last few days. */
 export async function renderOperations(main, ctx) {

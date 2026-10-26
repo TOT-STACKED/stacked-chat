@@ -4,7 +4,7 @@ export interface OrgRow { id: string; name: string; slug: string }
 export interface SiteRow { id: string; org_id: string; name: string; slug: string; created_at: string | null }
 export interface MemberRow {
   id: string; org_id: string; site_id: string | null; user_id: string | null; email: string;
-  display_name: string | null; role: Role; status: 'invited' | 'active' | 'disabled'; created_at: string;
+  display_name: string | null; phone?: string | null; role: Role; status: 'invited' | 'active' | 'disabled'; created_at: string;
 }
 export interface ApiKeyRow {
   id: string; org_id: string; site_id: string | null; name: string; scopes: string[]; key_prefix: string;
@@ -12,7 +12,7 @@ export interface ApiKeyRow {
   expires_at: string | null; revoked_at: string | null;
 }
 export interface TeamRow { id: string; org_id: string; site_id: string | null; name: string; created_at: string }
-export interface NewMember { org_id: string; site_id: string | null; email: string; display_name?: string | null; role: Role; status: 'invited' | 'active' }
+export interface NewMember { org_id: string; site_id: string | null; email: string; display_name?: string | null; phone?: string | null; role: Role; status: 'invited' | 'active' }
 export interface NewApiKey { org_id: string; site_id: string | null; name: string; scopes: string[]; key_prefix: string; key_hash: string; created_by: string | null; expires_at: string | null }
 
 /** Everything the identity/tenancy modules need from storage. Swappable (Supabase in prod, in-memory in tests). */
@@ -32,6 +32,8 @@ export interface Repo {
   countActiveOwners(orgId: string): Promise<number>;
   /** Does any organisation already have a member (in any state) with this email? Used so a sign-up cannot create a second company for the same address. */
   emailInUse(email: string): Promise<boolean>;
+  /** is there someone with this sign-in address (or phone key) who is invited or active, so may sign in? */
+  memberLoginable(email: string): Promise<boolean>;
   createOrg(o: { name: string; slug: string }): Promise<OrgRow>;
   createSite(s: { org_id: string; name: string; slug: string }): Promise<SiteRow>;
   listTeams(orgId: string): Promise<TeamRow[]>;

@@ -44,7 +44,32 @@ export function canEditMember(actorRole, member) {
   return actorRole === 'owner' || ROLE_RANK[member.role] < ROLE_RANK[actorRole];
 }
 
-export function displayName(m) { return (m.display_name && m.display_name.trim()) || m.email.split('@')[0]; }
+export function displayName(m) { return (m.display_name && m.display_name.trim()) || contactOf(m); }
+
+/** "447700900123" → "07700 900123" (other countries keep their "+" code). */
+export function formatPhone(e164) {
+  const m = /^\+44(\d{4})(\d{6})$/.exec(String(e164 || ''));
+  return m ? `0${m[1]} ${m[2]}` : String(e164 || '');
+}
+const PHONE_KEY = /^(\d{8,15})@phone\.invalid$/i;
+/** How to show how to reach someone: their mobile number if they sign in with one, otherwise their email. */
+export function contactOf(m) { return m.phone ? formatPhone(m.phone) : PHONE_KEY.test(m.email || '') ? formatPhone('+' + m.email.split('@')[0]) : m.email; }
+/** A person's sign-in address as a short, readable name for places that only have the address ("done by …"). */
+export function whoIs(email) { const e = String(email || ''); return PHONE_KEY.test(e) ? formatPhone('+' + e.split('@')[0]) : e.split('@')[0]; }
+
+/** "Amy Smith 07700 900123" or "Amy Smith, 07700 900123" per line, so a manager can paste a list. Names are needed to tell people apart. */
+export function parsePeople(text) {
+  const seen = new Set(); const valid = []; const invalid = [];
+  for (const raw of String(text || '').split(/\n|;/).map((x) => x.trim()).filter(Boolean)) {
+    const m = /(\+?\d[\d\s().-]{7,}\d)/.exec(raw);
+    const digits = m ? m[1].replace(/\D/g, '') : '';
+    const name = m ? raw.replace(m[1], ' ').replace(/[,:\-–]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
+    if (!m || digits.length < 10 || digits.length > 15 || !name) { invalid.push(raw); continue; }
+    if (seen.has(digits)) continue; seen.add(digits);
+    valid.push({ name, phone: m[1].trim() });
+  }
+  return { valid, invalid };
+}
 export function initials(name) {
   const parts = name.replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/).filter(Boolean);
   return ((parts[0]?.[0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase() || '?';
@@ -90,10 +115,11 @@ export function inviteResultText(results) {
   const sent = results.filter((r) => r.invite === 'sent').length;
   const saved = results.filter((r) => r.ok && r.invite !== 'sent').length;
   const failed = results.filter((r) => !r.ok);
+  const texted = results.length > 0 && results.every((r) => r.via === 'text');
   const parts = [];
-  if (sent) parts.push(`${sent} invitation${sent === 1 ? '' : 's'} emailed`);
-  if (saved) parts.push(`${saved} saved but not emailed, use Resend invite to try again`);
-  if (failed.length) parts.push(`${failed.length} could not be added (${failed.map((f) => f.email + ': ' + f.error).join('; ')})`);
+  if (sent) parts.push(`${sent} invitation${sent === 1 ? '' : 's'} ${texted ? 'texted' : 'emailed'}`);
+  if (saved) parts.push(`${saved} saved but not ${texted ? 'texted' : 'emailed'}, use Resend invite to try again`);
+  if (failed.length) parts.push(`${failed.length} could not be added (${failed.map((f) => (f.email || f.name) + ': ' + f.error).join('; ')})`);
   return parts.join('. ') + '.';
 }
 

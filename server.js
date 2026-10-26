@@ -23,6 +23,7 @@ async function initModern() {
     const h = createModernHandler({ config: {
       SUPABASE_URL, SUPABASE_KEY, SUPABASE_SERVICE_KEY: SUPABASE_SERVICE_KEY || undefined,
       RESEND_API_KEY: process.env.RESEND_API_KEY || undefined, RESEND_FROM: process.env.RESEND_FROM || undefined,
+      TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID || undefined, TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN || undefined, TWILIO_FROM: process.env.TWILIO_FROM || undefined, AUTH_SECRET: process.env.AUTH_SECRET || undefined,
       PUBLIC_URL: process.env.PUBLIC_URL || undefined,
       // Billing (Stripe, test mode). Billing stays off unless ALL the Stripe settings are present.
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || undefined, STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || undefined,

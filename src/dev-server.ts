@@ -7,6 +7,8 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './config.js';
 import { FakeMailer, FakeRepo } from './testing/fakes.js';
+import { FakePhoneCodeStore, FakeSms } from './testing/phone-fakes.js';
+import { phoneKey } from './lib/phone.js';
 import { FakeBillingStore, FakeStripe, testBillingConfig } from './testing/billing-fakes.js';
 import { FakeKnowledgeStore } from './testing/knowledge-fakes.js';
 import { FakeInsightsStore } from './testing/insights-fakes.js';
@@ -34,6 +36,8 @@ async function main() {
   const jordan = repo.addMember(org, 'jordan@example.com', 'staff', a, ids.staff); jordan.display_name = 'Jordan P.';
   const sam = repo.addMember(org, 'sam@example.com', 'staff', a, crypto.randomUUID()); sam.display_name = 'Sam R.';
   const casey = repo.addMember(org, 'casey@example.com', 'staff', a, null, 'invited'); casey.display_name = 'Casey T.';
+  repo.addMember(org, phoneKey('+447700900123'), 'staff', a, null, 'invited').display_name = 'Pat Phone';
+  repo.members.at(-1)!.phone = '+447700900123';
   repo.addMember(org, 'bea@example.com', 'site_manager', b, crypto.randomUUID()).display_name = 'Bea K.';
   repo.addMember(org, 'cal@example.com', 'staff', c, crypto.randomUUID()).display_name = 'Cal D.';
   await repo.setMemberTeams(mgr.id, [kitchen.id]); await repo.setMemberTeams(jordan.id, [foh.id]);
@@ -45,10 +49,12 @@ async function main() {
     'dev-mgr': { userId: ids.mgr, email: 'alex@example.com' }, 'dev-staff': { userId: ids.staff, email: 'jordan@example.com' },
   };
   const mailer = new FakeMailer();
+  // Texts go nowhere in the preview: the latest one is at /__dev/last-sms so sign-in by mobile number can be tried (try 07700 900123).
+  const sms = new FakeSms();
   // Sample billing: the group starts with no plan (try "Start free trial"). BILLING_DEMO=trial|lapsed pre-sets a state.
   const bc = testBillingConfig();
   const env: Record<string, string> = { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_KEY: 'dev-anon-key', LOG_LEVEL: 'warn',
-    STRIPE_SECRET_KEY: 'sk_test_dev', STRIPE_WEBHOOK_SECRET: 'whsec_dev', STACKED_STAFF_EMAILS: 'owner@example.com' };
+    STRIPE_SECRET_KEY: 'sk_test_dev', STRIPE_WEBHOOK_SECRET: 'whsec_dev', STACKED_STAFF_EMAILS: 'owner@example.com', AUTH_SECRET: 'dev-only-secret-dev-only-secret-0123456789' };
   for (const [k, v] of Object.entries(bc.prices)) { env[`STRIPE_PRICE_${k.toUpperCase()}_MONTHLY`] = v.month; env[`STRIPE_PRICE_${k.toUpperCase()}_ANNUAL`] = v.year; }
   const config = loadConfig(env);
   const store = new FakeBillingStore(); const stripe = new FakeStripe(bc);
@@ -131,12 +137,13 @@ async function main() {
   await store.saveAccount(OB, { stripe_customer_id: 'cus_b', stripe_subscription_id: 'sub_b', status: 'active', interval: 'month', has_payment_method: true });
   await store.saveAccount(OH, { stripe_customer_id: 'cus_h', stripe_subscription_id: 'sub_h', status: 'trialing', interval: 'year', has_payment_method: false, trial_ends_at: new Date(Date.now() + 3 * day).toISOString() });
   const drafter = { draft: async (q: string) => `Staff are paid for training days at [CONFIRM: rate]. Training is rostered like a normal shift. (Draft for: ${q})` };
-  const app = await buildApp(config, { repo, mailer, stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), sensitiveStore: new FakeSensitiveStore(), opsStore, commsStore, trainingStore,
+  const app = await buildApp(config, { repo, mailer, sms, phoneCodeStore: new FakePhoneCodeStore(), stripe, billingStore: store, knowledgeStore: kstore, insightsStore: istore, brandingStore: new FakeBrandingStore(() => repo.sites), sensitiveStore: new FakeSensitiveStore(), opsStore, commsStore, trainingStore,
     checklistDrafter: { async draft({ kind, venue }) { await new Promise((r) => setTimeout(r, 900)); const open = kind !== 'closing'; return { title: `${open ? 'Opening' : 'Closing'} checklist`, items: open ? ['Disarm the alarm and unlock the front door', 'Switch on the lights, ovens and extraction', 'Check and record the fridge and freezer temperatures', 'Count the float and set up the tills', 'Wipe down and set the tables', 'Check the toilets are clean and stocked', `Brief the team on today\u2019s specials and allergens${venue ? ` at ${venue}` : ''}`] : ['Cash up and put the takings in the safe', 'Switch off the ovens, fryers and grill', 'Clean down all surfaces and the floor', 'Record the fridge and freezer temperatures', 'Take the bins out and lock the back door', 'Switch off the lights and set the alarm [ADD: alarm procedure]'] }; } },
     courseDrafter: { async draft({ title }) { await new Promise((r) => setTimeout(r, 1200)); return { title: `${title.replace(/ and procedure$/i, '')} course`, description: 'The 14 allergens and what to do when a guest asks.', lessons: [{ title: 'The 14 allergens', body: 'Celery, gluten, crustaceans, eggs, fish, lupin, milk, molluscs, mustard, nuts, peanuts, sesame, soya and sulphites.' }, { title: 'When a guest asks', body: 'Tell them to speak to a manager. Never guess. Check the allergen matrix behind the pass.' }, { title: 'If there is a reaction', body: 'Call a manager at once, and 999 if they struggle to breathe.' }], quiz: [{ q: 'A guest asks about allergens. What do you do?', options: ['Guess', 'Tell them to speak to a manager', 'Say it is fine'], answer: 1 }, { q: 'Where is the allergen matrix?', options: ['Behind the pass', 'In the office', 'Online only'], answer: 0 }] }; } }, conversationStore: new FakeConversationStore(), consoleStore: cstore, chatModel: previewChatModel, mirrorNps: null,
     npsStore: { save: async (r) => { console.log('[preview] rating saved', JSON.stringify(r)); } },
     techStackStore: (() => { const stacks = new Map<string, Record<string, string>>([[a.id, { epos: 'Lightspeed', payments: 'Dojo' }]]); return { get: async (id: string) => stacks.get(id) ?? {}, list: async () => repo.sites.map((x) => ({ id: x.id, name: x.name, stack: stacks.get(x.id) ?? {} })), set: async (id: string, st: Record<string, string>) => { stacks.set(id, st); return st; } }; })(), drafter, devMode: true, verifyToken: async (t) => users[t] ?? null });
   const port = Number(process.env.PORT ?? 4300);
+  app.get('/__dev/last-sms', { schema: { hide: true } }, async () => sms.sent.at(-1) ?? null);
   await app.listen({ port, host: '127.0.0.1' });
   console.log(`Manage preview: http://127.0.0.1:${port}/manage/  (sample data, dev sign-in)`);
 }
